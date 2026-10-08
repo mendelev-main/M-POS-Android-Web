@@ -45,7 +45,7 @@ object MPosShiftReceiptImage {
                 val row = block.row
                 style(row)
                 if (row.kind == MPosShiftReceipt.Kind.SEPARATOR) {
-                    paint.color = Color.DKGRAY
+                    paint.color = Color.rgb(64,64,64)
                     paint.textSize = 16f
                     canvas.drawText("-".repeat(66), SIDE, top - paint.fontMetrics.top, paint)
                     paint.color = Color.BLACK
