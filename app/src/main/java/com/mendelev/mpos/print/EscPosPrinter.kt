@@ -43,7 +43,7 @@ class EscPosPrinter(private val onEvent: (JSONObject) -> Unit) {
 
     private fun event(type: String, status: String, message: String) = onEvent(JSONObject().put("type", type).put("status", status).put("message", message))
     private fun validIpv4(value: String) = value.split('.').let { parts -> parts.size == 4 && parts.all { part -> part.toIntOrNull()?.let { it in 0..255 } == true } }
-    private fun testPage() = byteArrayOf(0x1b, 0x40) + "\nM POS\nTEST PRINT\nLAN TCP 9100 OK\n\n\n".toByteArray() + byteArrayOf(0x1d, 0x56, 0x42, 0)
+    private fun testPage() = byteArrayOf(0x1b, 0x40) + "\nPRILAVOK POS\nTEST PRINT\nLAN TCP 9100 OK\n\n\n".toByteArray() + byteArrayOf(0x1d, 0x56, 0x42, 0)
 }
 
 internal object EscPosRaster {
