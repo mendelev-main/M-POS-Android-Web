@@ -72,7 +72,8 @@ class MainActivity : AppCompatActivity() {
         backup = BackupManager(this, imageStore)
         printer = EscPosPrinter(::printerEvent)
         shares = ReportShareManager(this)
-        telegram = TelegramClient(shares::createWarehousePdf, ::telegramResult, ::telegramMonthlyResult, ::telegramResult)
+        telegram = TelegramClient(shares::createWarehousePdf, ::telegramResult, ::telegramMonthlyResult, ::telegramResult,
+            onTestResult = { result -> callJavaScript("window.__mposTelegramTestResult&&window.__mposTelegramTestResult($result);") })
         network = com.mendelev.mpos.network.MPosWebNetwork(lifecycleScope) { result -> callJavaScript("window.__mposWebNetworkResult&&window.__mposWebNetworkResult($result);") }
         router = NativeBridgeRouter(this, photos, backup)
 

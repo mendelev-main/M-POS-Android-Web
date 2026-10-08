@@ -1752,3 +1752,68 @@ test('paid cart projection is not deducted a second time and parked baskets are 
  assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
  f.state.parked=[{items:[{productId:'flour',qty:3}]}];assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
 });
+
+// Android integration regressions: actual upstream storage/outbox, synthetic network only.
+function integrationFixture(){
+ const f=fixture(),timers=new Map(),statuses=[],requests=[];let timerId=0;
+ f.state.loaded=true;f.state.network={backendUrl:'https://backend.test',deviceKey:'fixture-device'};
+ f.c.URL=URL;f.c.currentShiftEmployeeIsAdmin=()=>true;
+ f.c.setNetworkStatus=(id,message,kind)=>statuses.push({id,message,kind});
+ f.c.setTimeout=(fn,ms)=>{const id=++timerId;timers.set(id,{fn,ms});return id};f.c.clearTimeout=id=>timers.delete(id);
+ f.c.fetch=async(url,options)=>{requests.push({url,options});return{ok:true,status:200,json:async()=>({ok:true,applied:true,ignoredAsStale:false})}};
+ vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-integrations.js'),'utf8'),f.c);
+ return Object.assign(f,{timers,statuses,requests});
+}
+test('Android backend check validates the device key and displays rejection safely',async()=>{
+ const f=integrationFixture();let restarted=0;f.c.startWebOrderEvents=()=>restarted++;f.c.operationalReconnect=()=>{};
+ f.c.fetch=async(url)=>({ok:!url.endsWith('/state'),status:url.endsWith('/state')?401:200,json:async()=>({ok:true})});
+ assert.equal(await f.c.testBackendConnection(),false);assert.equal(restarted,0);assert.match(f.messages.at(-1),/ключ устройства/);
+ assert.ok(f.statuses.some(x=>x.kind==='error'));assert.doesNotMatch(f.messages.join(' '),/fixture-device/);
+ f.c.fetch=async()=>({ok:true,status:200,json:async()=>({ok:true})});
+ assert.equal(await f.c.testBackendConnection(),true);assert.equal(restarted,1);assert.equal(f.timers.size,0);
+});
+test('Android order-channel check opens real SSE without creating orders or replacing live stream',async()=>{
+ const f=integrationFixture(),sources=[],live={close(){throw Error('live stream must remain open')}};
+ f.state.webEventsSource=live;const before=plain(f.state.webEvents);
+ f.c.EventSource=class{constructor(url){this.url=url;sources.push(this)}close(){this.closed=true}};
+ const pending=f.c.testWebOrder();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(sources.length,1);assert.equal(sources[0].url,'https://backend.test/api/orders/events?deviceKey=fixture-device');
+ sources[0].onopen();assert.equal(await pending,true);assert.equal(sources[0].closed,true);assert.equal(f.state.webEventsSource,live);
+ assert.deepEqual(plain(f.state.webEvents),before);assert.equal(f.requests.length,1);assert.equal(f.requests[0].url,'https://backend.test/api/operational/state');assert.equal(f.requests[0].options.method,undefined);assert.equal(f.timers.size,0);
+});
+test('Android Telegram test uses saved settings outside modal and correlates native callback',async()=>{
+ const f=integrationFixture(),sent=[];f.state.telegram={botToken:'fixture-token',chatId:'-123',threadId:'7'};
+ f.c.webkit={messageHandlers:{telegram:{postMessage:payload=>sent.push(plain(payload))}}};
+ const pending=f.c.testTelegramConnection();assert.equal(f.c.testTelegramConnection(),pending);
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(sent.length,1);assert.equal(sent[0].botToken,'fixture-token');assert.equal(sent[0].threadId,'7');
+ f.c.__mposTelegramTestResult({requestId:'wrong',ok:true});assert.equal(f.timers.size,1);
+ f.c.__mposTelegramTestResult({requestId:sent[0].requestId,ok:true,message:'Telegram подключён'});
+ assert.equal(await pending,true);assert.equal(f.timers.size,0);assert.doesNotMatch(f.messages.join(' '),/fixture-token/);
+});
+test('Android Telegram empty draft is validated and timeout ignores late native response',async()=>{
+ const f=integrationFixture(),sent=[];f.state.telegram={botToken:'fixture-token',chatId:'-123'};
+ f.c.webkit={messageHandlers:{telegram:{postMessage:payload=>sent.push(plain(payload))}}};
+ f.fields['telegram-token']={value:''};assert.equal(await f.c.testTelegramConnection(),false);assert.equal(sent.length,0);
+ delete f.fields['telegram-token'];const pending=f.c.testTelegramConnection();await new Promise(resolve=>setImmediate(resolve));
+ const timeout=[...f.timers.values()].find(x=>x.ms===35000);assert.ok(timeout);timeout.fn();assert.equal(await pending,false);assert.match(f.messages.at(-1),/не ответил вовремя/);
+ const count=f.messages.length;f.c.__mposTelegramTestResult({requestId:sent[0].requestId,ok:true});assert.equal(f.messages.length,count);
+});
+test('Android demand upgrades revision and requires an applied acknowledgement',async()=>{
+ const f=integrationFixture();f.state.operationalRevision=42;f.state.demandOverload=true;
+ const item=f.c.queueOperationalSnapshot(1700000000000);assert.equal(item.payload.revision,1700000000000);
+ f.fields['network-backend-url']={value:'https://unsaved.test'};
+ f.c.fetch=async(url,options)=>{f.requests.push({url,options});assert.ok(f.data.has('prilavok_operationalOutbox'));return{ok:true,status:200,json:async()=>({ok:true,applied:false,ignoredAsStale:true})}};
+ assert.equal(await f.c.flushOperationalOutbox(),false);assert.equal(f.state.operationalOutbox.length,1);assert.equal(f.state.operationalOutbox[0].attempts,1);
+ assert.equal(f.requests[0].url,'https://backend.test/api/operational/snapshot');assert.match(f.messages.at(-1),/устаревшая ревизия/);assert.ok([...f.timers.values()].some(x=>x.ms>=1000&&x.ms<=60000));
+ f.state.operationalOutbox[0].nextAttemptAt=0;f.c.fetch=async()=>({ok:true,status:200,json:async()=>({ok:true,applied:true,ignoredAsStale:false})});
+ assert.equal(await f.c.flushOperationalOutbox(),true);assert.equal(f.state.operationalOutbox.length,0);assert.equal(f.timers.size,0);assert.match(f.messages.at(-1),/передано на сайт/);
+});
+test('Android persisted old demand outbox is upgraded before sending without changing demand',async()=>{
+ const f=integrationFixture();const item={id:'old',type:'snapshot',payload:{schemaVersion:1,revision:4,demand:{overload:false}},attempts:0,nextAttemptAt:0};f.state.operationalOutbox=[item];
+ assert.equal(await f.c.sendOperationalItem(item),true);const payload=JSON.parse(f.requests[0].options.body);
+ assert.ok(payload.revision>=1000000000000);assert.equal(payload.demand.overload,false);assert.equal(JSON.parse(f.data.get('prilavok_operationalOutbox'))[0].payload.revision,payload.revision);
+});
+test('Android empty or background demand flush does not report a sync or start polling',async()=>{
+ const f=integrationFixture();await f.c.flushOperationalOutbox();assert.equal(f.statuses.length,0);assert.equal(f.timers.size,0);
+ f.c.queueOperationalSnapshot();f.c.document.hidden=true;assert.equal(await f.c.flushOperationalOutbox(),false);assert.equal(f.requests.length,0);assert.equal(f.timers.size,0);
+});

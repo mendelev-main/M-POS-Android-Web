@@ -43,7 +43,7 @@ android_html = source_html.replace(
 )
 android_html = android_html.replace(
     "<script>loadAll();</script>",
-    '<script src="android-pos-stock.js"></script>\n<script>loadAll();</script>',
+    '<script src="android-integrations.js"></script>\n<script src="android-pos-stock.js"></script>\n<script>loadAll();</script>',
 )
 (target / "pos.html").write_text(android_html)
 (target / "android-bridge.js").write_bytes(bridge)

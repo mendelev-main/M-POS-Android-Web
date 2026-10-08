@@ -42,3 +42,7 @@ Android compile/test/lint выполняется даже после JS failure,
 ## Полный CI подтверждён — 08.10.2026
 
 Запуск https://github.com/mendelev-main/M-POS-Android-Web/actions/runs/37825404083 для runtime commit e5d23c2cd78533eed3ee234b79333f9539f776d5 завершён успешно: 349/349 JS tests; Android compile, JVM multipart tests и lint; independent signing certificate/private-key preflight; release build; APK identity/version/certificate verification; upload artifact M-POS-Android-Web-1.0.5-1 (11570574903). Реальная установка и физические tablet/printer/backend/Telegram cases остаются pending. Все эти проверки выполнены GitHub Actions; локальных tests/build не было.
+
+## Диагностика интеграций и загрузка — 08.10.2026
+
+Android adapter исправляет отсутствие видимого результата test buttons, несуществующий /api/orders/test, Telegram config/callback и потерю operational snapshots при HTTP 200 с ignoredAsStale. Добавлены epoch-based revision, upgrade старого outbox и foreground retry с сохранением перед отправкой. Полный разбор, источники, 4/4 реализации (100%) и обязательные физические проверки: [INTEGRATIONS_ANDROID_RU.md](INTEGRATIONS_ANDROID_RU.md). Actions и планшетная приёмка pending; local suites/build не запускались.
