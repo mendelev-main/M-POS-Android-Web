@@ -616,8 +616,16 @@ test('loyalty job is durable, and overlapping programs cannot reuse one item',as
  assert.equal(f.c.loyaltyRewardDiscount(),10);assert.equal(f.c.cartTotal(),0);
  await f.c.finalizePayment([{method:'cash',amount:0}]);assert.equal(f.state.orders.length,0);assert.match(f.messages.at(-1),/Недостаточно/);
  f.state.loyaltyRedemptions={a:1};
- let release;f.c.loyaltyApi=()=>new Promise(resolve=>{release=resolve});await f.c.finalizePayment([{method:'cash',amount:0}]);
- const stored=JSON.parse(f.data.get('prilavok_orders'))[0];assert.equal(stored.loyaltySync.status,'pending');
+ const persisted=[];const originalWrite=f.c.localStorage.setItem;
+ f.c.localStorage.setItem=(key,value)=>{originalWrite(key,value);if(key==='prilavok_orders')persisted.push(JSON.parse(value));};
+ let release;f.c.loyaltyApi=()=>{
+   assert.equal(persisted.find(rows=>rows.length===1)[0].loyaltySync.status,'pending');
+   assert.equal(JSON.parse(f.data.get('prilavok_orders'))[0].loyaltySync.status,'sending');
+   return new Promise(resolve=>{release=resolve});
+ };
+ await f.c.finalizePayment([{method:'cash',amount:0}]);
+ const stored=persisted.find(rows=>rows.length===1)[0];assert.equal(stored.loyaltySync.status,'pending');
+ assert.equal(typeof release,'function');
  assert.deepEqual(stored.loyaltyRewardAllocations,{a:[{productId:'pizza',quantity:1}]});
  assert.equal(stored.loyaltyDiscount,10);assert.equal(stored.loyaltyProgramsApplied[0].name,'Программа a');assert.equal(stored.loyaltyProgramsApplied[0].discount,10);
  release({events:[]});
