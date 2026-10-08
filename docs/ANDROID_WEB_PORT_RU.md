@@ -28,3 +28,5 @@ M-POS-Android продолжает нативную миграцию. M-POS-Andr
 ## CI correction — 08.10.2026
 
 Первый запуск 37822568602: 61 JS проверка прошла, один suite не загрузился из-за ссылок source-product-stock на Swift host/SceneDelegate. Android compilation/lint и signed APK были skipped; проверка secrets ещё не выполнялась. Две платформенные проверки адаптированы к Android Activity lifecycle и backup router/file pickers/image pruning; остальные исходные бизнес-проверки сохранены. Локальные tests/build не запускались, новый результат подтверждает Actions. Пользователь сообщил, что новые signing secrets добавлены.
+
+Второй запуск 37823792263 выявил отсутствие queueMicrotask в synthetic VM suite, что вызывало общую ошибку загрузки feature-модулей. Fixture теперь изолирует автоматические startup microtasks, как уже изолирует loadAll; бизнес recovery вызывается тестами явно. Устаревшая проверка отсутствия foreground availability заменена проверкой текущего source behavior: только persisted availability snapshot, без menu sync. Runtime исходника не изменён; локальные tests/build не запускались.

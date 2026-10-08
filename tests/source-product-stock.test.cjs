@@ -45,7 +45,8 @@ const near=(actual,expected)=>assert.ok(Math.abs(actual-expected)<1e-10,`${actua
 function fixture(){
  const data=new Map(),messages=[],writes=[],fields={'pf-prep-station':{value:'kitchen'},'pf-prep-difficulty':{value:'1'},'pf-base-prep-minutes':{value:'5'}},events=[];
  const document={getElementById:id=>fields[id]||null,querySelector:()=>null,addEventListener:()=>{}};
- const c={console:{error:()=>{}},document,crypto:{randomUUID:()=> 'device-test'},setTimeout:()=>0,clearTimeout:()=>{},addEventListener:()=>{},removeEventListener:()=>{},AbortController,localStorage:{getItem:k=>data.has(k)?data.get(k):null,setItem:(k,v)=>{data.set(k,String(v));writes.push(k);},removeItem:k=>data.delete(k)},fetch:()=>{throw Error('Network is prohibited in this test');},setInterval:()=>{throw Error('Timer is prohibited in this test');}};
+ // Isolate automatic startup recovery; tests call recovery entry points explicitly.
+ const c={queueMicrotask:()=>{},console:{error:()=>{}},document,crypto:{randomUUID:()=> 'device-test'},setTimeout:()=>0,clearTimeout:()=>{},addEventListener:()=>{},removeEventListener:()=>{},AbortController,localStorage:{getItem:k=>data.has(k)?data.get(k):null,setItem:(k,v)=>{data.set(k,String(v));writes.push(k);},removeItem:k=>data.delete(k)},fetch:()=>{throw Error('Network is prohibited in this test');},setInterval:()=>{throw Error('Timer is prohibited in this test');}};
  c.window=c;vm.createContext(c);vm.runInContext(adapter,c);vm.runInContext(inline.replace(/loadAll\(\);\s*$/,''),c);vm.runInContext(shiftsScript,c);vm.runInContext(employeesScript,c);vm.runInContext(loyaltyScript,c);vm.runInContext(productConfigurationScript,c);vm.runInContext(productPhotoScript,c);vm.runInContext(productPersistenceScript,c);vm.runInContext(productEditorScript,c);vm.runInContext(availabilityScript,c);vm.runInContext(suppliersScript,c);vm.runInContext(purchaseOrdersScript,c);vm.runInContext(receivingUiScript,c);vm.runInContext(receivingDraftsScript,c);vm.runInContext(receivingScript,c);vm.runInContext(webOrdersScript,c);vm.runInContext(inventoryScript,c);vm.runInContext(warehouseReportingScript,c);vm.runInContext(analyticsScript,c);vm.runInContext(productCatalogScript,c);vm.runInContext(productCategoriesScript,c);vm.runInContext(posNavigationScript,c);vm.runInContext(cartPresentationScript,c);vm.runInContext(cartCompositionScript,c);vm.runInContext(parkedOrdersScript,c);vm.runInContext(paymentScript,c);vm.runInContext(receiptsScript,c);vm.runInContext(hallBookingsScript,c);vm.runInContext(backupScript,c);
  c.flash=m=>messages.push(m);c.render=()=>{};c.showReceipt=()=>{};c.showPaymentReceipt=()=>{};c.closeModal=()=>{};c.applyTheme=()=>{};
  const state=vm.runInContext('state',c);
@@ -1527,10 +1528,14 @@ test('availability distinguishes untracked, zero and broken recipes',()=>{
  const f=fixture();f.state.products.push({id:'untracked',type:'simple',noStockTracking:true},{id:'broken',type:'composite',components:[{productId:'missing',qty:1}]});f.c.getProduct('flour').stock=-1;
  const items=f.c.buildAvailabilityItems(f.state.products);assert.equal(items.find(i=>i.externalId==='untracked').quantity,null);assert.equal(items.find(i=>i.externalId==='flour').quantity,0);assert.equal(items.find(i=>i.externalId==='broken').quantity,0);
 });
-test('availability has no launch, foreground, visibility or network trigger',async()=>{
- const f=fixture();f.state.loaded=true;await f.c.saveKey('products',f.state.products);await f.c.saveKey('network',{backendUrl:'https://test',deviceKey:'test'});let calls=0;f.c.fetch=async()=>{calls++;return {ok:true}};
- f.c.onAvailabilityAppState(false);f.c.onAvailabilityAppState(true);assert.equal(calls,0);
- assert.doesNotMatch(inline,/startAvailabilitySchedule|AVAILABILITY_INTERVAL/);assert.doesNotMatch(availabilityScript,/addEventListener\s*\(\s*['"](?:online|visibilitychange)/);
+test('reviewed availability refreshes after foreground using persisted stock without catalogue sync',async()=>{
+ const f=fixture();f.state.loaded=true;await f.c.saveKey('products',f.state.products);await f.c.saveKey('network',{backendUrl:'https://test',deviceKey:'test'});
+ const urls=[];f.c.fetch=async url=>{urls.push(url);return {ok:true}};
+ f.c.onAvailabilityAppState(false);assert.equal(urls.length,0);
+ f.c.onAvailabilityAppState(true);await f.c.publishAvailability();
+ assert.ok(urls.length>0);assert.ok(urls.every(url=>url==='https://test/api/availability/snapshot'));
+ assert.match(availabilityScript,/addEventListener\('online'/);assert.match(availabilityScript,/addEventListener\('visibilitychange'/);
+ assert.doesNotMatch(inline,/startAvailabilitySchedule|AVAILABILITY_INTERVAL/);
 });
 test('availability coalesces an overlapping mutation and sends the newest persisted stock',async()=>{
  const f=fixture();f.state.loaded=true;await f.c.saveKey('products',f.state.products);await f.c.saveKey('network',{backendUrl:'https://test',deviceKey:'test'});
