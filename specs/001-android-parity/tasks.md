@@ -6,8 +6,8 @@
 - [x] Add Android HTTPS fetch and SSE with abort/close/reconnect.
 - [x] Separate application identity and CI test/build jobs with permanent signing/version rules.
 - [x] Write source parity, source business and transport tests/documentation.
-- [ ] Set Actions signing secrets in the new repository.
-- [ ] Verify CI tests/lint and signed APK.
+- [x] Set Actions signing secrets in the new repository.
+- [x] Verify CI tests/lint and signed APK (run 37825404083, APK 1.0.5-1).
 - [ ] Accept physical tablet/printer/backend/Telegram/backup/update cases.
 
-Implementation 6/6; release acceptance 0/3 pending. This is not native migration progress or acceptance of hardware behavior.
+Implementation 6/6; release acceptance 2/3; physical acceptance pending. This is not native migration progress or acceptance of hardware behavior.
