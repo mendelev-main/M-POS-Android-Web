@@ -38,7 +38,7 @@ class LocalContentWebViewClient(
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val uri = request.url
-        if (uri.host == MainActivity.APP_HOST) return false
+        if (uri.scheme == "https" && uri.host == MainActivity.APP_HOST) return false
         runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
         return true
     }

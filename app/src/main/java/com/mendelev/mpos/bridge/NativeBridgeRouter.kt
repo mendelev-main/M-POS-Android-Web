@@ -15,6 +15,7 @@ class NativeBridgeRouter(
             val envelope = JSONObject(raw)
             val payload = envelope.optJSONObject("payload") ?: JSONObject()
             when (envelope.optString("channel")) {
+                "startup" -> if (payload.optString("action") == "ready") activity.finishStartup()
                 "photoPicker" -> photos.handle(payload)
                 "backup" -> backup.handle(payload)
                 "printer" -> activity.handlePrinter(payload)

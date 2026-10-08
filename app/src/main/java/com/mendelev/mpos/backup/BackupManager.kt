@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Base64
 import com.mendelev.mpos.MainActivity
 import com.mendelev.mpos.media.ProductImageStore
+import com.mendelev.mpos.safety.BoundedInput
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -36,9 +37,7 @@ class BackupManager(
         val staged = mutableListOf<String>()
         runCatching {
             val raw = activity.contentResolver.openInputStream(uri)!!.use { input ->
-                val bytes = input.readBytes()
-                require(bytes.size <= 500_000_000) { "Файл резервной копии больше 500 МБ" }
-                bytes
+                BoundedInput.read(input, BoundedInput.MAX_BACKUP_BYTES, "Файл резервной копии больше 32 МБ; восстановление не начато")
             }
             val document = JSONObject(raw.toString(Charsets.UTF_8))
             val products = document.optJSONArray("products") ?: error("Некорректный файл резервной копии")
@@ -53,7 +52,9 @@ class BackupManager(
                     continue
                 }
                 val image = Base64.decode(encoded.getString(oldId), Base64.DEFAULT)
-                require(image.size <= 2_000_000 && BitmapFactory.decodeByteArray(image, 0, image.size) != null) {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(image, 0, image.size, bounds)
+                require(image.size <= 2_000_000 && bounds.outWidth > 0 && bounds.outHeight > 0 && bounds.outWidth.toLong() * bounds.outHeight <= 16_000_000) {
                     "Повреждена фотография товара в резервной копии"
                 }
                 val fresh = images.save(image)
@@ -79,18 +80,24 @@ class BackupManager(
             val document = JSONObject(payload.getJSONObject("data").toString())
             val productImages = JSONObject()
             val products = document.optJSONArray("products") ?: JSONArray()
+            var photoBytes = 0L
             for (index in 0 until products.length()) {
                 val id = products.optJSONObject(index)?.optString("localImageId").orEmpty()
                 if (id.isNotBlank() && !productImages.has(id)) {
-                    images.read(id)?.let { productImages.put(id, Base64.encodeToString(it, Base64.NO_WRAP)) }
+                    val bytes = images.read(id) ?: error("Локальная фотография отсутствует; неполная копия не создана")
+                    photoBytes += bytes.size
+                    require(photoBytes <= 20 * 1024 * 1024) { "Фотографии превышают безопасный размер копии; файл не создан" }
+                    productImages.put(id, Base64.encodeToString(bytes, Base64.NO_WRAP))
                 }
             }
             document.put("productImages", productImages)
             document.put("imageCount", productImages.length())
-            pendingExport = document.toString(2).toByteArray(Charsets.UTF_8)
+            val bytes = document.toString(2).toByteArray(Charsets.UTF_8)
+            require(bytes.size <= BoundedInput.MAX_BACKUP_BYTES) { "Резервная копия больше 32 МБ; файл не создан" }
+            pendingExport = bytes
             pendingExportName = payload.optString("fileName", pendingExportName).replace('/', '-')
             activity.createBackupFile(pendingExportName)
-        }.onFailure { result(false, "Не удалось подготовить резервную копию") }
+        }.onFailure { pendingExport = null; result(false, if (it is IllegalArgumentException || it is IllegalStateException) it.message ?: "Не удалось подготовить резервную копию" else "Не удалось подготовить резервную копию") }
     }
 
     private fun result(ok: Boolean, message: String) {

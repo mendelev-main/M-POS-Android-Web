@@ -26,6 +26,7 @@
         </provider>
         <activity
             android:name=".MainActivity"
+            android:theme="@style/Theme.MPOS.Starting"
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="true"
             android:launchMode="singleTask"

@@ -44,12 +44,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var printer: EscPosPrinter
     private lateinit var shares: ReportShareManager
     private lateinit var network: com.mendelev.mpos.network.MPosWebNetwork
+    private lateinit var startupView: android.widget.TextView
+    private val startupTimeout = Runnable { showStartupFailure() }
     private lateinit var telegram: TelegramClient
 
     private val photoPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri ?: return@registerForActivityResult
         lifecycleScope.launch(Dispatchers.IO) {
-            runCatching { contentResolver.openInputStream(uri)!!.use { it.readBytes() } }
+            runCatching { contentResolver.openInputStream(uri)!!.use { com.mendelev.mpos.safety.BoundedInput.read(it, com.mendelev.mpos.safety.BoundedInput.MAX_PHOTO_BYTES, "Фотография больше 32 МБ") } }
                 .onSuccess(photos::accept)
                 .onFailure { nativeMessage("Не удалось открыть фотографию") }
         }
@@ -104,7 +106,22 @@ class MainActivity : AppCompatActivity() {
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
         webView.webViewClient = LocalContentWebViewClient(this, loader, imageStore)
-        setContentView(webView)
+        val root = android.widget.FrameLayout(this)
+        root.setBackgroundColor(android.graphics.Color.rgb(17, 17, 17))
+        root.addView(webView)
+        startupView = android.widget.TextView(this).apply {
+            text = "M POS"
+            textSize = 34f
+            setTextColor(android.graphics.Color.WHITE)
+            setBackgroundColor(android.graphics.Color.rgb(17, 17, 17))
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            gravity = android.view.Gravity.CENTER
+            layoutParams = android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            isClickable = true
+        }
+        root.addView(startupView)
+        setContentView(root)
+        startupView.postDelayed(startupTimeout, 30_000)
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             WebViewCompat.addWebMessageListener(webView, "MPosNative", setOf(APP_ORIGIN)) { _, message, sourceOrigin, isMainFrame, _ ->
@@ -137,6 +154,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        if (::startupView.isInitialized) startupView.removeCallbacks(startupTimeout)
         if (::network.isInitialized) network.close()
         if (::telegram.isInitialized) telegram.close()
         if (::webView.isInitialized) {
@@ -146,6 +164,28 @@ class MainActivity : AppCompatActivity() {
             webView.destroy()
         }
         super.onDestroy()
+    }
+
+    fun finishStartup() = runOnUiThread {
+        if (::startupView.isInitialized) {
+            startupView.removeCallbacks(startupTimeout)
+            startupView.visibility = android.view.View.GONE
+        }
+    }
+
+    fun showStartupFailure() = runOnUiThread {
+        if (::startupView.isInitialized && startupView.visibility == android.view.View.VISIBLE) {
+            startupView.text = "M POS\n\nЗапуск не завершён\nНажмите, чтобы повторить"
+            startupView.textSize = 24f
+            startupView.setOnClickListener {
+                startupView.text = "M POS"
+                startupView.textSize = 34f
+                startupView.setOnClickListener(null)
+                startupView.removeCallbacks(startupTimeout)
+                startupView.postDelayed(startupTimeout, 30_000)
+                webView.reload()
+            }
+        }
     }
 
     fun pickProductPhoto() = runOnUiThread {

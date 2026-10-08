@@ -7,6 +7,7 @@
   const handler=channel=>Object.freeze({postMessage:payload=>send(channel,payload)});
   global.webkit=global.webkit||{};
   global.webkit.messageHandlers=Object.freeze({
+    startup:handler('startup'),
     printer:handler('printer'),
     telegram:handler('telegram'),
     photoPicker:handler('photoPicker'),

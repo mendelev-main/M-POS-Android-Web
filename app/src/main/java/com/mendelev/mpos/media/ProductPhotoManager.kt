@@ -37,7 +37,13 @@ class ProductPhotoManager(
     }
 
     private fun prepare(source: ByteArray): ByteArray? {
-        val original = BitmapFactory.decodeByteArray(source, 0, source.size) ?: return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(source, 0, source.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (max(bounds.outWidth, bounds.outHeight) / sample > 2048) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        val original = BitmapFactory.decodeByteArray(source, 0, source.size, options) ?: return null
         var maxDimension = 1200
         repeat(8) {
             val longest = max(original.width, original.height)

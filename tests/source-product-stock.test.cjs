@@ -1746,12 +1746,12 @@ test('folder stock projection matches workspace and always restores warehouse av
  assert.strictEqual(f.c.availableStock,warehouse);assert.equal(f.c.availableStock(f.c.getProduct('a')),10);
  f.c.renderCartPanel=()=>{throw Error('render failed')};f.state.posPath='';assert.throws(()=>f.c.renderPosScreen(null),/render failed/);assert.strictEqual(f.c.availableStock,warehouse);
 });
-test('paid cart projection is not deducted a second time and parked baskets are not reserved',async()=>{
+test('paid cart is deducted once and parked baskets retain reservations',async()=>{
  const f=liveStockFixture();liveStockWorkspace(f,['flour']);installLivePosStock(f);
  f.cart('flour',1);assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
  await f.c.finalizePayment([{method:'cash',amount:10}]);assert.equal(f.state.cart.length,0);assert.equal(f.c.getProduct('flour').stock,9);
  assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
- f.state.parked=[{items:[{productId:'flour',qty:3}]}];assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
+ f.state.parked=[{items:[{productId:'flour',qty:3}]}];assert.match(f.c.renderPosScreen(null),/Остаток: 6 шт/);
 });
 
 // Android integration regressions: actual upstream storage/outbox, synthetic network only.
@@ -1833,4 +1833,44 @@ test('Android administrator sees all five original actions with monochrome vecto
 test('Android hides admin entry after administrator shift closes',()=>{
  const f=fixture();f.state.employees=[{id:'admin',name:'Администратор',role:'admin'}];f.state.shifts[0].employeeId='admin';installAndroidAdmin(f);assert.match(f.c.renderSettingsScreen(),/openAdminPanel\(\)/);
  f.state.shifts[0].status='closed';assert.doesNotMatch(f.c.renderSettingsScreen(),/onclick="openAdminPanel\(\)"/);assert.equal(f.c.renderAdminPanel(),'');
+});
+
+
+test('park, restart, resume and delete preserve or release reservations without warehouse writes',async()=>{
+ const f=liveStockFixture();liveStockWorkspace(f,['flour']);installLivePosStock(f);
+ f.cart('flour',3);f.state.orderLabel='Стол 1';assert.equal(await f.c.parkOrderNow(),true);
+ assert.match(f.c.renderPosScreen(null),/Остаток: 7 шт/);near(f.c.getProduct('flour').stock,10);
+ const next=liveStockFixture();for(const [key,value] of f.data)next.data.set(key,value);await next.c.loadAll();liveStockWorkspace(next,['flour']);installLivePosStock(next);
+ assert.match(next.c.renderPosScreen(null),/Остаток: 7 шт/);
+ assert.equal(await next.c.resumeParked(next.state.parked[0].id),true);assert.match(next.c.renderPosScreen(null),/Остаток: 7 шт/);
+ next.state.cart[0].qty=2;assert.match(next.c.renderPosScreen(null),/Остаток: 8 шт/);
+ assert.equal(await next.c.parkOrderNow(),true);next.c.openParkedModal=()=>{};
+ assert.equal(await next.c.deleteParked(next.state.parked[0].id),true);assert.match(next.c.renderPosScreen(null),/Остаток: 10 шт/);
+ near(next.c.getProduct('flour').stock,10);
+});
+test('other parked orders block overselling and payment consumes only the current cart',async()=>{
+ const f=liveStockFixture();installLivePosStock(f);f.state.parked=[{id:'parked',items:[{productId:'flour',qty:8}]}];
+ f.cart('flour',3);assert.equal(f.c.canFulfillCart(),false);await f.c.finalizePayment([{method:'cash',amount:30}]);assert.equal(f.state.orders.length,0);near(f.c.getProduct('flour').stock,10);
+ f.cart('flour',2);assert.equal(f.c.canFulfillCart(),true);await f.c.finalizePayment([{method:'cash',amount:20}]);assert.equal(f.state.orders.length,1);near(f.c.getProduct('flour').stock,8);assert.equal(f.state.parked.length,1);
+ liveStockWorkspace(f,['flour']);assert.match(f.c.renderPosScreen(null),/Остаток: 0 шт/);
+});
+test('parked recipes and modifiers share ingredient reservations with the current cart',()=>{
+ const f=liveStockFixture();installLivePosStock(f);liveStockWorkspace(f,['flour']);
+ f.state.parked=[{items:[{productId:'pizza',qty:2,selectedModifiers:[{productId:'flour',qty:.5}]}]}];f.cart('flour',1);
+ assert.match(f.c.renderPosScreen(null),/Остаток: 7\.6 шт/);near(f.c.getProduct('flour').stock,10);
+});
+
+function installRuntimeSafety(f){f.c.requestAnimationFrame=()=>0;vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-safety.js'),'utf8'),f.c);}
+test('critical journal rejects concurrent writers before either snapshot is overwritten',async()=>{
+ const f=fixture();let release;const gate=new Promise(resolve=>release=resolve),set=f.c.PrilavokCore.Storage.set;
+ f.c.PrilavokCore.Storage.set=async function(key,value){if(key==='criticalStorageJournal')await gate;return set.call(this,key,value)};
+ installRuntimeSafety(f);const first=f.c.commitCriticalStorage('first',{parked:[{id:'first'}]});
+ await assert.rejects(f.c.commitCriticalStorage('second',{parked:[{id:'second'}]}),/другой операции/);
+ release();await first;assert.equal(JSON.parse(f.data.get('prilavok_parked'))[0].id,'first');
+ await f.c.commitCriticalStorage('third',{parked:[]});assert.deepEqual(JSON.parse(f.data.get('prilavok_parked')),[]);
+});
+test('broken storage blocks financial commits but allows validated backup recovery path',async()=>{
+ const f=fixture();installRuntimeSafety(f);vm.runInContext('storageBroken=true',f.c);
+ await assert.rejects(f.c.commitCriticalStorage('payment',{orders:[]}),/Хранилище/);assert.equal(f.writes.length,0);
+ await f.c.commitCriticalStorage('backup-import',{parked:[]});assert.deepEqual(JSON.parse(f.data.get('prilavok_parked')),[]);
 });
