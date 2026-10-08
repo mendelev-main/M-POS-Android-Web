@@ -46,3 +46,7 @@ Android compile/test/lint выполняется даже после JS failure,
 ## Диагностика интеграций и загрузка — 08.10.2026
 
 Android adapter исправляет отсутствие видимого результата test buttons, несуществующий /api/orders/test, Telegram config/callback и потерю operational snapshots при HTTP 200 с ignoredAsStale. Добавлены epoch-based revision, upgrade старого outbox и foreground retry с сохранением перед отправкой. Полный разбор, источники, 4/4 реализации (100%) и обязательные физические проверки: [INTEGRATIONS_ANDROID_RU.md](INTEGRATIONS_ANDROID_RU.md). Actions и планшетная приёмка pending; local suites/build не запускались.
+
+## Исправление CI для остатков — 08.10.2026
+
+Run 37834064692: 356/361 JS tests passed; все 7 Android integration regressions прошли, Android compilation/JVM/lint и signing preflight успешны. APK корректно заблокирован пятью live-stock tests: synthetic simple products не имели stockUnit, поэтому исходный renderer показывал «ед. (не задана)», а assertions ожидали «шт». Добавлен отдельный liveStockFixture с stockUnit=piece; folder fixture получил такую же явную единицу. Проверки динамического уменьшения/восстановления, recipes/modifiers, склада и отсутствия двойного списания сохранены. Runtime и CI gates не изменены. Повторная проверка — только Actions; local tests/build не запускались.
