@@ -73,7 +73,8 @@ class MainActivity : AppCompatActivity() {
         printer = EscPosPrinter(::printerEvent)
         shares = ReportShareManager(this)
         telegram = TelegramClient(shares::createWarehousePdf, ::telegramResult, ::telegramMonthlyResult, ::telegramResult,
-            onTestResult = { result -> callJavaScript("window.__mposTelegramTestResult&&window.__mposTelegramTestResult($result);") })
+            onTestResult = { result -> callJavaScript("window.__mposTelegramTestResult&&window.__mposTelegramTestResult($result);") },
+            onTestProgress = { result -> callJavaScript("window.__mposTelegramTestProgress&&window.__mposTelegramTestProgress($result);") })
         network = com.mendelev.mpos.network.MPosWebNetwork(lifecycleScope) { result -> callJavaScript("window.__mposWebNetworkResult&&window.__mposWebNetworkResult($result);") }
         router = NativeBridgeRouter(this, photos, backup)
 
@@ -137,6 +138,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         if (::network.isInitialized) network.close()
+        if (::telegram.isInitialized) telegram.close()
         if (::webView.isInitialized) {
             webView.stopLoading()
             webView.loadUrl("about:blank")

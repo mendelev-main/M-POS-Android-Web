@@ -60,6 +60,7 @@
   });
   const openBackend=global.openBackendSettings;
   global.openBackendSettings=function(...args){const result=openBackend.apply(this,args);const button=document.querySelector('[onclick="testWebOrder()"]');if(button)button.textContent='Проверить канал заказов';return result};
+  global.__mposTelegramTestProgress=result=>{if(telegramTests.has(result?.requestId))status('telegram',result.message||'Подключаемся к Telegram API…')};
   global.__mposTelegramTestResult=result=>telegramTests.get(result?.requestId)?.(result);
   global.testTelegramConnection=()=>test('telegram',async()=>{
     const config=telegramConfigFromState();

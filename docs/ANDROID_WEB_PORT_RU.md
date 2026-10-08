@@ -54,3 +54,7 @@ Run 37834064692: 356/361 JS tests passed; все 7 Android integration regressio
 ## Фотографии после импорта iPad — 08.10.2026
 
 Пользователь подтвердил 49 фотографий в Android окне восстановления: файл копии включает изображения, Android декодировал и сохранил их. Исправлен platform путь отображения: img mpos-image://UUID переводится в local HTTPS APP_HOST/product-images/UUID с выдачей native файла без сети. Source products/backup и 33 source hashes не меняются. JS DOM и Robolectric transport regressions добавлены для Actions; local suites не запускались, физическая проверка pending. Подробности: [BACKUP_PHOTOS_RU.md](BACKUP_PHOTOS_RU.md).
+
+## Telegram deadlines и диагностика смен — 08.10.2026
+
+Текст/PNG/PDF переведены на единый ограниченный HTTPS transport; test queue отделена от отчётов, добавлены correlated native progress и safe ошибки всех форматов, закрытие transport при уничтожении Activity. Исходные shift triggers, storage flags и формат отчётов сохранены. Backend/project_bot не менялись; физическая доставка не подтверждена. Tests только Actions. Разбор сохранения флагов/ID и приёмки: [INTEGRATIONS_ANDROID_RU.md](INTEGRATIONS_ANDROID_RU.md).

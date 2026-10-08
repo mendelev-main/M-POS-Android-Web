@@ -70,3 +70,11 @@ test('restored iPad photos use the Android HTTPS origin and update when editor D
  const added=image('mpos-image://'+id);images.push(added);observers[0].fn();assert.equal(added.src,local.src);
  added.src='mpos-image://'+id;observers[0].fn();assert.equal(added.src,local.src);assert.equal(observers[0].options.attributes,true);assert.deepEqual(Array.from(observers[0].options.attributeFilter),['src']);
 });
+
+test('Telegram native progress is correlated and activity closes its transport',()=>{
+ const activity=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/MainActivity.kt'),'utf8');
+ assert.match(activity,/onTestProgress\s*=.*__mposTelegramTestProgress/);
+ assert.match(activity,/telegram\.close\(\)/);
+ const script=fs.readFileSync(path.join(assets,'android-integrations.js'),'utf8');
+ assert.match(script,/__mposTelegramTestProgress=result=>\{if\(telegramTests.has\(result\?\.requestId\)\)/);
+});

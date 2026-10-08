@@ -21,7 +21,7 @@ class MPosTelegramFailure(val safeMessage: String) : Exception(safeMessage) {
             is MPosTelegramFailure -> error.safeMessage
             is java.net.UnknownHostException -> "Не найден адрес Telegram. Проверьте интернет и DNS на планшете"
             is javax.net.ssl.SSLException -> "Не удалось проверить HTTPS сертификат Telegram"
-            is java.net.SocketTimeoutException -> "Telegram не ответил вовремя. Проверьте доступ к Telegram с планшета"
+            is java.net.SocketTimeoutException, is java.io.InterruptedIOException -> "Telegram не ответил вовремя. Проверьте доступ к Telegram с планшета"
             else -> "Не удалось подключиться к Telegram. Проверьте интернет на планшете"
         }
     }
