@@ -37,8 +37,9 @@ const receiptsScript=fs.readFileSync(path.join(root,'app/src/main/assets/pos/Web
 const hallBookingsScript=fs.readFileSync(path.join(root,'app/src/main/assets/pos/Web/js/features/hall-bookings.js'),'utf8');
 const backupScript=fs.readFileSync(path.join(root,'app/src/main/assets/pos/Web/js/features/backup.js'),'utf8');
 const printerScript=fs.readFileSync(path.join(root,'app/src/main/assets/pos/network-printer.js'),'utf8');
-const appSwift=fs.readFileSync(path.join(root,'app/src/main/assets/pos/PrilavokPOSApp.swift'),'utf8');
-const sceneSwift=fs.readFileSync(path.join(root,'app/src/main/assets/pos/SceneDelegate.swift'),'utf8');
+const androidActivity=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/MainActivity.kt'),'utf8');
+const androidBackup=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/backup/BackupManager.kt'),'utf8');
+const androidRouter=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/bridge/NativeBridgeRouter.kt'),'utf8');
 const plain=x=>JSON.parse(JSON.stringify(x));
 const near=(actual,expected)=>assert.ok(Math.abs(actual-expected)<1e-10,`${actual} != ${expected}`);
 function fixture(){
@@ -289,9 +290,11 @@ test('hall table persistence keeps legacy keys and deletion removes linked booki
  f.state.bookings=[{id:'linked',tableId:table.id,date:'2026-10-02',status:'confirmed'},{id:'other',tableId:'other',date:'2026-10-02',status:'confirmed'}];f.c.saveBookings();await Promise.resolve();f.c.confirmDeleteHallTable(table.id);await Promise.resolve();
  assert.equal(f.state.hallTables.length,0);assert.deepEqual(plain(f.state.bookings.map(x=>x.id)),['other']);assert.deepEqual(JSON.parse(f.data.get('prilavok_hallTables')),[]);assert.deepEqual(JSON.parse(f.data.get('prilavok_bookings')).map(x=>x.id),['other']);
 });
-test('scene delegate is the single owner of the POS window',()=>{
- const appLifecycle=appSwift.slice(appSwift.indexOf('@main'),appSwift.indexOf('final class POSViewController'));
- assert.doesNotMatch(appLifecycle,/UIWindow\s*\(/);assert.doesNotMatch(appLifecycle,/POSViewController\s*\(/);assert.match(sceneSwift,/window\.rootViewController\s*=\s*POSViewController\(\)/);
+test('Android activity owns the local POS WebView lifecycle',()=>{
+ assert.match(androidActivity,/setContentView\(webView\)/);
+ assert.match(androidActivity,/webView\.loadUrl\(START_URL\)/);
+ assert.match(androidActivity,/override fun onDestroy/);
+ assert.match(androidActivity,/webView\.destroy\(\)/);
 });
 test('startup first paint does not wait for WEB acceptance recovery',async()=>{
  const f=fixture();let rendered=false,recoveryStarted=false,release;
@@ -871,7 +874,7 @@ test('backup version 13 rejects a missing full-data section before any write',as
  await assert.rejects(f.c.applyBackupData(backup),/webOrderAcceptances/);assert.equal(f.writes.length,writesBefore);
 });
 test('native backup bridge packages product images and uses system export and import',()=>{
- assert.match(appSwift,/name: "backup"/);assert.match(appSwift,/document\["productImages"\]=images/);assert.match(appSwift,/UIActivityViewController/);assert.match(appSwift,/UIDocumentPickerViewController/);assert.match(appSwift,/productImages\.prune/);assert.match(backupScript,/handleNativeBackupImport/);
+ assert.match(androidRouter,/"backup" -> backup\.handle/);assert.match(androidBackup,/document\.put\("productImages", productImages\)/);assert.match(androidActivity,/ActivityResultContracts\.CreateDocument/);assert.match(androidActivity,/ActivityResultContracts\.OpenDocument/);assert.match(androidBackup,/images\.prune/);assert.match(backupScript,/handleNativeBackupImport/);
 });
 test('printer backup adapter preserves exact legacy keys and rolls back a partial restore',()=>{
  const data=new Map([['printers','[{"id":"old"}]'],['posNotificationSettings','{"sound":"soft"}']]),errors=[],messages=[];let failNotify=false;
