@@ -50,3 +50,7 @@ Android adapter исправляет отсутствие видимого ре�
 ## Исправление CI для остатков — 08.10.2026
 
 Run 37834064692: 356/361 JS tests passed; все 7 Android integration regressions прошли, Android compilation/JVM/lint и signing preflight успешны. APK корректно заблокирован пятью live-stock tests: synthetic simple products не имели stockUnit, поэтому исходный renderer показывал «ед. (не задана)», а assertions ожидали «шт». Добавлен отдельный liveStockFixture с stockUnit=piece; folder fixture получил такую же явную единицу. Проверки динамического уменьшения/восстановления, recipes/modifiers, склада и отсутствия двойного списания сохранены. Runtime и CI gates не изменены. Повторная проверка — только Actions; local tests/build не запускались.
+
+## Фотографии после импорта iPad — 08.10.2026
+
+Пользователь подтвердил 49 фотографий в Android окне восстановления: файл копии включает изображения, Android декодировал и сохранил их. Исправлен platform путь отображения: img mpos-image://UUID переводится в local HTTPS APP_HOST/product-images/UUID с выдачей native файла без сети. Source products/backup и 33 source hashes не меняются. JS DOM и Robolectric transport regressions добавлены для Actions; local suites не запускались, физическая проверка pending. Подробности: [BACKUP_PHOTOS_RU.md](BACKUP_PHOTOS_RU.md).

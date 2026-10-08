@@ -59,3 +59,14 @@ test('Android Telegram completion reaches the original network-settings callback
  const activity=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/MainActivity.kt'),'utf8');
  assert.match(html,/window\.onTelegramResult=function/);assert.match(activity,/window\.onTelegramResult&&window\.onTelegramResult/);
 });
+
+test('restored iPad photos use the Android HTTPS origin and update when editor DOM changes',()=>{
+ const bridge=fs.readFileSync(path.join(assets,'android-bridge.js'),'utf8'),listeners={},images=[],observers=[];
+ const id='12345678-1234-1234-1234-123456789abc';
+ const image=src=>({src,getAttribute(){return this.src},setAttribute(name,value){assert.equal(name,'src');this.src=value}});
+ const local=image('mpos-image://'+id.toUpperCase()),remote=image('https://photos.test/photo.jpg'),inline=image('data:image/png;base64,AA'),invalid=image('mpos-image://../../secret');images.push(local,remote,inline,invalid);
+ const c={document:{body:{},querySelector:()=>null,querySelectorAll:()=>images.filter(x=>x.src.startsWith('mpos-image://')),addEventListener:(name,fn)=>listeners[name]=fn},MutationObserver:class{constructor(fn){this.fn=fn;observers.push(this)}observe(node,options){this.options=options}}};c.window=c;vm.createContext(c);vm.runInContext(bridge,c);
+ listeners.DOMContentLoaded();assert.equal(local.src,'https://appassets.androidplatform.net/product-images/'+id);assert.equal(remote.src,'https://photos.test/photo.jpg');assert.equal(inline.src,'data:image/png;base64,AA');assert.equal(invalid.src,'mpos-image://../../secret');
+ const added=image('mpos-image://'+id);images.push(added);observers[0].fn();assert.equal(added.src,local.src);
+ added.src='mpos-image://'+id;observers[0].fn();assert.equal(added.src,local.src);assert.equal(observers[0].options.attributes,true);assert.deepEqual(Array.from(observers[0].options.attributeFilter),['src']);
+});

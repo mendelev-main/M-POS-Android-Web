@@ -16,5 +16,14 @@
   global.__MPOS_PLATFORM__='android';
   global.__MPOS_VERSION__='1.0';
   function stampVersion(){const node=document.querySelector('.settings-version');if(node&&node.textContent.includes('__MPOS_VERSION__'))node.textContent=node.textContent.replace('__MPOS_VERSION__',global.__MPOS_VERSION__)}
-  document.addEventListener('DOMContentLoaded',()=>{stampVersion();new MutationObserver(stampVersion).observe(document.body,{childList:true,subtree:true})});
+  function localPhotoSources(){
+    document.querySelectorAll('img[src^="mpos-image://"]').forEach(image=>{
+      const match=/^mpos-image:\/\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i.exec(image.getAttribute('src')||'');
+      if(match)image.setAttribute('src','https://appassets.androidplatform.net/product-images/'+match[1].toLowerCase());
+    });
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    stampVersion();localPhotoSources();
+    new MutationObserver(()=>{stampVersion();localPhotoSources()}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+  });
 })(window);

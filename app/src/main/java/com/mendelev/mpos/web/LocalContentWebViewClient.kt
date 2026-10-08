@@ -18,15 +18,22 @@ class LocalContentWebViewClient(
 ) : WebViewClientCompat() {
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
         val uri = request.url
-        if (uri.scheme == "mpos-image") return uri.host?.let(images::response)
+        localImageResponse(uri)?.let { return it }
         return assetLoader.shouldInterceptRequest(uri)
     }
 
     @Suppress("DEPRECATION")
     override fun shouldInterceptRequest(view: WebView, url: String): WebResourceResponse? {
         val uri = Uri.parse(url)
-        if (uri.scheme == "mpos-image") return uri.host?.let(images::response)
+        localImageResponse(uri)?.let { return it }
         return assetLoader.shouldInterceptRequest(uri)
+    }
+
+    private fun localImageResponse(uri: Uri): WebResourceResponse? {
+        if (uri.scheme == "mpos-image") return uri.host?.let(images::response)
+        if (uri.scheme == "https" && uri.host == MainActivity.APP_HOST && uri.path?.startsWith("/product-images/") == true)
+            return images.response(uri.path!!.removePrefix("/product-images/"))
+        return null
     }
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
