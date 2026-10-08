@@ -7,3 +7,5 @@ Package com.mendelev.mpos.web позволяет сосуществовать с
 Источник и текущий статус: ../../docs/ANDROID_WEB_PORT_RU.md.
 
 Диагностика сетевых интеграций должна давать видимый результат/тайм-аут; проверка заказов не создаёт фиктивную продажу. Operational demand считается отправленным только после applied acknowledgement backend; revision/outbox сохраняются до HTTP, stale-200 не удаляет очередь, активное приложение повторяет отправку с bounded backoff. Telegram test использует saved config вне окна настройки и correlated native callback. Реализация и приёмка: ../../docs/INTEGRATIONS_ANDROID_RU.md.
+
+Согласованное UI исключение Android: вход в панель администратора отображается только для currentShiftEmployeeIsAdmin; сама панель использует монохромные SVG с сохранёнными названиями, действиями и проверками доступа. Спецификация и приёмка: ../../docs/ADMIN_SETTINGS_RU.md.

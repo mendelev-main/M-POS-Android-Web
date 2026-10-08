@@ -58,3 +58,7 @@ Run 37834064692: 356/361 JS tests passed; все 7 Android integration regressio
 ## Telegram deadlines и диагностика смен — 08.10.2026
 
 Текст/PNG/PDF переведены на единый ограниченный HTTPS transport; test queue отделена от отчётов, добавлены correlated native progress и safe ошибки всех форматов, закрытие transport при уничтожении Activity. Исходные shift triggers, storage flags и формат отчётов сохранены. Backend/project_bot не менялись; физическая доставка не подтверждена. Tests только Actions. Разбор сохранения флагов/ID и приёмки: [INTEGRATIONS_ANDROID_RU.md](INTEGRATIONS_ANDROID_RU.md).
+
+## Настройки и панель администратора — 08.10.2026
+
+По явному запросу пользователя кнопка администратора скрыта для неадминистратора; обновлено представление пяти действий с монохромными SVG и равными отступами, сохранены original actions/guards. Светлая и тёмная темы просмотрены в browser preview; source hashes сохранены; 3 role/render regressions добавлены в Actions. Подробнее: [ADMIN_SETTINGS_RU.md](ADMIN_SETTINGS_RU.md). APK/CI приёмка pending.
