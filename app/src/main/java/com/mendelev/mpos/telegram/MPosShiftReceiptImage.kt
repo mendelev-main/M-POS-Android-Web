@@ -29,20 +29,25 @@ object MPosShiftReceiptImage {
             val lines = if (row.kind == MPosShiftReceipt.Kind.SEPARATOR) emptyList() else wrap(row.label, labelWidth, paint)
             Block(row, lines, if (row.kind == MPosShiftReceipt.Kind.SEPARATOR) 28f else maxOf(1, lines.size) * (row.size + 12f))
         }
-        val height = maxOf(980, ceil(blocks.sumOf { it.height.toDouble() } + 60).toInt())
+        val tops = MPosShiftReceipt.tops(report)
+        val extra = blocks.sumOf { maxOf(0f, (it.lines.size-1)*(it.row.size+12f)).toDouble() }.toFloat()
+        val count = report.optJSONArray("cashMovements")?.length() ?: 0
+        val height = maxOf(980, ceil(910f + (if(count>0)62f+count*46f else 0f) + extra).toInt())
         // Telegram photo dimensions must sum to <= 10,000. Fail explicitly rather than truncate cash movements.
         require(height <= 10_000 - WIDTH) { "Сменный отчёт слишком длинный для фотографии Telegram" }
         val bitmap = Bitmap.createBitmap(WIDTH, height, Bitmap.Config.ARGB_8888)
         try {
             val canvas = Canvas(bitmap)
             canvas.drawColor(Color.WHITE)
-            var top = 30f
-            for (block in blocks) {
+            var overflow = 0f
+            for ((index, block) in blocks.withIndex()) {
+                val top = tops[index] + overflow
                 val row = block.row
                 style(row)
                 if (row.kind == MPosShiftReceipt.Kind.SEPARATOR) {
                     paint.color = Color.DKGRAY
-                    canvas.drawLine(SIDE, top + 14f, WIDTH - SIDE, top + 14f, paint)
+                    paint.textSize = 16f
+                    canvas.drawText("-".repeat(66), SIDE, top - paint.fontMetrics.top, paint)
                     paint.color = Color.BLACK
                 } else {
                     block.lines.forEachIndexed { index, text ->
@@ -57,7 +62,7 @@ object MPosShiftReceiptImage {
                         canvas.drawText(row.value, WIDTH - SIDE - paint.measureText(row.value), top - paint.fontMetrics.top, paint)
                     }
                 }
-                top += block.height
+                overflow += maxOf(0f, (block.lines.size-1)*(row.size+12f))
             }
             return ByteArrayOutputStream().use { output ->
                 check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) { "Не удалось сформировать изображение смены" }

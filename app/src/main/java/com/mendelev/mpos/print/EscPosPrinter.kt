@@ -4,17 +4,14 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Typeface
 import android.media.AudioManager
 import android.media.ToneGenerator
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.Executors
 import kotlin.math.ceil
-import kotlin.math.max
 
 class EscPosPrinter(private val onEvent: (JSONObject) -> Unit) {
     private val executor = Executors.newCachedThreadPool()
@@ -49,140 +46,39 @@ class EscPosPrinter(private val onEvent: (JSONObject) -> Unit) {
     private fun testPage() = byteArrayOf(0x1b, 0x40) + "\nM POS\nTEST PRINT\nLAN TCP 9100 OK\n\n\n".toByteArray() + byteArrayOf(0x1d, 0x56, 0x42, 0)
 }
 
-private object EscPosRaster {
-    private data class Line(val text: String, val size: Float = 25f, val bold: Boolean = false, val center: Boolean = false, val gap: Int = 5)
-
+internal object EscPosRaster {
     fun encode(order: JSONObject): ByteArray {
-        val config = order.optJSONObject("__printerConfig") ?: JSONObject()
-        val width = if (config.optInt("paperWidth", 80) <= 58) 384 else 576
-        val lines = receiptLines(order, config)
-        val bitmap = render(lines, width)
+        val bitmap=render(order)
+        return try { ByteArrayOutputStream().apply {write(byteArrayOf(0x1b,0x40));write(raster(bitmap));write(byteArrayOf(0x0a,0x0a,0x0a,0x1d,0x56,0x42,0))}.toByteArray() } finally { bitmap.recycle() }
+    }
+    fun render(order:JSONObject):Bitmap {
+        val model=MPosReceiptLayout.build(order);val content=model.width-model.margin*2
+        data class Measured(val row:MPosReceiptLayout.Row,val left:android.text.StaticLayout?,val right:android.text.StaticLayout?,val height:Float)
+        val measured=model.rows.map{row->
+            if(row.kind==MPosReceiptLayout.Kind.SEPARATOR)Measured(row,null,null,1f)
+            else {
+                val left=if(row.left.isEmpty())null else com.mendelev.mpos.documents.MPosDocumentCanvas.layout(row.left,if(row.kind==MPosReceiptLayout.Kind.PAIR)content*.55f else content,row.size,row.weight,align=if(row.centered)android.text.Layout.Alignment.ALIGN_CENTER else android.text.Layout.Alignment.ALIGN_NORMAL)
+                val right=if(row.kind==MPosReceiptLayout.Kind.PAIR)com.mendelev.mpos.documents.MPosDocumentCanvas.layout(row.right,content*.43f,row.size,row.weight,align=android.text.Layout.Alignment.ALIGN_OPPOSITE) else null
+                Measured(row,left,right,maxOf(left?.height?:0,right?.height?:0).toFloat()+2)
+            }
+        }
+        val height=ceil(model.top+model.bottom+measured.sumOf{(it.height+it.row.gap).toDouble()}).toInt().coerceAtLeast(1)
+        require(height<=65535){"Чек слишком длинный для ESC/POS raster"}
+        return Bitmap.createBitmap(model.width,height,Bitmap.Config.ARGB_8888).also{bitmap->
+            val canvas=Canvas(bitmap);canvas.drawColor(Color.WHITE);var y=model.top
+            val rule=Paint().apply{color=Color.BLACK;strokeWidth=1f;pathEffect=android.graphics.DashPathEffect(floatArrayOf(3f,3f),0f)}
+            for(m in measured){
+                if(m.row.kind==MPosReceiptLayout.Kind.SEPARATOR)canvas.drawLine(model.margin,y,model.width-model.margin,y,rule)
+                else {val save=canvas.save();canvas.translate(model.margin,y);m.left?.draw(canvas);canvas.restoreToCount(save);m.right?.let{right->val r=canvas.save();canvas.translate(model.margin+content*.57f,y);right.draw(canvas);canvas.restoreToCount(r)}}
+                y+=m.height+m.row.gap
+            }
+        }
+    }
+    internal fun raster(bitmap:Bitmap):ByteArray {
+        val widthBytes=(bitmap.width+7)/8
         return ByteArrayOutputStream().apply {
-            write(byteArrayOf(0x1b, 0x40))
-            write(raster(bitmap))
-            write(byteArrayOf(0x0a, 0x0a, 0x0a, 0x1d, 0x56, 0x42, 0))
-            bitmap.recycle()
+            write(byteArrayOf(0x1d,0x76,0x30,0,(widthBytes and 255).toByte(),(widthBytes shr 8).toByte(),(bitmap.height and 255).toByte(),(bitmap.height shr 8).toByte()))
+            for(y in 0 until bitmap.height)for(xb in 0 until widthBytes){var value=0;for(bit in 0..7){val x=xb*8+bit;if(x<bitmap.width){val pixel=bitmap.getPixel(x,y);val gray=(Color.red(pixel)*.299+Color.green(pixel)*.587+Color.blue(pixel)*.114);if(gray<180)value=value or (128 shr bit)}};write(value)}
         }.toByteArray()
     }
-
-    private fun receiptLines(order: JSONObject, config: JSONObject): List<Line> {
-        val kind = order.optString("__printDocumentType", "receipt")
-        val lines = mutableListOf<Line>()
-        fun line(text: String, size: Float = 25f, bold: Boolean = false, center: Boolean = false, gap: Int = 5) {
-            if (text.isNotBlank()) lines += Line(text, size, bold, center, gap)
-        }
-        if (kind == "kitchen") {
-            line(order.optString("receiptDisplayNumber", "#—"), 38f, true, true, 8)
-            line(order.optString("orderType", "Заказ"), 30f, true, true, 12)
-            order.optJSONArray("items").objects().forEach { item ->
-                line("${quantity(item.optDouble("qty", 1.0))} × ${item.optString("name")}", 31f, true, false, 5)
-                line(item.optString("comment").takeIf(String::isNotBlank)?.let { "↳ $it" }.orEmpty(), 24f, false, false, 9)
-            }
-            return lines
-        }
-        if (kind == "shift-close") {
-            line(order.optString("establishmentName"), 31f, true, true, 5)
-            line("ОТЧЁТ О ЗАКРЫТИИ СМЕНЫ", 30f, true, true, 12)
-            line("Сотрудник: ${order.optString("employeeName", "Сотрудник")}", 23f, false, true)
-            line("Заказов: ${quantity(order.optDouble("count"))}")
-            line("Выручка: ${money(order.optDouble("total"))}", 28f, true)
-            line("Наличные: ${money(order.optDouble("cash"))}")
-            line("Карта: ${money(order.optDouble("card"))}")
-            line("Ожидается в кассе: ${money(order.optDouble("expectedCash"))}")
-            line("Фактически: ${money(order.optDouble("countedCash"))}")
-            line("Расхождение: ${money(order.optDouble("difference"))}", 28f, true)
-            return lines
-        }
-        line(config.optString("paymentReceiptTitle", "ПРИЛАВОК"), 36f, true, true, 12)
-        line("Сотрудник: ${order.optString("employeeName", "Сотрудник")}", 22f)
-        line("Касса: ${config.optString("registerLabel", "POS 1")}", 22f, false, false, 10)
-        order.optJSONObject("customer")?.let { customer ->
-            line(customer.optString("name").takeIf(String::isNotBlank)?.let { "Клиент: $it" }.orEmpty())
-            line(customer.optString("phone"))
-        }
-        line(order.optString("orderType", "На месте"), 26f, true, false, 10)
-        order.optJSONArray("items").objects().forEach { item ->
-            val qty = item.optDouble("qty", 1.0)
-            val price = item.optDouble("price")
-            line(item.optString("name"), 28f, true, false, 2)
-            line("${quantity(qty)} × ${money(price)}     ${money(qty * price)}", 23f, false, false, 5)
-            line(item.optString("comment").takeIf(String::isNotBlank)?.let { "Комментарий: $it" }.orEmpty(), 21f)
-        }
-        val productDiscount = order.optDouble("productDiscountTotal")
-        val loyaltyDiscount = order.optDouble("loyaltyDiscount")
-        if (productDiscount > 0) line("Скидки на товары: −${money(productDiscount)}")
-        if (loyaltyDiscount > 0) line("Программа лояльности: −${money(loyaltyDiscount)}")
-        val delivery = order.optDouble("deliveryFee")
-        if (delivery > 0) line("Доставка: ${money(delivery)}")
-        line("ИТОГО: ${money(order.optDouble("total"))}", 34f, true, false, 12)
-        order.optJSONArray("payments").objects().forEach { payment ->
-            val label = if (payment.optString("method") == "cash") "Наличные" else "Карта"
-            line("$label: ${money(payment.optDouble("amount"))}")
-        }
-        line(order.optString("receiptDisplayNumber"), 23f, true, true, 8)
-        return lines
-    }
-
-    private fun render(lines: List<Line>, width: Int): Bitmap {
-        val margin = if (width <= 384) 14f else 24f
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
-        data class Layout(val line: Line, val rows: List<String>, val lineHeight: Int)
-        val layouts = lines.map { line ->
-            paint.textSize = line.size
-            paint.typeface = if (line.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-            val rows = wrap(line.text, paint, width - margin * 2)
-            Layout(line, rows, ceil(line.size * 1.28).toInt())
-        }
-        val height = max(1, layouts.sumOf { it.rows.size * it.lineHeight + it.line.gap } + 12)
-        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
-            val canvas = Canvas(bitmap)
-            canvas.drawColor(Color.WHITE)
-            var y = 4f
-            layouts.forEach { layout ->
-                paint.textSize = layout.line.size
-                paint.typeface = if (layout.line.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-                layout.rows.forEach { row ->
-                    y += layout.lineHeight * 0.82f
-                    val x = if (layout.line.center) (width - paint.measureText(row)) / 2f else margin
-                    canvas.drawText(row, x, y, paint)
-                    y += layout.lineHeight * 0.18f
-                }
-                y += layout.line.gap
-            }
-        }
-    }
-
-    private fun wrap(text: String, paint: Paint, maxWidth: Float): List<String> {
-        if (text.isBlank()) return emptyList()
-        val result = mutableListOf<String>()
-        text.lines().forEach { paragraph ->
-            var current = ""
-            paragraph.split(Regex("\\s+")).forEach { word ->
-                val candidate = if (current.isEmpty()) word else "$current $word"
-                if (paint.measureText(candidate) <= maxWidth || current.isEmpty()) current = candidate
-                else { result += current; current = word }
-            }
-            if (current.isNotEmpty()) result += current
-        }
-        return result
-    }
-
-    private fun raster(bitmap: Bitmap): ByteArray {
-        val widthBytes = (bitmap.width + 7) / 8
-        return ByteArrayOutputStream().apply {
-            write(byteArrayOf(0x1d, 0x76, 0x30, 0x00, (widthBytes and 0xff).toByte(), (widthBytes shr 8).toByte(), (bitmap.height and 0xff).toByte(), (bitmap.height shr 8).toByte()))
-            for (y in 0 until bitmap.height) for (xb in 0 until widthBytes) {
-                var value = 0
-                for (bit in 0..7) {
-                    val x = xb * 8 + bit
-                    if (x < bitmap.width && Color.luminance(bitmap.getPixel(x, y)) < 0.55f) value = value or (0x80 shr bit)
-                }
-                write(value)
-            }
-        }.toByteArray()
-    }
-
-    private fun money(value: Double) = "%.2f BYN".format(value)
-    private fun quantity(value: Double) = if (value % 1.0 == 0.0) value.toInt().toString() else "%.3f".format(value).trimEnd('0').trimEnd('.')
-    private fun JSONArray?.objects(): List<JSONObject> = if (this == null) emptyList() else buildList { for (index in 0 until length()) optJSONObject(index)?.let(::add) }
 }

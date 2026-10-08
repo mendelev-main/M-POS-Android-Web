@@ -18,34 +18,34 @@ object MPosShiftReceipt {
         fun money(key: String) = String.format(Locale.US, "%.2f %s", report.optDouble(key, 0.0), report.optString("currency", "Br"))
         val closed = report.optLong("closedAt")
         return buildList {
-            add(Row(report.optString("establishmentName").ifBlank { "M POS" }, kind = Kind.CENTER, bold = true, size = 28f))
+            add(Row(report.optString("establishmentName").trim().ifBlank { "ПРИЛАВОК" }, kind = Kind.CENTER, bold = true, size = 28f))
             add(Row("ОТЧЁТ О КАССОВОЙ СМЕНЕ", kind = Kind.CENTER, bold = true, size = 18f))
             add(Row("СМЕНА ЗАКРЫТА", kind = Kind.CENTER, bold = true, size = 17f))
             add(Row("№ ${report.optString("id")}", kind = Kind.RIGHT))
             add(Row("", kind = Kind.SEPARATOR))
-            add(Row("СОТРУДНИК", kind = Kind.TEXT, bold = true))
+            add(Row("СОТРУДНИК", kind = Kind.TEXT, bold = true, size = 17f))
             add(Row(report.optString("employeeName", "Сотрудник не указан"), kind = Kind.TEXT, bold = true, size = 21f))
             add(Row("Открытие смены", date(report.optLong("openedAt"))))
             add(Row("Закрытие смены", if (closed > 0) date(closed) else "—"))
             add(Row("", kind = Kind.SEPARATOR))
-            add(Row("ПРОДАЖИ", kind = Kind.CENTER, bold = true))
+            add(Row("ПРОДАЖИ", kind = Kind.CENTER, bold = true, size = 17f))
             // iPad uses all report orders, including returned receipts, rather than active-sale count.
             add(Row("Количество чеков", (report.optJSONArray("orders")?.length() ?: 0).toString()))
-            add(Row("Выручка", money("total"), bold = true))
+            add(Row("Выручка", money("total"), bold = true, size = 17f))
             add(Row("Наличные", money("cash")))
             add(Row("Карта", money("card")))
             add(Row("Наличные на начало смены", money("openingCash")))
             add(Row("Внесено наличных", money("deposits")))
             add(Row("Изъято наличных", money("withdrawals")))
             add(Row("", kind = Kind.SEPARATOR))
-            add(Row("ИТОГ", kind = Kind.CENTER, bold = true))
+            add(Row("ИТОГ", kind = Kind.CENTER, bold = true, size = 17f))
             add(Row("Ожидается в кассе", money("expectedCash")))
-            add(Row("Фактически в кассе", money("countedCash"), bold = true))
-            add(Row("Расхождение", money("difference"), bold = abs(report.optDouble("difference", 0.0)) > 0.009))
+            add(Row("Фактически в кассе", money("countedCash"), bold = true, size = 17f))
+            add(Row("Расхождение", money("difference"), bold = abs(report.optDouble("difference", 0.0)) > 0.009, size = 17f))
             val movements = report.optJSONArray("cashMovements")
             if (movements != null && movements.length() > 0) {
                 add(Row("", kind = Kind.SEPARATOR))
-                add(Row("ДВИЖЕНИЕ НАЛИЧНЫХ", kind = Kind.CENTER, bold = true))
+                add(Row("ДВИЖЕНИЕ НАЛИЧНЫХ", kind = Kind.CENTER, bold = true, size = 17f))
                 for (index in 0 until movements.length()) {
                     val movement = movements.getJSONObject(index)
                     val deposit = movement.optString("type") == "deposit"
@@ -56,9 +56,16 @@ object MPosShiftReceipt {
                 }
             }
             add(Row("", kind = Kind.SEPARATOR))
-            add(Row("СПАСИБО ЗА РАБОТУ", kind = Kind.CENTER, bold = true))
+            add(Row("СПАСИБО ЗА РАБОТУ", kind = Kind.CENTER, bold = true, size = 17f))
             add(Row(date(if (closed > 0) closed else now), kind = Kind.CENTER))
         }
+    }
+
+    /** Original iPad y coordinates; only unusually long wrapped labels add space in the renderer. */
+    fun tops(report: JSONObject): List<Float> {
+        val fixed = listOf(30f,72f,102f,132f,160f,188f,216f,246f,270f,300f,328f,362f,390f,418f,446f,474f,502f,530f,564f,592f,626f,654f,682f)
+        val count = report.optJSONArray("cashMovements")?.length() ?: 0
+        return fixed + if (count == 0) listOf(718f,752f,786f) else listOf(718f,746f) + List(count) { 780f + it*46f } + listOf(780f+count*46f,814f+count*46f,848f+count*46f)
     }
 
     fun caption(report: JSONObject, zone: TimeZone = TimeZone.getDefault(), now: Long = System.currentTimeMillis()): String {

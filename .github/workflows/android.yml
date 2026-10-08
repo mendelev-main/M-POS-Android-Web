@@ -37,6 +37,7 @@ jobs:
             build/ci/
             app/build/reports/
             app/build/test-results/
+            app/build/visual-parity/
           if-no-files-found: ignore
   signing:
     name: Permanent signing key preflight

@@ -45,6 +45,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions.jvmTarget = "17"
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 dependencies {
@@ -55,5 +56,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("org.json:json:20240303")
 }
