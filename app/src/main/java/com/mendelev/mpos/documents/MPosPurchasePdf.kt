@@ -7,7 +7,7 @@ import java.io.File
 
 /** PurchaseOrderPDF.swift geometry and typography, with Android text shaping. */
 internal object MPosPurchasePdf {
-    fun write(order:JSONObject,file:File)=MPosPdfPages(595,842).use{pages->
+    fun write(order:JSONObject,file:File,surface:MPosDocumentPages=MPosPdfPages(595,842))=surface.use{pages->
         val d=MPosDocumentCanvas;val ink=Color.rgb(18,23,33);val muted=Color.rgb(97,107,122);val dark=Color.rgb(18,26,41);val accent=Color.rgb(33,102,242);val soft=Color.rgb(245,247,250);val line=Color.rgb(224,230,237)
         var y=36f
         fun text(s:String,x:Float,top:Float,w:Float,size:Float=8.5f,bold:Boolean=false,color:Int=ink,right:Boolean=false,center:Boolean=false)=d.text(pages.canvas,s,x,top,w,size,if(bold)700 else 400,color,if(center)Layout.Alignment.ALIGN_CENTER else if(right)Layout.Alignment.ALIGN_OPPOSITE else Layout.Alignment.ALIGN_NORMAL,1.5f)
@@ -31,7 +31,7 @@ internal object MPosPurchasePdf {
         val items=d.objects(order.optJSONArray("items"));y+=154f;text("СОСТАВ ЗАКАЗА",36f,y,400f,11f,true);text("${items.size} позиций",409f,y,150f,8.5f,true,muted,true);y+=16f
         var tableTop=y
         fun header(){tableTop=y;d.round(pages.canvas,36f,y,523f,34f,18f,dark);text("№",48f,y+10f,25f,8.5f,true,Color.LTGRAY);text("ТОВАР",78f,y+10f,403f,8.5f,true,Color.WHITE);text("КОЛ-ВО",484f,y+10f,62f,8.5f,true,Color.WHITE,true);y+=34f}
-        fun outline(){d.round(pages.canvas,36f,tableTop,523f,maxOf(42f,y-tableTop),18f,line,.9f)}
+        fun outline(){d.round(pages.canvas,36f,tableTop,523f,maxOf(42f,y-tableTop+8f),18f,line,.9f)}
         header()
         items.forEachIndexed{index,item->
             val name=item.optString("productName","Товар");val qty=item.optString("quantityText").ifBlank{"${item.opt("qty")?:0} шт."}

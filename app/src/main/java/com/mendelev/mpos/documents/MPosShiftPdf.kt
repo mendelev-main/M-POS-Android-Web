@@ -8,7 +8,7 @@ import java.util.Locale
 
 /** Portrait cash shift report from the original iPad print bridge. */
 internal object MPosShiftPdf {
-    fun write(report:JSONObject,file:File)=MPosPdfPages(595,842).use{pages->
+    fun write(report:JSONObject,file:File,surface:MPosDocumentPages=MPosPdfPages(595,842))=surface.use{pages->
         val d=MPosDocumentCanvas;val ink=Color.rgb(18,23,33);val muted=Color.rgb(97,107,122);val light=Color.rgb(242,245,250)
         var y=0f
         fun text(s:String,x:Float,top:Float,w:Float,size:Float=9f,bold:Boolean=false,color:Int=ink,right:Boolean=false)=d.text(pages.canvas,s,x,top,w,size,if(bold)700 else 400,color,if(right)Layout.Alignment.ALIGN_OPPOSITE else Layout.Alignment.ALIGN_NORMAL)

@@ -42,11 +42,19 @@ internal object MPosDocumentCanvas {
     fun strings(values:JSONArray?):List<String> = if(values==null)emptyList() else (0 until values.length()).map{values.optString(it)}
 }
 
-internal class MPosPdfPages(private val width:Int,private val height:Int):AutoCloseable {
+/** Shared page surface lets CI render the real layout without mocking PDF serialization. */
+internal interface MPosDocumentPages:AutoCloseable {
+    val number:Int
+    val canvas:Canvas
+    fun next()
+    fun save(file:File)
+}
+
+internal class MPosPdfPages(private val width:Int,private val height:Int):MPosDocumentPages {
     private val document=PdfDocument();private var page:PdfDocument.Page?=null
-    var number=0;private set
-    val canvas:Canvas get()=page!!.canvas
-    fun next(){page?.let(document::finishPage);number++;page=document.startPage(PdfDocument.PageInfo.Builder(width,height,number).create());canvas.drawColor(Color.WHITE)}
-    fun save(file:File){page?.let(document::finishPage);page=null;file.outputStream().use{document.writeTo(it)}}
+    override var number=0;private set
+    override val canvas:Canvas get()=page!!.canvas
+    override fun next(){page?.let(document::finishPage);number++;page=document.startPage(PdfDocument.PageInfo.Builder(width,height,number).create());canvas.drawColor(Color.WHITE)}
+    override fun save(file:File){page?.let(document::finishPage);page=null;file.outputStream().use{document.writeTo(it)}}
     override fun close(){page?.let(document::finishPage);page=null;document.close()}
 }

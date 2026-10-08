@@ -49,7 +49,7 @@ class EscPosPrinter(private val onEvent: (JSONObject) -> Unit) {
 internal object EscPosRaster {
     fun encode(order: JSONObject): ByteArray {
         val bitmap=render(order)
-        return try { ByteArrayOutputStream().apply {write(byteArrayOf(0x1b,0x40));write(raster(bitmap));write(byteArrayOf(0x0a,0x0a,0x0a,0x1d,0x56,0x42,0))}.toByteArray() } finally { bitmap.recycle() }
+        return try { ByteArrayOutputStream().apply {write(byteArrayOf(0x1b,0x40));write(raster(bitmap));write(byteArrayOf(0x0a,0x1d,0x56,0x42,0))}.toByteArray() } finally { bitmap.recycle() }
     }
     fun render(order:JSONObject):Bitmap {
         val model=MPosReceiptLayout.build(order);val content=model.width-model.margin*2

@@ -1,8 +1,7 @@
 package com.mendelev.mpos.documents
 
 import android.graphics.Bitmap
-import android.graphics.pdf.PdfRenderer
-import android.os.ParcelFileDescriptor
+import android.graphics.Canvas
 import com.mendelev.mpos.print.EscPosRaster
 import com.mendelev.mpos.print.MPosReceiptLayout
 import com.mendelev.mpos.telegram.MPosShiftReceipt
@@ -44,6 +43,18 @@ class MPosDocumentParityTest {
         assertTrue(kitchen.rows.any{it.left=="↳ Без сахара"})
         assertFalse(kitchen.rows.any{it.right.contains("BYN")})
     }
+    @Test fun splitPaymentsAndShiftTotalsKeepTheirOriginalOrder(){
+        val data=order().put("payments",JSONArray("""[{"method":"cash","amount":8,"cashGiven":10,"change":2},{"method":"card","amount":10}]"""))
+        val rows=MPosReceiptLayout.build(data).rows
+        val first=rows.indexOfFirst{it.left=="Платёж 1 · Наличные"&&it.right=="8.00 BYN"}
+        val second=rows.indexOfFirst{it.left=="Платёж 2 · Карта"&&it.right=="10.00 BYN"}
+        assertTrue(first>=0&&second>first)
+        assertTrue(rows.subList(first,second).any{it.left=="  Сдача"&&it.right=="2.00 BYN"})
+        val shiftRows=MPosReceiptLayout.build(shift().put("__printDocumentType","shift-close")).rows
+        assertTrue(shiftRows.any{it.left=="Расхождение"&&it.right=="0.00 BYN"&&it.weight==700})
+        assertTrue(shiftRows.any{it.left=="Ожидается в кассе"&&it.right=="135.00 BYN"})
+        assertTrue(shiftRows.last().left=="Смена закрыта")
+    }
     @Test fun producesPreviewArtifactsAndCorrectRasterEnvelope(){
         for(width in listOf(58,80))for(kind in listOf("receipt","kitchen","shift-close")){
             val data=if(kind=="shift-close")shift()else order()
@@ -60,10 +71,10 @@ class MPosDocumentParityTest {
         assertEquals(390f,MPosShiftReceipt.tops(report)[12]);assertEquals("ПРИЛАВОК",MPosShiftReceipt.rows(JSONObject()).first().label)
         File(directory,"telegram-shift.png").writeBytes(MPosShiftReceiptImage.render(report))
         val warehouse=JSONObject("""{"company":"ПРИЛАВОК","title":"Остатки","period":"08.10.2026","generatedAt":"08.10.2026 15:00","sections":[{"title":"Товары","headers":["Товар","Остаток"],"excelRows":[["Капучино",42.5]],"rows":[["Капучино","42,5 шт."]]}],"notes":["Остатки после продаж и списаний"]}""")
-        val pdf=File(directory,"warehouse.pdf");MPosWarehousePdf.write(warehouse,pdf);preview(pdf,842,595)
-        val shiftPdf=File(directory,"shift.pdf");MPosShiftPdf.write(report,shiftPdf);preview(shiftPdf,595,842)
+        val warehousePages=PreviewPages(842,595,"warehouse");MPosWarehousePdf.write(warehouse,File(directory,"warehouse.pdf"),warehousePages);assertEquals(2,warehousePages.number)
+        val shiftPages=PreviewPages(595,842,"shift");MPosShiftPdf.write(report,File(directory,"shift.pdf"),shiftPages);assertEquals(1,shiftPages.number)
         val purchase=JSONObject("""{"supplierName":"Поставщик","timestamp":1791450000000,"company":{"legalName":"ООО Пример","deliveryAddress":"Минск, улица Примерная, 1"},"items":[{"productName":"Кофе в зёрнах","quantityText":"2 кг"}]}""")
-        val purchasePdf=File(directory,"purchase.pdf");MPosPurchasePdf.write(purchase,purchasePdf);preview(purchasePdf,595,842)
+        val purchasePages=PreviewPages(595,842,"purchase");MPosPurchasePdf.write(purchase,File(directory,"purchase.pdf"),purchasePages);assertEquals(1,purchasePages.number)
         val files=MPosWarehouseWorkbook.files(warehouse)
         val factory=DocumentBuilderFactory.newInstance().apply{isNamespaceAware=true}
         files.values.forEach{factory.newDocumentBuilder().parse(it.byteInputStream())}
@@ -73,13 +84,17 @@ class MPosDocumentParityTest {
     @Test fun longWarehouseRowsAndNotesArePaginatedWithoutDroppingDocuments(){
         val rows=JSONArray().apply{repeat(85){put(JSONArray().put("Длинное название товара ".repeat(20)).put(it))}}
         val report=JSONObject().put("company","ПРИЛАВОК").put("sections",JSONArray().put(JSONObject().put("title","Товары").put("headers",JSONArray(listOf("Товар","Остаток"))).put("rows",rows))).put("notes",JSONArray(listOf("Пояснение ".repeat(350))))
-        val file=File(directory,"warehouse-long.pdf");MPosWarehousePdf.write(report,file)
-        ParcelFileDescriptor.open(file,ParcelFileDescriptor.MODE_READ_ONLY).use{descriptor->PdfRenderer(descriptor).use{assertTrue(it.pageCount>2)}}
+        val pages=PreviewPages(842,595,"warehouse-long");MPosWarehousePdf.write(report,File(directory,"warehouse-long.pdf"),pages);assertTrue(pages.number>2)
     }
     private fun save(bitmap:Bitmap,name:String){File(directory,name).outputStream().use{assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,it))}}
-    private fun preview(file:File,width:Int,height:Int){
-        ParcelFileDescriptor.open(file,ParcelFileDescriptor.MODE_READ_ONLY).use{descriptor->PdfRenderer(descriptor).use{renderer->
-            assertTrue(renderer.pageCount>0);renderer.openPage(0).use{page->assertEquals(width,page.width);assertEquals(height,page.height);val bitmap=Bitmap.createBitmap(width*2,height*2,Bitmap.Config.ARGB_8888);bitmap.eraseColor(android.graphics.Color.WHITE);page.render(bitmap,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);save(bitmap,file.nameWithoutExtension+".png");bitmap.recycle()}
-        }}
+    /** Same layout/Canvas calls as PdfDocument; Robolectric 4.14 has no PDF native bridge. */
+    private inner class PreviewPages(private val width:Int,private val height:Int,private val name:String):MPosDocumentPages {
+        override var number=0;private set
+        private var bitmap:Bitmap?=null
+        override val canvas:Canvas get()=Canvas(bitmap!!).apply{scale(2f,2f)}
+        private fun finish(){bitmap?.let{assertEquals(width*2,it.width);assertEquals(height*2,it.height);save(it,"$name-page-$number.png");it.recycle()};bitmap=null}
+        override fun next(){finish();number++;bitmap=Bitmap.createBitmap(width*2,height*2,Bitmap.Config.ARGB_8888).apply{eraseColor(android.graphics.Color.WHITE)}}
+        override fun save(file:File){finish()}
+        override fun close(){finish()}
     }
 }

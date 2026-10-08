@@ -9,7 +9,7 @@ import kotlin.math.min
 
 /** Landscape warehouse template from WarehouseReportPDF.swift. */
 internal object MPosWarehousePdf {
-    fun write(report:JSONObject,file:File) = MPosPdfPages(842,595).use { pages ->
+    fun write(report:JSONObject,file:File,surface:MPosDocumentPages=MPosPdfPages(842,595))=surface.use{pages->
         val d=MPosDocumentCanvas;val ink=Color.rgb(31,31,31);val muted=Color.rgb(107,107,107);val paper=Color.rgb(245,245,245)
         var y=0f
         fun text(s:String,x:Float,top:Float,w:Float,size:Float=10f,bold:Boolean=false,color:Int=ink)=d.text(pages.canvas,s,x,top,w,size,if(bold)700 else 400,color)
