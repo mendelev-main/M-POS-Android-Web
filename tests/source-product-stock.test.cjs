@@ -292,7 +292,9 @@ test('hall table persistence keeps legacy keys and deletion removes linked booki
  assert.equal(f.state.hallTables.length,0);assert.deepEqual(plain(f.state.bookings.map(x=>x.id)),['other']);assert.deepEqual(JSON.parse(f.data.get('prilavok_hallTables')),[]);assert.deepEqual(JSON.parse(f.data.get('prilavok_bookings')).map(x=>x.id),['other']);
 });
 test('Android activity owns the local POS WebView lifecycle',()=>{
- assert.match(androidActivity,/setContentView\(webView\)/);
+ assert.match(androidActivity,/root\.addView\(webView\)/);
+ assert.match(androidActivity,/root\.addView\(startupView\)/);
+ assert.match(androidActivity,/setContentView\(root\)/);
  assert.match(androidActivity,/webView\.loadUrl\(START_URL\)/);
  assert.match(androidActivity,/override fun onDestroy/);
  assert.match(androidActivity,/webView\.destroy\(\)/);
@@ -1838,6 +1840,7 @@ test('Android hides admin entry after administrator shift closes',()=>{
 
 test('park, restart, resume and delete preserve or release reservations without warehouse writes',async()=>{
  const f=liveStockFixture();liveStockWorkspace(f,['flour']);installLivePosStock(f);
+ await f.c.PrilavokCore.Storage.set('products',f.state.products);await f.c.PrilavokCore.Storage.set('shifts',f.state.shifts);
  f.cart('flour',3);f.state.orderLabel='Стол 1';assert.equal(await f.c.parkOrderNow(),true);
  assert.match(f.c.renderPosScreen(null),/Остаток: 7 шт/);near(f.c.getProduct('flour').stock,10);
  const next=liveStockFixture();for(const [key,value] of f.data)next.data.set(key,value);await next.c.loadAll();liveStockWorkspace(next,['flour']);installLivePosStock(next);

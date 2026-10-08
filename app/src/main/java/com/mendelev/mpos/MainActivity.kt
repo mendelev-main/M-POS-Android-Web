@@ -45,7 +45,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var shares: ReportShareManager
     private lateinit var network: com.mendelev.mpos.network.MPosWebNetwork
     private lateinit var startupView: android.widget.TextView
-    private val startupTimeout = Runnable { showStartupFailure() }
+    private val startupTimeout: Runnable = Runnable { showStartupFailure() }
     private lateinit var telegram: TelegramClient
 
     private val photoPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -173,7 +173,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun showStartupFailure() = runOnUiThread {
+    fun showStartupFailure(): Unit = runOnUiThread {
         if (::startupView.isInitialized && startupView.visibility == android.view.View.VISIBLE) {
             startupView.text = "M POS\n\nЗапуск не завершён\nНажмите, чтобы повторить"
             startupView.textSize = 24f
