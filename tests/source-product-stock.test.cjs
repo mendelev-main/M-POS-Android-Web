@@ -1709,3 +1709,46 @@ test('editing readiness time saves without remounting the picker and rejects inc
  for(const value of ['18:30','19:30','19:45']){f.c.editWebReadyTime(value);assert.equal(opened,0);assert.equal(f.fields['web-order-accept'].disabled,false);assert.equal(vm.runInContext('selectedWebReadyEstimate',f.c),'at:'+value)}
  for(const value of ['','19:','24:00']){f.c.editWebReadyTime(value);assert.equal(opened,0);assert.equal(f.fields['web-order-accept'].disabled,true);assert.equal(vm.runInContext('selectedWebReadyEstimate',f.c),'custom')}
 });
+
+function installLivePosStock(f){vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-pos-stock.js'),'utf8'),f.c);}
+function liveStockWorkspace(f,ids){f.state.layoutTiles=ids.map((id,col)=>({type:'product',id,col,row:0}));f.c.syncCategoryOrder=()=>{};f.state.posPath='';f.state.search='';f.state.editMode=false;f.c.renderCartPanel=()=>'';}
+test('POS cards immediately project current cart stock and restore it on quantity decrease or removal',()=>{
+ const f=fixture();liveStockWorkspace(f,['flour']);installLivePosStock(f);
+ const warehouse=f.c.availableStock,products=JSON.stringify(f.state.products);
+ assert.match(f.c.renderPosScreen(null),/Остаток: 10 шт/);
+ f.cart('flour',2);assert.match(f.c.renderPosScreen(null),/Остаток: 8 шт/);
+ f.cart('flour',1);assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
+ f.state.cart=[];assert.match(f.c.renderPosScreen(null),/Остаток: 10 шт/);
+ assert.strictEqual(f.c.availableStock,warehouse);assert.equal(f.c.availableStock(f.c.getProduct('flour')),10);
+ assert.equal(JSON.stringify(f.state.products),products);assert.equal(f.writes.length,0);
+});
+test('POS projection consumes shared nested recipes and modifiers without changing warehouse validation',()=>{
+ const f=fixture();liveStockWorkspace(f,['pizza','flour']);installLivePosStock(f);
+ f.cart('pizza',2);f.state.cart[0].selectedModifiers=[{productId:'flour',qty:.5,name:'Дополнительная мука'}];
+ const html=f.c.renderPosScreen(null);
+ // 10 - (2 * .2 nested recipe + 2 * .5 modifier) = 8.6; floor(8.6/.2)=43 pizzas.
+ assert.match(html,/Остаток: 8\.6 шт/);assert.match(html,/Доступно: 43/);
+ near(f.c.getProduct('flour').stock,10);assert.equal(f.c.availableStock(f.c.getProduct('pizza')),50);
+ assert.equal(f.c.canFulfillCart(),true);assert.equal(f.writes.length,0);
+});
+test('POS unlimited products and exhausted cards retain expected behavior',()=>{
+ const f=fixture();f.state.products[0].noStockTracking=true;liveStockWorkspace(f,['flour','water']);installLivePosStock(f);
+ f.cart('water',10);const html=f.c.renderPosScreen(null);
+ assert.match(html,/Остаток: ∞/);assert.match(html,/pcard disabled/);assert.match(html,/Остаток: 0 шт/);
+ assert.equal(f.c.getProduct('water').stock,10);
+});
+test('folder stock projection matches workspace and always restores warehouse availability',()=>{
+ const f=navigationFixture();f.state.editMode=false;f.state.cart=[{productId:'a',qty:3}];
+ f.state.posNavigation={version:1,categories:[{category:'Пицца',items:[{type:'folder',id:'folder',name:'Популярное',parentId:''},{type:'product',id:'a',parentId:'folder'}]}]};
+ f.c._posFolderModal={category:'Пицца',id:'folder'};installLivePosStock(f);
+ const warehouse=f.c.availableStock;f.c.renderPosFolderModal();assert.match(f.fields['modal-root'].innerHTML,/Остаток: 7 шт/);
+ assert.strictEqual(f.c.availableStock,warehouse);assert.equal(f.c.availableStock(f.c.getProduct('a')),10);
+ f.c.renderCartPanel=()=>{throw Error('render failed')};f.state.posPath='';assert.throws(()=>f.c.renderPosScreen(null),/render failed/);assert.strictEqual(f.c.availableStock,warehouse);
+});
+test('paid cart projection is not deducted a second time and parked baskets are not reserved',async()=>{
+ const f=fixture();liveStockWorkspace(f,['flour']);installLivePosStock(f);
+ f.cart('flour',1);assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
+ await f.c.finalizePayment([{method:'cash',amount:10}]);assert.equal(f.state.cart.length,0);assert.equal(f.c.getProduct('flour').stock,9);
+ assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
+ f.state.parked=[{items:[{productId:'flour',qty:3}]}];assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
+});

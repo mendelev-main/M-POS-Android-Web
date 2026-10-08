@@ -41,6 +41,10 @@ android_html = source_html.replace(
     '<script src="network-printer.js"></script>',
     '<script src="network-printer.js"></script>\n<script src="notification-native.js"></script>',
 )
+android_html = android_html.replace(
+    "<script>loadAll();</script>",
+    '<script src="android-pos-stock.js"></script>\n<script>loadAll();</script>',
+)
 (target / "pos.html").write_text(android_html)
 (target / "android-bridge.js").write_bytes(bridge)
 
