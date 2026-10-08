@@ -1,0 +1,16 @@
+.gradle/
+.idea/
+local.properties
+**/build/
+captures/
+*.iml
+*.jks
+*.keystore
+keystore.properties
+.DS_Store
+
+
+outputs/
+*.p12
+*PASSWORD*.txt
+*BASE64*.txt
