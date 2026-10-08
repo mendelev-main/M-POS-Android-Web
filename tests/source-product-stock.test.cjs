@@ -1877,3 +1877,26 @@ test('broken storage blocks financial commits but allows validated backup recove
  await assert.rejects(f.c.commitCriticalStorage('payment',{orders:[]}),/Хранилище/);assert.equal(f.writes.length,0);
  await f.c.commitCriticalStorage('backup-import',{parked:[]});assert.deepEqual(JSON.parse(f.data.get('prilavok_parked')),[]);
 });
+
+function installPurchaseValidation(f){vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-purchase-validation.js'),'utf8'),f.c);}
+test('purchase diagnostics name the incompatible product and both units without changing its draft',async()=>{
+ const f=purchaseOrderFixture();f.state.purchaseOrderCart[0]={productId:'flour',requestedQty:4,requestedUnit:'l'};let modal='';f.c.showModal=html=>modal=html;installPurchaseValidation(f);
+ const before=JSON.stringify({products:f.state.products,orders:f.state.purchaseOrders,cart:f.state.purchaseOrderCart});
+ assert.equal(await f.c.finalizePurchaseOrder(),false);assert.match(modal,/Мука/);assert.match(modal,/Единица заказа: «л»/);assert.match(modal,/Складской учёт: «кг»/);assert.match(modal,/кг или г/);assert.match(modal,/Перейти к товару/);
+ assert.equal(JSON.stringify({products:f.state.products,orders:f.state.purchaseOrders,cart:f.state.purchaseOrderCart}),before);assert.equal(f.writes.length,0);
+});
+test('purchase diagnostics distinguish contents of a package and collect every invalid position',async()=>{
+ const f=purchaseOrderFixture();f.state.suppliers[0].productIds.push('water');f.c.getProduct('water').stockUnit='l';
+ f.state.purchaseOrderCart=[{productId:'flour',requestedQty:2,requestedUnit:'box',packSize:3,contentUnit:'l'},{productId:'water',requestedQty:1,requestedUnit:'kg'}];let modal='';f.c.showModal=html=>modal=html;installPurchaseValidation(f);
+ assert.equal(await f.c.finalizePurchaseOrder(),false);assert.match(modal,/Единица внутри коробки: «л»/);assert.match(modal,/Мука/);assert.match(modal,/Вода/);assert.equal((modal.match(/Перейти к товару/g)||[]).length,2);assert.equal(f.writes.length,0);
+});
+test('compatible purchase conversion and unknown package size retain source journal behavior',async()=>{
+ const f=purchaseOrderFixture();installPurchaseValidation(f);near(f.c.makePurchaseLine(f.c.getProduct('flour'),2500,'g','').expectedQty,2.5);
+ assert.equal(f.c.makePurchaseLine(f.c.getProduct('flour'),2,'pack','').expectedQty,null);
+ assert.equal(await f.c.finalizePurchaseOrder(),true);assert.equal(f.state.purchaseOrders.length,1);assert.equal(f.state.purchaseOrders[0].items[0].expectedQty,8);assert.equal(f.state.purchaseOrderCart.length,0);
+ assert.equal(JSON.parse(f.data.get('prilavok_purchaseOrders'))[0].items[0].expectedQty,8);
+});
+test('purchase diagnostics preserve escaping and identify an invalid requested quantity',async()=>{
+ const f=purchaseOrderFixture();f.c.getProduct('flour').name='<img src=x onerror=bad()>';f.state.purchaseOrderCart[0].requestedQty=-1;let modal='';f.c.showModal=html=>modal=html;installPurchaseValidation(f);
+ assert.equal(await f.c.finalizePurchaseOrder(),false);assert.match(modal,/&lt;img/);assert.doesNotMatch(modal,/<img/);assert.match(modal,/Количество заказа должно быть больше нуля/);assert.equal(f.writes.length,0);
+});
