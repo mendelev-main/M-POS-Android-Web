@@ -22,6 +22,17 @@ internal object MPosReceiptLayout {
         fun sep(gap:Float=8f){rows+=Row(kind=Kind.SEPARATOR,size=small,gap=gap)}
         fun money(value:Double)=String.format(Locale.US,"%.2f BYN",value)
         fun qty(value:Double)=if(value%1.0==0.0)value.toLong().toString() else String.format(Locale.US,"%.2f",value)
+        fun modifiers(item:JSONObject,withPrices:Boolean) {
+            for(modifier in objects(item.optJSONArray("selectedModifiers"))) {
+                val name=modifier.optString("name").trim()
+                if(name.isEmpty())continue
+                val quantity=number(modifier,"qty",1.0)
+                val delta=number(modifier,"priceDelta")
+                val label="↳ "+(if(quantity>1)qty(quantity)+" × " else "")+name
+                val price=if(withPrices&&delta!=0.0)" ("+(if(delta>0)"+" else "")+money(delta)+")" else ""
+                add(label+price,if(withPrices)small else regular,gap=3f)
+            }
+        }
         val kind=order.optString("__printDocumentType","receipt");val kitchen=kind=="kitchen"
         if(kind=="shift-close") {
             order.optString("establishmentName").trim().takeIf{it.isNotEmpty()}?.let{add(it,title,700,true,5f)}
@@ -35,7 +46,7 @@ internal object MPosReceiptLayout {
         } else if(kitchen) {
             add(order.optString("receiptDisplayNumber","#—"),title,700,true,3f);add(date(number(order,"timestamp").toLong()),small,400,true,8f);sep(7f)
             add(order.optString("orderType","Заказ"),medium,600,true,8f);sep()
-            for(item in objects(order.optJSONArray("items"))){add(qty(number(item,"qty",1.0))+" × "+item.optString("name"),bold,700,false,4f);item.optString("comment").takeIf{it.isNotEmpty()}?.let{add("↳ "+it,regular,400,false,9f)}}
+            for(item in objects(order.optJSONArray("items"))){add(qty(number(item,"qty",1.0))+" × "+item.optString("name"),bold,700,false,4f);modifiers(item,false);item.optString("comment").takeIf{it.isNotEmpty()}?.let{add("↳ "+it,regular,400,false,9f)}}
         } else {
             cfg.optString("paymentReceiptTitle","ПРИЛАВОК").trim().takeIf{it.isNotEmpty()}?.let{add(it,title,700,true,14f)}
             add("Сотрудник: "+order.optString("employeeName","Сотрудник"),small,gap=2f)
@@ -46,6 +57,7 @@ internal object MPosReceiptLayout {
                 val q=number(item,"qty",1.0);val price=number(item,"price");val gross=q*price;val dv=number(item,"discountValue");val dt=item.optString("discountType")
                 val discount=if(dt=="percent")gross*dv/100 else if(dt.isEmpty())0.0 else dv*q
                 pair(item.optString("name"),money(max(0.0,gross-discount)),medium,600,0f);add(qty(q)+" × "+money(price),gap=1f)
+                modifiers(item,true)
                 if(discount>0)add(item.optString("discountName").trim().ifBlank{"Скидка"}+": −"+money(discount),small,gap=1f)
                 if(cfg.optBoolean("printPaymentComments",true))item.optString("comment").takeIf{it.isNotEmpty()}?.let{add("Комментарий: "+it,small,gap=1f)}
                 add("",small,gap=0f)

@@ -43,6 +43,32 @@ class MPosDocumentParityTest {
         assertTrue(kitchen.rows.any{it.left=="↳ Без сахара"})
         assertFalse(kitchen.rows.any{it.right.contains("BYN")})
     }
+    @Test fun modifiersPrintUnderTheirItemWithoutChangingPriceOrSnapshot(){
+        val data=order()
+        data.getJSONArray("items").getJSONObject(0).put("selectedModifiers",JSONArray("""[{"name":"Овсяное молоко","qty":1,"priceDelta":2},{"name":"Сироп","qty":2,"priceDelta":0},{"name":"Без добавки","qty":1,"priceDelta":-1}]"""))
+        data.getJSONObject("__printerConfig").put("printPaymentComments",false)
+        val snapshot=data.toString()
+        for(width in listOf(58,80)){
+            data.getJSONObject("__printerConfig").put("paperWidth",width)
+            val payment=MPosReceiptLayout.build(data).rows
+            val product=payment.indexOfFirst{it.left=="Капучино"}
+            val modifier=payment.indexOfFirst{it.left=="↳ Овсяное молоко (+2.00 BYN)"}
+            assertTrue(modifier>product)
+            assertTrue(payment.any{it.left=="↳ 2 × Сироп"})
+            assertTrue(payment.any{it.left=="↳ Без добавки (-1.00 BYN)"})
+            assertEquals("18.00 BYN",payment[product].right)
+            data.put("__printDocumentType","kitchen")
+            val kitchen=MPosReceiptLayout.build(data).rows
+            assertTrue(kitchen.any{it.left=="↳ Овсяное молоко"})
+            assertTrue(kitchen.any{it.left=="↳ 2 × Сироп"})
+            assertFalse(kitchen.any{it.left.contains("BYN")||it.right.contains("BYN")})
+            save(EscPosRaster.render(data),"kitchen-modifiers-$width.png")
+            data.remove("__printDocumentType")
+            save(EscPosRaster.render(data),"receipt-modifiers-$width.png")
+        }
+        data.getJSONObject("__printerConfig").put("paperWidth",80)
+        assertEquals(snapshot,data.toString())
+    }
     @Test fun splitPaymentsAndShiftTotalsKeepTheirOriginalOrder(){
         val data=order().put("payments",JSONArray("""[{"method":"cash","amount":8,"cashGiven":10,"change":2},{"method":"card","amount":10}]"""))
         val rows=MPosReceiptLayout.build(data).rows
