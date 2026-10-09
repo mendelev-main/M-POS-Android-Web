@@ -1864,12 +1864,11 @@ test('parked recipes and modifiers share ingredient reservations with the curren
 });
 
 function installRuntimeSafety(f){f.c.requestAnimationFrame=()=>0;vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-safety.js'),'utf8'),f.c);}
-test('critical journal rejects concurrent writers before either snapshot is overwritten',async()=>{
- const f=fixture();let release;const gate=new Promise(resolve=>release=resolve),set=f.c.PrilavokCore.Storage.set;
- f.c.PrilavokCore.Storage.set=async function(key,value){if(key==='criticalStorageJournal')await gate;return set.call(this,key,value)};
- installRuntimeSafety(f);const first=f.c.commitCriticalStorage('first',{parked:[{id:'first'}]});
- await assert.rejects(f.c.commitCriticalStorage('second',{parked:[{id:'second'}]}),/другой операции/);
- release();await first;assert.equal(JSON.parse(f.data.get('prilavok_parked'))[0].id,'first');
+test('critical journal rejects reentrant writers before either snapshot is overwritten',async()=>{
+ const f=fixture();installRuntimeSafety(f);const set=f.c.localStorage.setItem;let competing;
+ f.c.localStorage.setItem=(key,value)=>{if(key==='prilavok_criticalStorageJournal'&&!competing){competing=f.c.commitCriticalStorage('second',{parked:[{id:'second'}]});competing.catch(()=>{});}set(key,value)};
+ await f.c.commitCriticalStorage('first',{parked:[{id:'first'}]});
+ await assert.rejects(competing,/другой операции/);assert.equal(JSON.parse(f.data.get('prilavok_parked'))[0].id,'first');
  await f.c.commitCriticalStorage('third',{parked:[]});assert.deepEqual(JSON.parse(f.data.get('prilavok_parked')),[]);
 });
 test('broken storage blocks financial commits but allows validated backup recovery path',async()=>{
@@ -1899,4 +1898,97 @@ test('compatible purchase conversion and unknown package size retain source jour
 test('purchase diagnostics preserve escaping and identify an invalid requested quantity',async()=>{
  const f=purchaseOrderFixture();f.c.getProduct('flour').name='<img src=x onerror=bad()>';f.state.purchaseOrderCart[0].requestedQty=-1;let modal='';f.c.showModal=html=>modal=html;installPurchaseValidation(f);
  assert.equal(await f.c.finalizePurchaseOrder(),false);assert.match(modal,/&lt;img/);assert.doesNotMatch(modal,/<img/);assert.match(modal,/Количество заказа должно быть больше нуля/);assert.equal(f.writes.length,0);
+});
+
+// Android write boundary: actual source handlers, synthetic localStorage, no network.
+test('ordinary writes and mutations are refused during financial publication without marking storage broken',async()=>{
+ const f=fixture();f.cart();installRuntimeSafety(f);const before=JSON.stringify(f.state.cart);vm.runInContext('criticalOperationBusy=true',f.c);
+ await assert.rejects(f.c.PrilavokCore.Storage.set('orders',[{id:'stale'}]),/другой операции/);
+ assert.equal(f.c.changeQty('pizza',1),false);assert.equal(JSON.stringify(f.state.cart),before);assert.equal(f.writes.length,0);
+ try{await f.c.PrilavokCore.Storage.set('orders',[])}catch(error){f.c.markStorageBroken(error)}
+ assert.equal(vm.runInContext('storageBroken',f.c),false);
+ vm.runInContext('criticalOperationBusy=false',f.c);await f.c.PrilavokCore.Storage.set('orders',[]);assert.deepEqual(JSON.parse(f.data.get('prilavok_orders')),[]);
+});
+test('direct writes cannot overwrite or remove the journal and pending recovery rejects async editors',async()=>{
+ const f=fixture();installRuntimeSafety(f);
+ await assert.rejects(f.c.PrilavokCore.Storage.set('criticalStorageJournal',null),/Журнал/);
+ assert.throws(()=>f.c.PrilavokCore.Storage.remove('criticalStorageJournal'),/журнал/);
+ vm.runInContext('criticalStorageRecoveryPending=true',f.c);
+ await assert.rejects(f.c.PrilavokCore.Storage.set('products',[]),/Незавершённая/);
+ assert.equal(await f.c.saveProduct('pizza'),false);assert.equal(f.writes.length,0);
+});
+test('cart write failure rolls back proposed memory and suppresses success rendering until recovery',async()=>{
+ const f=fixture();f.cart();await f.c.saveCurrentOrderSession();let renders=0;f.c.render=()=>renders++;installRuntimeSafety(f);
+ const before=JSON.stringify(f.state.cart),set=f.c.localStorage.setItem;let failed=false;
+ f.c.localStorage.setItem=(key,value)=>{if(key==='prilavok_currentOrderSession'&&!failed){failed=true;throw Error('injected session failure')}set(key,value)};
+ assert.equal(f.c.changeQty('pizza',1),false);assert.equal(JSON.stringify(f.state.cart),before);assert.equal(renders,0);assert.match(f.messages.at(-1),/не подтверждены/);
+ assert.equal(vm.runInContext('criticalStorageRecoveryPending',f.c),true);
+ await assert.rejects(f.c.PrilavokCore.Storage.set('currentOrderSession',{items:[]}),/Незавершённая/);
+ assert.equal(await f.c.recoverCriticalStorageJournal(),true);assert.equal(JSON.parse(f.data.get('prilavok_currentOrderSession')).items[0].qty,2);
+ assert.equal(await f.c.recoverCriticalStorageJournal(),true);assert.equal(JSON.parse(f.data.get('prilavok_currentOrderSession')).items[0].qty,2);
+});
+test('table and booking deletion share one journal and partial failure preserves UI then recovers both keys',async()=>{
+ const f=fixture();f.state.hallTables=[{id:'table',name:'Стол'}];f.state.bookings=[{id:'booking',tableId:'table'}];
+ await f.c.saveKey('hallTables',f.state.hallTables);await f.c.saveKey('bookings',f.state.bookings);
+ let closed=0;f.c.closeModal=()=>closed++;installRuntimeSafety(f);const set=f.c.localStorage.setItem;let failed=false;
+ f.c.localStorage.setItem=(key,value)=>{if(key==='prilavok_bookings'&&!failed){failed=true;throw Error('injected booking failure')}set(key,value)};
+ assert.equal(f.c.confirmDeleteHallTable('table'),false);assert.equal(f.state.hallTables.length,1);assert.equal(f.state.bookings.length,1);assert.equal(closed,0);
+ const journal=JSON.parse(f.data.get('prilavok_criticalStorageJournal'));assert.deepEqual(journal.writes.map(x=>x.key),['hallTables','bookings']);
+ assert.equal(await f.c.recoverCriticalStorageJournal(),true);assert.deepEqual(JSON.parse(f.data.get('prilavok_hallTables')),[]);assert.deepEqual(JSON.parse(f.data.get('prilavok_bookings')),[]);
+});
+test('network persistence failure returns false and prevents backend test request',async()=>{
+ const f=fixture();f.c.currentShiftEmployeeIsAdmin=()=>true;f.state.network={backendUrl:'https://old.test',deviceKey:'key',deviceName:'old'};
+ f.fields['network-backend-url']={value:'https://new.test'};f.fields['network-device-name']={value:'new'};
+ let requests=0;f.c.fetch=async()=>{requests++;return{ok:true,json:async()=>({ok:true})}};installRuntimeSafety(f);
+ const before=JSON.stringify(f.state.network);f.c.localStorage.setItem=()=>{throw Error('quota')};
+ await f.c.testBackendConnection();assert.equal(requests,0);assert.equal(JSON.stringify(f.state.network),before);assert.doesNotMatch(f.messages.join(' '),/Backend подключён/);
+});
+test('inventory startup retains synchronous boolean contract and writes before reporting success',()=>{
+ const f=fixture();f.state.inventoryConfig={productIds:['flour'],frequency:'monthly'};installRuntimeSafety(f);
+ assert.equal(f.c.startInventory('adhoc'),true);const stored=JSON.parse(f.data.get('prilavok_inventoryDraft'));assert.equal(stored.items[0].productId,'flour');assert.equal(stored.type,'adhoc');
+ assert.equal(JSON.parse(f.data.get('prilavok_criticalStorageJournal')),null);
+});
+test('demand state and outbox are committed before the deferred external effect',()=>{
+ const f=fixture();f.state.loaded=true;let seen;f.c.flushOperationalOutbox=async()=>{seen={demand:JSON.parse(f.data.get('prilavok_demandOverload')),outbox:JSON.parse(f.data.get('prilavok_operationalOutbox'))}};installRuntimeSafety(f);
+ f.c.setDemandOverload(true);assert.equal(seen.demand,true);assert.equal(seen.outbox[0].payload.demand.overload,true);assert.equal(f.state.demandOverload,true);
+});
+test('invalid journal is validated completely before replay writes any business document',async()=>{
+ const f=fixture();f.data.set('prilavok_criticalStorageJournal',JSON.stringify({version:1,writes:[{key:'products',value:[]},{key:'not-allowed',value:[]}]}));installRuntimeSafety(f);
+ assert.equal(await f.c.recoverCriticalStorageJournal(),false);assert.equal(f.writes.length,0);assert.equal(vm.runInContext('criticalStorageRecoveryPending',f.c),true);
+ await assert.rejects(f.c.PrilavokCore.Storage.set('orders',[]),/Незавершённая/);
+});
+test('loyalty background save is refused before HTTP when a financial operation is publishing',async()=>{
+ const f=fixture();f.state.orders=[{id:'sale',customer:{id:'customer'},items:[],loyaltySync:{status:'pending'}}];let requests=0;f.c.fetch=async()=>{requests++};installRuntimeSafety(f);
+ vm.runInContext('criticalOperationBusy=true',f.c);await f.c.publishPaidOrderLoyalty(f.state.orders[0]);
+ assert.equal(requests,0);assert.equal(f.writes.length,0);assert.equal(vm.runInContext('storageBroken',f.c),false);assert.equal(f.state.orders[0].loyaltySync.status,'pending');
+});
+
+test('backup restoration holds an exclusive lease through async state publication and rejects a second import',async()=>{
+ const f=fixture();let release,entered=false;const gate=new Promise(resolve=>release=resolve);
+ f.c.applyBackupData=async()=>{entered=true;await gate;f.c.render();return{restored:true}};let renders=0;f.c.render=()=>renders++;installRuntimeSafety(f);
+ const first=f.c.applyBackupData({});assert.equal(entered,true);
+ await assert.rejects(f.c.applyBackupData({}),/другой операции/);await assert.rejects(f.c.PrilavokCore.Storage.set('orders',[]),/другой операции/);
+ await assert.rejects(f.c.commitCriticalStorage('payment',{orders:[]}),/другой операции/);
+ release();assert.equal((await first).restored,true);assert.equal(renders,1);await f.c.PrilavokCore.Storage.set('orders',[]);
+});
+
+test('category rename journals products navigation and layout together and recovers after second-key failure',async()=>{
+ const f=fixture();f.state.categoryOrder=['Сырьё'];f.state.categoryColors={};f.state.categorySymbols={};f.state.categoryOnlineOrder={'Сырьё':true};f.state.categoryOnlineMenu={'Сырьё':true};f.state.categoryOnline=f.state.categoryOnlineOrder;f.state.posNavigation={categories:[{category:'Сырьё',items:[]}]};f.state.layoutTiles=[{type:'category',id:'Сырьё'}];f.fields['cf-name']={value:'Новое'};
+ await f.c.saveKey('products',f.state.products);await f.c.saveKey('posNavigation',f.state.posNavigation);await f.c.saveKey('layout',f.c.categoryLayoutSnapshot());installRuntimeSafety(f);
+ const before=JSON.stringify(f.state.products),set=f.c.localStorage.setItem;let failed=false;
+ f.c.localStorage.setItem=(key,value)=>{if(key==='prilavok_products'&&!failed){failed=true;throw Error('injected catalogue failure')}set(key,value)};
+ assert.equal(f.c.saveCategory('Сырьё'),false);assert.equal(JSON.stringify(f.state.products),before);assert.equal(f.state.posNavigation.categories[0].category,'Сырьё');assert.equal(f.state.categoryOnline,f.state.categoryOnlineOrder);
+ const journal=JSON.parse(f.data.get('prilavok_criticalStorageJournal'));assert.deepEqual(journal.writes.map(x=>x.key),['posNavigation','products','layout']);
+ assert.equal(await f.c.recoverCriticalStorageJournal(),true);assert.equal(JSON.parse(f.data.get('prilavok_products'))[0].category,'Новое');assert.equal(JSON.parse(f.data.get('prilavok_posNavigation')).categories[0].category,'Новое');assert.equal(JSON.parse(f.data.get('prilavok_layout')).tiles[0].id,'Новое');
+});
+test('a failed deferred render does not roll back or misreport an already committed cart edit',()=>{
+ const f=fixture();f.cart();f.c.render=()=>{throw Error('injected view failure')};installRuntimeSafety(f);
+ f.c.changeQty('pizza',1);assert.equal(f.state.cart[0].qty,2);assert.equal(JSON.parse(f.data.get('prilavok_currentOrderSession')).items[0].qty,2);
+ assert.equal(JSON.parse(f.data.get('prilavok_criticalStorageJournal')),null);assert.match(f.messages.at(-1),/Изменения сохранены/);assert.equal(vm.runInContext('storageBroken',f.c),false);
+});
+
+test('read-only startup does not replace damaged documents with compatibility defaults',async()=>{
+ const f=fixture();f.data.set('prilavok_products','broken-original');f.state.loaded=false;installRuntimeSafety(f);vm.runInContext('storageBroken=true',f.c);
+ assert.equal(await f.c.saveKey('products',[]),false);assert.equal(f.data.get('prilavok_products'),'broken-original');assert.equal(f.writes.length,0);
+ f.state.loaded=true;assert.throws(()=>f.c.saveKey('products',[]),/Хранилище/);
 });
