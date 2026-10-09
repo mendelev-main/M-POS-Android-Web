@@ -2154,7 +2154,7 @@ test('cent rounding preserves another half-cent item and audits a zero monetary 
 });
 test('multiple program discounts sum to exactly the rounded gift total',()=>{
  const f=netGiftFixture();discountedGift(f);f.state.cart[0].qty=3;f.state.cart[0].price=.01;giftProgram(f,'second');giftProgram(f,'third');
- const a=f.c.loyaltyRewardAllocation();assert.equal(a.discount,.02);assert.equal(Math.round(Object.values(a.programDiscounts).reduce((s,v)=>s+v,0)*100),2);assert.equal(f.c.cartTotal(),0);assert.equal(f.c.loyaltyReceiptSnapshot().programs.length,3);f.state.orderType='Доставка';f.state.deliveryFee=3;assert.equal(f.c.cartTotal(),3);assert.ok(f.c.renderCartPanel().includes('<span class="label">Итого</span><span class="value">'+f.c.fullMoney(3)+'</span>'));assert.ok(f.c.paymentReceiptHtml().includes(f.c.fullMoney(3)));
+ const a=f.c.loyaltyRewardAllocation();assert.equal(a.discount,.02);assert.equal(Math.round(Object.values(a.programDiscounts).reduce((s,v)=>s+v,0)*100),2);assert.equal(f.c.cartTotal(),0);assert.equal(f.c.loyaltyReceiptSnapshot().programs.length,3);f.state.orderType='Доставка';f.state.deliveryFee=3;assert.equal(f.c.cartTotal(),3);assert.ok(f.c.renderCartPanel().includes('<span class="label">Итого</span><span class="value">'+vm.runInContext('fullMoney(3)',f.c)+'</span>'));assert.ok(f.c.paymentReceiptHtml().includes(vm.runInContext('fullMoney(3)',f.c)));
 });
 test('fractional cart quantity gifts one full unit and leaves the fractional remainder payable',()=>{
  const f=netGiftFixture();discountedGift(f);f.state.cart[0].qty=1.5;f.state.orderType='Доставка';f.state.deliveryFee=3;assert.equal(f.c.loyaltyRewardDiscount(),5);assert.equal(f.c.cartTotal(),5.5);
@@ -2176,4 +2176,58 @@ test('allocation is pure, repeatable and reacts to changed quantity and discount
 });
 test('large quantity allocation is bounded by cart lines without expanding every unit',()=>{
  const f=netGiftFixture();f.cart('pizza',100000000);giftProgram(f);const allocation=f.c.loyaltyRewardAllocation();assert.equal(allocation.discount,10);assert.equal(allocation.allocations.gift[0].quantity,1);assert.equal(f.c.cartTotal(),999999990);
+});
+
+function isolatedParkedFixture(){const f=fixture();installRuntimeSafety(f);installLivePosStock(f);f.c.publishAvailability=async()=>true;f.c.publishPaidOrderLoyalty=async()=>true;f.state.loaded=true;return f;}
+test('missing product in a parked order no longer blocks an unrelated real payment',async()=>{
+ const f=isolatedParkedFixture();f.state.parked=[{id:'broken',orderLabel:'Старый заказ',items:[{productId:'deleted',name:'Удалённый товар',qty:1,price:10}]}];f.cart('water');
+ await f.c.finalizePayment([{method:'cash',amount:10}]);assert.equal(f.state.orders.length,1);assert.equal(f.c.getProduct('water').stock,9);assert.equal(f.state.parked.length,1);assert.equal(f.c.__androidParkedStockIssues()[0].line,'Удалённый товар');
+});
+test('valid parked lines keep reserving stock despite another missing product',()=>{
+ const f=isolatedParkedFixture();f.state.parked=[{id:'broken',items:[{productId:'deleted',name:'Нет товара',qty:1},{productId:'flour',qty:3}]}];
+ assert.throws(()=>f.c.checkedStockConsumption([{productId:'flour',qty:8}]),/отложенных/);assert.equal(f.c.checkedStockConsumption([{productId:'flour',qty:7}]).items[0].qty,7);
+});
+test('missing modifier preserves both base recipe and other valid modifiers',()=>{
+ const f=isolatedParkedFixture();f.state.parked=[{id:'broken',items:[{productId:'pizza',name:'Пицца',qty:1,selectedModifiers:[{productId:'deleted',qty:.5},{productId:'flour',qty:.5}]}]}];
+ assert.throws(()=>f.c.checkedStockConsumption([{productId:'flour',qty:9.4}]),/отложенных/);assert.doesNotThrow(()=>f.c.checkedStockConsumption([{productId:'flour',qty:9.3}]));assert.throws(()=>f.c.checkedStockConsumption([{productId:'water',qty:10}]),/отложенных/);
+});
+test('valid recipe siblings remain reserved even when missing branch comes first',()=>{
+ const f=isolatedParkedFixture();f.c.getProduct('dough').components=[{productId:'deleted',qty:1},{productId:'flour',qty:2}];f.state.parked=[{id:'broken',items:[{productId:'dough',qty:2}]}];
+ assert.throws(()=>f.c.checkedStockConsumption([{productId:'flour',qty:7}]),/отложенных/);assert.doesNotThrow(()=>f.c.checkedStockConsumption([{productId:'flour',qty:6}]));assert.doesNotThrow(()=>f.c.checkedStockConsumption([{productId:'water',qty:10}]));
+});
+test('unknown quantity blocks its ingredients but not unrelated products',()=>{
+ const f=isolatedParkedFixture();f.state.parked=[{id:'bad-quantity',items:[{productId:'flour',name:'Мука',qty:'unknown'}]}];
+ assert.throws(()=>f.c.checkedStockConsumption([{productId:'flour',qty:.0001}]),/Не определён резерв/);assert.doesNotThrow(()=>f.c.checkedStockConsumption([{productId:'water',qty:10}]));
+});
+test('cyclic reservation blocks reachable ingredients without poisoning unrelated stock',()=>{
+ const f=isolatedParkedFixture();f.c.getProduct('dough').components=[{productId:'pizza',qty:1},{productId:'flour',qty:.2}];f.state.parked=[{id:'cycle',items:[{productId:'pizza',qty:1}]}];
+ assert.throws(()=>f.c.checkedStockConsumption([{productId:'flour',qty:.001}]),/Не определён резерв/);assert.doesNotThrow(()=>f.c.checkedStockConsumption([{productId:'water',qty:10}]));
+});
+test('POS keeps partial reservations and does not release all stock after a bad line',()=>{
+ const f=isolatedParkedFixture();for(const p of f.state.products)if(p.type==='simple')p.stockUnit='piece';liveStockWorkspace(f,['flour']);f.state.parked=[{id:'broken',items:[{productId:'deleted',qty:1},{productId:'flour',qty:3}]}];f.cart('flour',1);const before=JSON.stringify(f.state.products);
+ assert.match(f.c.renderPosScreen(null),/Остаток: 6 шт/);assert.equal(JSON.stringify(f.state.products),before);assert.equal(f.writes.length,0);
+});
+test('unfulfillable parked stock only blocks payments using the same resource',()=>{
+ const f=isolatedParkedFixture();f.state.parked=[{id:'shortage',items:[{productId:'flour',qty:12}]}];assert.doesNotThrow(()=>f.c.checkedStockConsumption([{productId:'water',qty:1}]));assert.throws(()=>f.c.checkedStockConsumption([{productId:'flour',qty:1}]),/отложенных/);
+});
+test('broken payable cart stays strictly blocked and is not silently repaired',async()=>{
+ const f=isolatedParkedFixture();f.cart('deleted');const cart=JSON.stringify(f.state.cart);await f.c.finalizePayment([{method:'cash',amount:10}]);assert.equal(f.state.orders.length,0);assert.equal(JSON.stringify(f.state.cart),cart);assert.match(f.messages.at(-1),/не найден/);
+});
+test('deletion of current, parked, selected-modifier and nested-recipe dependencies is blocked',()=>{
+ for(const mode of ['current','parked','modifier','nested']){
+  const f=isolatedParkedFixture();if(mode==='current')f.cart('flour');if(mode==='parked')f.state.parked=[{orderLabel:'Заказ стола',items:[{productId:'flour',qty:1}]}];if(mode==='modifier'){f.cart('water');f.state.cart[0].selectedModifiers=[{productId:'flour',qty:.1}]}if(mode==='nested')f.state.parked=[{items:[{productId:'pizza',qty:1}]}];
+  const products=JSON.stringify(f.state.products),writes=f.writes.length;assert.equal(f.c.confirmDelete('product','flour'),false);assert.equal(JSON.stringify(f.state.products),products);assert.equal(f.writes.length,writes);assert.match(f.messages.at(-1),/Нельзя удалить товар/);
+ }
+});
+test('catalogue modifier references block deletion while unrelated deletion delegates normally',()=>{
+ const f=fixture();let delegated=0;f.c.confirmDelete=()=>{delegated++;return true};installLivePosStock(f);f.c.getProduct('pizza').modifierGroups=[{options:[{productId:'water'}]}];assert.equal(f.c.confirmDelete('product','water'),false);assert.equal(delegated,0);assert.equal(f.c.confirmDelete('product','flour'),true);assert.equal(delegated,1);
+});
+test('type change is blocked for a product reserved by an unpaid order',async()=>{
+ const f=isolatedParkedFixture();f.state.parked=[{items:[{productId:'water',qty:1}]}];f.c._pmType='composite';assert.equal(await f.c.saveProduct('water'),false);assert.equal(f.c.getProduct('water').type,'simple');assert.match(f.messages.at(-1),/Нельзя изменить тип/);assert.equal(f.writes.length,0);
+});
+test('parked diagnostics name affected order and line and escape markup without changing data',()=>{
+ const f=isolatedParkedFixture();f.state.parked=[{id:'broken',orderLabel:'<script>bad</script>',items:[{productId:'deleted',name:'<b>Товар</b>',qty:1}],createdAt:1}];let html;const show=(s)=>{html=s};f.c.showModal=show;const before=JSON.stringify(f.state.parked);f.c.openParkedModal();assert.match(html,/Некоторые заказы требуют исправления/);assert.match(html,/&lt;script&gt;bad/);assert.match(html,/&lt;b&gt;Товар/);assert.doesNotMatch(html,/<script>bad/);assert.strictEqual(f.c.showModal,show);assert.equal(JSON.stringify(f.state.parked),before);assert.equal(f.writes.length,0);
+});
+test('deleting a broken parked order releases its conservative reservation through journal',async()=>{
+ const f=isolatedParkedFixture();f.state.parked=[{id:'broken',items:[{productId:'flour',qty:'unknown'}]}];assert.throws(()=>f.c.checkedStockConsumption([{productId:'flour',qty:1}]),/Не определён резерв/);assert.equal(await f.c.deleteParked('broken'),true);assert.doesNotThrow(()=>f.c.checkedStockConsumption([{productId:'flour',qty:1}]));assert.deepEqual(JSON.parse(f.data.get('prilavok_parked')),[]);
 });
