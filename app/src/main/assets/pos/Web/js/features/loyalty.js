@@ -26,7 +26,7 @@ async function loadCustomerLoyalty(customerId){
  try{
   const data=await loyaltyApi('/api/customers/'+encodeURIComponent(customerId)+'/loyalty');
   if(state.customer!==selectedCustomer||String(state.customer?.id)!==String(customerId))return;
-  state.customer={...state.customer,id:data.customer.id,name:data.customer.name,phone:data.customer.normalized_phone};
+  state.customer={...state.customer,id:data.customer.id,name:data.customer.name,phone:data.customer.normalized_phone,telegram_username:data.customer.telegram_username||null};
   state.loyaltyPrograms=data.programs||[];state.loyaltyRedemptions={};state.loyaltyCustomerId=String(customerId);state.loyaltyLoadingCustomerId='';state.loyaltyLoadError='';saveCurrentOrderSession();render();if(typeof refreshOrderCustomerModal==='function')refreshOrderCustomerModal();
  }catch(e){
   if(state.customer===selectedCustomer&&String(state.customer?.id)===String(customerId)){state.loyaltyLoadingCustomerId='';state.loyaltyLoadError=String(e?.message||e);if(typeof refreshOrderCustomerModal==='function')refreshOrderCustomerModal()}
@@ -38,9 +38,13 @@ function openOrderCustomer(){
  renderOrderCustomerModal();
  const id=String(state.customer.id);if(state.loyaltyCustomerId!==id&&state.loyaltyLoadingCustomerId!==id)void loadCustomerLoyalty(id).catch(()=>{});
 }
+function orderCustomerTelegramAction(){
+ const username=String(state.customer?.telegram_username||'').replace(/^@/,'');
+ return /^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(username)?`<a class="btn btn-secondary customer-profile-telegram" href="https://t.me/${encodeURIComponent(username)}">Написать в Telegram</a>`:'<button class="btn btn-secondary customer-profile-telegram" disabled title="У клиента не указан username Telegram">Написать в Telegram</button>';
+}
 function renderOrderCustomerModal(){
  if(!state.customer?.id)return;
- showModal(`<div class="customer-profile-heading"><div class="customer-avatar" aria-hidden="true">${customerInitial(state.customer.name)}</div><div><div class="modal-title">${escapeHtml(state.customer.name||'Клиент')}</div><div class="customer-profile-phone">${escapeHtml(state.customer.phone||'')}</div></div></div><div class="loyalty-summary-section">${loyaltySummaryHtml()}</div><div class="modal-actions customer-profile-actions"><button class="btn btn-secondary" onclick="openCustomerPicker()">Сменить клиента</button><button class="btn btn-primary" onclick="closeModal();render()">Готово</button></div><button class="btn btn-secondary loyalty-remove-customer" onclick="removeOrderCustomer()">Убрать клиента из заказа</button>`,false);
+ showModal(`<div class="customer-profile-heading"><div class="customer-avatar" aria-hidden="true">${customerInitial(state.customer.name)}</div><div><div class="modal-title">${escapeHtml(state.customer.name||'Клиент')}</div><div class="customer-profile-phone">${escapeHtml(state.customer.phone||'')}</div></div>${orderCustomerTelegramAction()}</div><div class="loyalty-summary-section">${loyaltySummaryHtml()}</div><div class="modal-actions customer-profile-actions"><button class="btn btn-secondary" onclick="openCustomerPicker()">Сменить клиента</button><button class="btn btn-primary" onclick="closeModal();render()">Готово</button></div><button class="btn btn-secondary loyalty-remove-customer" onclick="removeOrderCustomer()">Убрать клиента из заказа</button>`,false);
  document.querySelector('#modal-root .modal')?.classList.add('customer-profile-modal');
 }
 function refreshOrderCustomerModal(){if(typeof document!=='undefined'&&document.querySelector?.('#modal-root .customer-profile-modal'))renderOrderCustomerModal()}
@@ -56,27 +60,32 @@ function loyaltySummaryHtml(){
  if(state.loyaltyLoadingCustomerId===String(state.customer.id))return '<div class="customer-loyalty-state"><strong>Загружаем программы</strong><span>Данные клиента обновляются…</span></div>';
  if(state.loyaltyLoadError)return '<div class="customer-loyalty-state is-error"><strong>Не удалось загрузить программы</strong><span>Проверьте интернет и повторите.</span><button class="btn btn-secondary" onclick="retryCustomerLoyalty()">Повторить</button></div>';
  if(!state.loyaltyPrograms.length)return '<div class="setting-sub">Для клиента пока нет активных программ.</div>';
- return state.loyaltyPrograms.map(p=>{const available=Number(p.rewards)>0;return `<div class="loyalty-summary-card"><div class="loyalty-summary-main"><div class="list-row-name">${escapeHtml(p.name)}</div><div class="list-row-sub">${available?'Накопление приостановлено до использования подарка':`Прогресс: ${Number(p.progress)||0} из ${Number(p.required_quantity)||0}`}</div></div><div class="loyalty-reward-count"><span>Подарок:</span><strong>${available?'доступен':'нет'}</strong></div>${available?`<select aria-label="Использовать подарок программы ${escapeAttr(p.name)}" onchange="setLoyaltyRedemption(${loyaltyInlineArg(p.id)},this.value)"><option value="0" ${!Number(state.loyaltyRedemptions?.[p.id])?'selected':''}>Не использовать</option><option value="1" ${Number(state.loyaltyRedemptions?.[p.id])===1?'selected':''}>Использовать подарок</option></select>`:''}</div>`}).join('');
+ const allocation=loyaltyRewardAllocation();
+ return state.loyaltyPrograms.map(p=>{
+  const available=Number(p.rewards)>0,selected=Number(state.loyaltyRedemptions?.[p.id])>0,applied=(allocation.allocations?.[p.id]||[]).some(x=>Number(x.quantity)>0);
+  const giftNames=(p.loyalty_reward_products||[]).map(x=>(state.products||[]).find(product=>String(product.id)===String(x.product_id))?.name).filter(Boolean);
+  const hint=selected?(applied?'Подарок применён к этому заказу.':`Подарок ещё не применён. Добавьте в заказ ${giftNames.length?giftNames.join(' или '):'товар, участвующий в акции'}.`):'Отметьте подарок, чтобы использовать его в этом заказе.';
+  return `<div class="loyalty-summary-card"><div class="loyalty-summary-main"><div class="list-row-name">${escapeHtml(p.name)}</div><div class="list-row-sub">${available?'Накопление продолжится после использования подарка':`Прогресс: ${Number(p.progress)||0} из ${Number(p.required_quantity)||0}`}</div></div><div class="loyalty-reward-count"><span>Подарок:</span><strong>${available?'доступен':'нет'}</strong></div>${available?`<label class="loyalty-gift-choice"><input type="checkbox" ${selected?'checked':''} onchange="setLoyaltyRedemption(${loyaltyInlineArg(p.id)},this.checked?1:0)"><span>Использовать подарок в этом заказе</span></label><div class="loyalty-gift-hint ${selected&&applied?'is-applied':''}" role="status">${escapeHtml(hint)}</div>`:''}</div>`;
+ }).join('');
 }
 async function openCustomerPicker(){
  ++customerSearchSeq;
- showModal(`<div class="customer-picker-heading"><button class="icon-btn customer-picker-close" type="button" aria-label="Закрыть" title="Закрыть" onclick="closeModal()"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button><div class="modal-title">Клиент заказа</div><button class="icon-btn customer-picker-add" type="button" aria-label="Добавить нового клиента" title="Добавить нового клиента" onclick="openCreateCustomer()"><span class="ui-icon ui-icon-add" aria-hidden="true"></span></button></div><div class="field customer-search-field"><label for="customer-search">Номер телефона</label><div class="customer-phone-field"><span>+375</span><input id="customer-search" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="9" autocomplete="off" enterkeyhint="search" placeholder="29 123 45 67" aria-label="Номер телефона после +375" oninput="customerSearchChanged(this.value)"></div></div><div id="customer-search-results" class="customer-picker-results"><div class="center-note">Введите минимум 4 цифры номера</div></div>`,false);
+ showModal(`<div class="customer-picker-heading"><button class="icon-btn customer-picker-close" type="button" aria-label="Закрыть" title="Закрыть" onclick="closeModal()"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button><div class="modal-title">Клиент заказа</div><button class="icon-btn customer-picker-add" type="button" aria-label="Добавить нового клиента" title="Добавить нового клиента" onclick="openCreateCustomer()"><span class="ui-icon ui-icon-add" aria-hidden="true"></span></button></div><div class="field customer-search-field"><label for="customer-search">Последние 4 цифры телефона</label><div class="customer-phone-field"><input id="customer-search" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" enterkeyhint="search" placeholder="4567" aria-label="Последние четыре цифры номера телефона" oninput="customerSearchChanged(this.value)"></div></div><div id="customer-search-results" class="customer-picker-results"><div class="center-note">Введите последние 4 цифры номера</div></div>`,false);
  document.querySelector('#modal-root .modal')?.classList.add('customer-picker-modal');
 }
 let customerSearchSeq=0;
 function customerPhoneDigits(value){
- const raw=String(value||''),digits=raw.replace(/\D/g,'');
- return ((raw.trim().startsWith('+375')||digits.length===12&&digits.startsWith('375'))?digits.slice(3):digits).slice(0,9);
+ return String(value||'').replace(/\D/g,'').slice(-4);
 }
 function customerInitial(name){return escapeHtml((String(name||'?').trim().charAt(0)||'?').toLocaleUpperCase('ru'))}
 function customerResultCards(rows){return rows.map(x=>`<button class="customer-result-card" data-customer-id="${escapeAttr(x.id)}"><span class="customer-result-avatar" aria-hidden="true">${customerInitial(x.name)}</span><span class="customer-result-copy"><strong>${escapeHtml(x.name)}</strong><small>${escapeHtml(x.normalized_phone)}</small></span><span class="customer-result-action">Выбрать</span></button>`).join('')}
 async function customerSearchChanged(value){
  const seq=++customerSearchSeq,el=document.getElementById('customer-search-results'),input=document.getElementById('customer-search');
  const digits=customerPhoneDigits(value);if(input)input.value=digits;if(!el)return;
- if(digits.length<4){el.innerHTML='<div class="center-note">Введите минимум 4 цифры номера</div>';return}
- const phone='+375'+digits;el.innerHTML='<div class="center-note">Поиск…</div>';
+ if(digits.length<4){el.innerHTML='<div class="center-note">Введите последние 4 цифры номера</div>';return}
+ const phone=digits;el.innerHTML='<div class="center-note">Поиск…</div>';
  try{
-  const rows=(await searchCustomers(phone)).filter(x=>String(x.normalized_phone||'').replace(/\D/g,'').startsWith('375'+digits));
+  const rows=(await searchCustomers(phone)).filter(x=>String(x.normalized_phone||'').replace(/\D/g,'').endsWith(digits));
   if(seq!==customerSearchSeq||document.getElementById('customer-search-results')!==el)return;
   el.innerHTML=rows.length?customerResultCards(rows):'<div class="center-note">Клиент не найден. Можно создать нового.</div>';
   el.querySelectorAll('[data-customer-id]').forEach(button=>{button.onclick=()=>{const x=rows.find(x=>String(x.id)===button.dataset.customerId);if(x)selectCustomer(x.id,x.name,x.normalized_phone)}});
@@ -89,7 +98,7 @@ function removeOrderCustomer(){
  saveCurrentOrderSession();closeModal();render();
 }
 async function selectCustomer(id,name,phone){
- state.customer={...state.customer,id,name,phone};
+ state.customer={...state.customer,id,name,phone,telegram_username:null};
  state.loyaltyPrograms=[];state.loyaltyRedemptions={};state.loyaltyCustomerId='';state.loyaltyLoadingCustomerId=String(id);state.loyaltyLoadError='';
  const selectedCustomer=state.customer;
  saveCurrentOrderSession();closeModal();render();
