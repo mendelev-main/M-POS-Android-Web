@@ -2114,3 +2114,66 @@ test('backup preparation invalidates unconfirmed count and preserves fixed rows'
 test('new inventory cannot silently replace an existing counted draft',()=>{
  const f=guardedInventoryFixture();countedFlour(f);const before=JSON.stringify(f.state.inventoryDraft),writes=f.writes.length;assert.equal(f.c.startInventory('adhoc'),false);assert.equal(JSON.stringify(f.state.inventoryDraft),before);assert.equal(f.writes.length,writes);
 });
+
+function netGiftFixture(){const f=fixture();vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-loyalty-pricing.js'),'utf8'),f.c);installLivePosStock(f);installRuntimeSafety(f);f.c.publishAvailability=async()=>true;f.c.publishPaidOrderLoyalty=async()=>true;f.state.loaded=true;f.state.deliveryRates=[{id:'test-delivery',amount:3}];return f;}
+function giftProgram(f,id='gift',productIds=['pizza']){f.state.loyaltyPrograms.push({id,name:'Подарок '+id,loyalty_reward_products:productIds.map(product_id=>({product_id}))});f.state.loyaltyRedemptions[id]=1;}
+function discountedGift(f){f.cart();f.state.discounts=[{id:'half',name:'50%',type:'percent',value:50}];f.state.cart[0].discountId='half';giftProgram(f);}
+test('net gift leaves delivery payable and persists consistent receipt and payment values',async()=>{
+ const f=netGiftFixture();discountedGift(f);f.state.orderType='Доставка';f.state.deliveryFee=3;f.state.deliveryTariffSelected=true;
+ assert.equal(f.c.loyaltyRewardDiscount(),5);assert.equal(f.c.cartTotal(),3);assert.equal(f.c.loyaltyReceiptSnapshot().programs[0].discount,5);
+ await f.c.finalizePayment([{method:'cash',amount:3}]);assert.equal(f.state.orders.length,1);const o=f.state.orders[0];assert.equal(o.total,3);assert.equal(o.productDiscountTotal,5);assert.equal(o.loyaltyDiscount,5);assert.equal(o.deliveryFee,3);assert.equal(o.loyaltyProgramsApplied[0].discount,5);
+ const stored=JSON.parse(f.data.get('prilavok_orders'))[0];assert.equal(stored.total,3);assert.equal(stored.payments[0].amount,3);assert.deepEqual(stored.loyaltyRewardAllocations,{gift:[{productId:'pizza',quantity:1}]});
+ await f.c.processFullReturn(o.id);assert.ok(f.state.orders[0].returnedAt);assert.equal(f.state.orders[0].returnAmount,3);assert.equal(f.state.orders[0].total,3);near(f.c.getProduct('flour').stock,10);
+});
+test('net gift cannot subsidize another product',()=>{
+ const f=netGiftFixture();discountedGift(f);f.state.cart.push({productId:'water',name:'Вода',price:7,qty:1});assert.equal(f.c.cartTotal(),7);assert.equal(f.c.loyaltyRewardDiscount(),5);
+});
+test('fixed discount and multiple units only gift one discounted unit',()=>{
+ const f=netGiftFixture();f.cart('pizza',2);f.state.discounts=[{id:'fixed',type:'fixed',value:3}];f.state.cart[0].discountId='fixed';giftProgram(f);
+ assert.equal(f.c.cartSubtotal(),14);assert.equal(f.c.loyaltyRewardDiscount(),7);assert.equal(f.c.cartTotal(),7);assert.equal(f.c.loyaltyRewardAllocation().allocations.gift[0].quantity,1);
+});
+test('separate lines of same product retain their own discount when gifting',()=>{
+ const f=netGiftFixture();discountedGift(f);f.state.discounts.push({id:'fixed',type:'fixed',value:2});f.state.cart.push({productId:'pizza',name:'Пицца',price:10,qty:1,discountId:'fixed'});
+ assert.equal(f.c.loyaltyRewardDiscount(),5);assert.equal(f.c.cartTotal(),8);
+});
+test('overlapping programs cannot gift one unit twice or finalize an unavailable reward',async()=>{
+ const f=netGiftFixture();discountedGift(f);giftProgram(f,'second');assert.deepEqual(plain(f.c.loyaltyRewardAllocation().allocations),{gift:[{productId:'pizza',quantity:1}]});
+ await f.c.finalizePayment([{method:'cash',amount:0}]);assert.equal(f.state.orders.length,0);assert.match(f.messages.at(-1),/Недостаточно подходящих товаров/);
+});
+test('100 percent discount cannot consume a gift on an already free unit',async()=>{
+ const f=netGiftFixture();discountedGift(f);f.state.discounts[0].value=100;assert.equal(f.c.loyaltyRewardDiscount(),0);assert.deepEqual(plain(f.c.loyaltyRewardAllocation().allocations),{});
+ await f.c.finalizePayment([{method:'cash',amount:0}]);assert.equal(f.state.orders.length,0);assert.match(f.messages.at(-1),/Недостаточно подходящих товаров/);
+});
+test('gift selection preserves gross cheapest-first policy instead of reordering by discount',()=>{
+ const f=netGiftFixture();discountedGift(f);f.state.cart.push({productId:'water',name:'Вода',price:7,qty:1});giftProgram(f,'gift',['pizza','water']);f.state.loyaltyPrograms.shift();
+ assert.deepEqual(plain(f.c.loyaltyRewardAllocation().allocations),{gift:[{productId:'water',quantity:1}]});assert.equal(f.c.cartTotal(),5);
+});
+test('cent rounding preserves another half-cent item and audits a zero monetary gift',()=>{
+ const f=netGiftFixture();discountedGift(f);f.state.cart[0].price=.01;f.state.cart.push({productId:'water',name:'Вода',price:.01,qty:1,discountId:'half'});f.state.orderType='Доставка';f.state.deliveryFee=3;
+ assert.equal(f.c.cartSubtotal(),.01);assert.equal(f.c.loyaltyRewardDiscount(),0);assert.equal(f.c.cartTotal(),3.01);const snapshot=f.c.loyaltyReceiptSnapshot();assert.equal(snapshot.programs.length,1);assert.equal(snapshot.programs[0].discount,0);assert.equal(snapshot.programs[0].rewards,1);
+});
+test('multiple program discounts sum to exactly the rounded gift total',()=>{
+ const f=netGiftFixture();discountedGift(f);f.state.cart[0].qty=3;f.state.cart[0].price=.01;giftProgram(f,'second');giftProgram(f,'third');
+ const a=f.c.loyaltyRewardAllocation();assert.equal(a.discount,.02);assert.equal(Math.round(Object.values(a.programDiscounts).reduce((s,v)=>s+v,0)*100),2);assert.equal(f.c.cartTotal(),0);assert.equal(f.c.loyaltyReceiptSnapshot().programs.length,3);f.state.orderType='Доставка';f.state.deliveryFee=3;assert.equal(f.c.cartTotal(),3);assert.ok(f.c.renderCartPanel().includes('<span class="label">Итого</span><span class="value">'+f.c.fullMoney(3)+'</span>'));assert.ok(f.c.paymentReceiptHtml().includes(f.c.fullMoney(3)));
+});
+test('fractional cart quantity gifts one full unit and leaves the fractional remainder payable',()=>{
+ const f=netGiftFixture();discountedGift(f);f.state.cart[0].qty=1.5;f.state.orderType='Доставка';f.state.deliveryFee=3;assert.equal(f.c.loyaltyRewardDiscount(),5);assert.equal(f.c.cartTotal(),5.5);
+});
+test('gift with modifiers consumes all recipe stock exactly once and returns historic quantities',async()=>{
+ const f=netGiftFixture();discountedGift(f);f.state.cart[0].price=12;f.state.cart[0].selectedModifiers=[{productId:'flour',qty:.05,name:'Добавка'}];
+ assert.equal(f.c.loyaltyRewardDiscount(),6);await f.c.finalizePayment([{method:'cash',amount:0}]);assert.equal(f.state.orders.length,1);near(f.c.getProduct('flour').stock,9.75);
+ await f.c.processFullReturn(f.state.orders[0].id);near(f.c.getProduct('flour').stock,10);
+});
+test('failed gift payment recovers one receipt with net discount and protected delivery',async()=>{
+ const f=netGiftFixture();discountedGift(f);f.state.orderType='Доставка';f.state.deliveryFee=3;f.state.deliveryTariffSelected=true;const set=f.c.localStorage.setItem;let fail=true;
+ f.c.localStorage.setItem=(key,value)=>{if(key==='prilavok_orders'&&fail){fail=false;throw Error('injected gift payment failure')}return set(key,value)};
+ await f.c.finalizePayment([{method:'cash',amount:3}]);assert.equal(f.state.orders.length,0);near(f.c.getProduct('flour').stock,10);
+ assert.equal(await f.c.recoverCriticalStorageJournal(),true);const rows=JSON.parse(f.data.get('prilavok_orders'));assert.equal(rows.length,1);assert.equal(rows[0].total,3);assert.equal(rows[0].loyaltyDiscount,5);assert.equal(await f.c.recoverCriticalStorageJournal(),true);assert.equal(JSON.parse(f.data.get('prilavok_orders')).length,1);
+});
+test('allocation is pure, repeatable and reacts to changed quantity and discount',()=>{
+ const f=netGiftFixture();discountedGift(f);const before=JSON.stringify(f.state),writes=f.writes.length;assert.equal(f.c.loyaltyRewardDiscount(),5);assert.equal(f.c.loyaltyRewardDiscount(),5);assert.equal(JSON.stringify(f.state),before);assert.equal(f.writes.length,writes);
+ f.state.discounts[0].value=20;assert.equal(f.c.loyaltyRewardDiscount(),8);f.state.cart[0].qty=0;assert.equal(f.c.loyaltyRewardDiscount(),0);
+});
+test('large quantity allocation is bounded by cart lines without expanding every unit',()=>{
+ const f=netGiftFixture();f.cart('pizza',100000000);giftProgram(f);const allocation=f.c.loyaltyRewardAllocation();assert.equal(allocation.discount,10);assert.equal(allocation.allocations.gift[0].quantity,1);assert.equal(f.c.cartTotal(),999999990);
+});

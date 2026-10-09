@@ -29,7 +29,7 @@ test('Android bridge preserves all native iPad channels',()=>{
 
 test('Android POS differs from source HTML only by platform scripts',()=>{
  const manifest=JSON.parse(fs.readFileSync(path.join(root,'web-source-manifest.json')));
- const restored=html.replace('<script src="android-inventory.js"></script>\n','').replace('<script src="android-purchase-validation.js"></script>\n','').replace('<script src="android-bookings-customers.js"></script>\n','').replace('<script src="android-safety.js"></script>\n','').replace('<script src="android-admin.js"></script>\n','').replace('<script src="android-integrations.js"></script>\n','').replace('<script src="android-pos-stock.js"></script>\n','').replace('<script src="android-bridge.js"></script>\n','').replace('<script src="android-network.js"></script>\n','').replace('\n<script src="notification-native.js"></script>','');
+ const restored=html.replace('<script src="android-loyalty-pricing.js"></script>\n','').replace('<script src="android-inventory.js"></script>\n','').replace('<script src="android-purchase-validation.js"></script>\n','').replace('<script src="android-bookings-customers.js"></script>\n','').replace('<script src="android-safety.js"></script>\n','').replace('<script src="android-admin.js"></script>\n','').replace('<script src="android-integrations.js"></script>\n','').replace('<script src="android-pos-stock.js"></script>\n','').replace('<script src="android-bridge.js"></script>\n','').replace('<script src="android-network.js"></script>\n','').replace('\n<script src="notification-native.js"></script>','');
  assert.equal(sha(restored),manifest.files['pos.html']);
  for(const [file,expected] of Object.entries(manifest.files)){
    if(file==='pos.html')continue;
