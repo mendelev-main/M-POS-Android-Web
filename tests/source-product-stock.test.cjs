@@ -1992,3 +1992,49 @@ test('read-only startup does not replace damaged documents with compatibility de
  assert.equal(await f.c.saveKey('products',[]),false);assert.equal(f.data.get('prilavok_products'),'broken-original');assert.equal(f.writes.length,0);
  f.state.loaded=true;assert.throws(()=>f.c.saveKey('products',[]),/Хранилище/);
 });
+
+// Android precision regressions execute source financial handlers with the final adapter.
+function preciseStockFixture(){const f=fixture();installLivePosStock(f);installRuntimeSafety(f);f.c.publishAvailability=async()=>true;f.c.publishPaidOrderLoyalty=async()=>true;return f;}
+test('Android stock keeps small quantities and only formats display noise',()=>{
+ const f=preciseStockFixture();for(const n of [.0004,.0000004,1e-20,1.23456789,0,-2.0004])assert.equal(f.c.roundStockQty(n),n);
+ assert.equal(f.c.roundStockQty(-0),0);assert.equal(f.c.roundStockQty(Infinity),Infinity);assert.ok(Number.isNaN(f.c.roundStockQty(NaN)));
+ assert.equal(f.c.stockQtyText(15.0000000000002),'15');assert.equal(f.c.stockQtyText(.9996),'0.9996');assert.equal(f.c.stockQtyText(1.2345),'1.2345');
+});
+test('1000 small recipe sales deduct 0.4 kg and persist each historical consumption',async()=>{
+ const f=preciseStockFixture();f.c.getProduct('flour').stock=1;f.c.getProduct('flour').stockUnit='kg';f.c.getProduct('pizza').components=[{productId:'flour',qty:.0004}];
+ for(let i=0;i<1000;i++){await f.sale();assert.equal(f.state.orders.length,i+1);}
+ near(f.c.getProduct('flour').stock,.6);const stored=JSON.parse(f.data.get('prilavok_products'));near(stored.find(p=>p.id==='flour').stock,.6);
+ for(const o of f.state.orders)assert.equal(o.stockConsumption.items[0].qty,.0004);
+});
+test('small modifier consumption and historical return retain precision and reject duplicate return',async()=>{
+ const f=preciseStockFixture();f.c.getProduct('flour').stock=1;f.c.getProduct('pizza').components=[{productId:'flour',qty:.0004}];
+ f.cart();f.state.cart[0].selectedModifiers=[{productId:'flour',qty:.0002}];await f.c.finalizePayment([{method:'cash',amount:10}]);
+ assert.equal(f.state.orders.length,1);near(f.c.getProduct('flour').stock,.9994);const id=f.state.orders[0].id;
+ f.c.getProduct('pizza').components=[{productId:'flour',qty:10}];await f.c.processFullReturn(id);near(f.c.getProduct('flour').stock,1);
+ await f.c.processFullReturn(id);near(f.c.getProduct('flour').stock,1);
+});
+test('small invoice converted from grams credits warehouse without rounding away quantity',async()=>{
+ const f=preciseStockFixture();f.c.getProduct('flour').stock=1;f.c.getProduct('flour').stockUnit='kg';
+ f.c.finishReceivingPage=()=>{};f.c._receivingPending={draft:{supplierId:'',invoiceNumber:'TEST',invoiceDate:'2026-10-09',lines:[{productId:'flour',qtyInput:'0.4',totalInput:'0.01',unit:'g'}]}};
+ assert.equal(await f.c.applyReceivingDocument(),true);near(f.c.getProduct('flour').stock,1.0004);
+ near(f.state.receivings.at(-1).items[0].qty,.0004);near(JSON.parse(f.data.get('prilavok_products')).find(p=>p.id==='flour').stock,1.0004);
+});
+test('inventory draft retains entered fractional quantity instead of rounding to zero',()=>{
+ const f=preciseStockFixture();f.state.inventoryDraft={items:[{productId:'flour',actual:null}]};f.c.updateInventoryActual('flour','0,0004');
+ assert.equal(f.state.inventoryDraft.items[0].actual,.0004);assert.equal(JSON.parse(f.data.get('prilavok_inventoryDraft')).items[0].actual,.0004);
+});
+test('fractional card availability includes both current and parked reservations',()=>{
+ const f=preciseStockFixture();f.c.getProduct('flour').stock=1;f.c.getProduct('flour').stockUnit='kg';liveStockWorkspace(f,['flour']);
+ f.cart('flour',.0004);f.state.parked=[{id:'reserved',items:[{productId:'flour',qty:.0004}]}];
+ assert.match(f.c.renderPosScreen(null),/Остаток: 0\.9992 кг/);assert.equal(f.c.getProduct('flour').stock,1);
+});
+test('fractional payment still refuses real stock shortage',async()=>{
+ const f=preciseStockFixture();f.c.getProduct('flour').stock=.0003;f.c.getProduct('pizza').components=[{productId:'flour',qty:.0004}];
+ await f.sale();assert.equal(f.state.orders.length,0);assert.equal(f.c.getProduct('flour').stock,.0003);assert.match(f.messages.at(-1),/Недостаточно остатка/);
+});
+test('failed fractional payment keeps warehouse unchanged and recovery preserves exact deduction',async()=>{
+ const f=preciseStockFixture();f.c.getProduct('flour').stock=1;f.c.getProduct('pizza').components=[{productId:'flour',qty:.0004}];
+ const set=f.c.localStorage.setItem;let fail=true;f.c.localStorage.setItem=(key,value)=>{if(key==='prilavok_orders'&&fail){fail=false;throw Error('injected disk failure');}return set(key,value);};
+ await f.sale();assert.equal(f.c.getProduct('flour').stock,1);assert.equal(f.state.orders.length,0);
+ assert.equal(await f.c.recoverCriticalStorageJournal(),true);near(JSON.parse(f.data.get('prilavok_products')).find(p=>p.id==='flour').stock,.9996);assert.equal(JSON.parse(f.data.get('prilavok_orders')).length,1);
+});

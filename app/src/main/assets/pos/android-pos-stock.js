@@ -1,6 +1,19 @@
-/* Android POS presentation: available stock after current and parked baskets, using source recipe rules. */
+/* Android stock precision and POS reservations, using source recipe and transaction rules. */
 (function(global){
   'use strict';
+  // Quantities are data, not display values. Never round each warehouse movement
+  // to 0.001: repeated sub-gram deductions/receipts otherwise disappear entirely.
+  // Preserve the existing Number/JSON schema and non-finite validation behavior.
+  global.roundStockQty=function(value){
+    const quantity=Number(value);
+    return Object.is(quantity,-0)?0:quantity;
+  };
+  // Formatting alone hides ordinary floating-point noise. This string is never
+  // written back to the warehouse or used as a recipe/payment authority.
+  global.stockQtyText=function(value){
+    const quantity=global.roundStockQty(value);
+    return Number.isFinite(quantity)?String(Number(quantity.toPrecision(12))):'0';
+  };
   const warehouseAvailability=global.availableStock;
   function reservedItems(current){
     return [...(current||[]),...(state.parked||[]).flatMap(order=>order.items||[])];
