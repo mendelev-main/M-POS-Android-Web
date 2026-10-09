@@ -2038,3 +2038,79 @@ test('failed fractional payment keeps warehouse unchanged and recovery preserves
  await f.sale();assert.equal(f.c.getProduct('flour').stock,1);assert.equal(f.state.orders.length,0);
  assert.equal(await f.c.recoverCriticalStorageJournal(),true);near(JSON.parse(f.data.get('prilavok_products')).find(p=>p.id==='flour').stock,.9996);assert.equal(JSON.parse(f.data.get('prilavok_orders')).length,1);
 });
+
+function guardedInventoryFixture(){const f=fixture();f.c.uid=(()=>{let n=0;return ()=>'inventory-test-'+(++n)})();vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-inventory.js'),'utf8'),f.c);installLivePosStock(f);installRuntimeSafety(f);f.c.currentShiftEmployeeIsAdmin=()=>true;f.c.publishAvailability=async()=>true;f.c.publishPaidOrderLoyalty=async()=>true;f.state.loaded=true;f.state.inventoryConfig={enabled:true,frequency:'monthly',productIds:['flour'],lastCompletedAt:null};return f;}
+function countedFlour(f,actual=3){assert.equal(f.c.startInventory('adhoc'),true);f.c.updateInventoryActual('flour',String(actual));}
+test('fresh inventory count fixes once and stores stock movement revision',async()=>{
+ const f=guardedInventoryFixture();countedFlour(f);f.c.updateInventoryActual('flour',' ');assert.equal(f.state.inventoryDraft.items[0].actual,null);assert.equal(await f.c.fixInventoryItem('flour'),false);f.c.updateInventoryActual('flour','3');assert.equal(await f.c.fixInventoryItem('flour'),true);assert.equal(f.c.getProduct('flour').stock,3);
+ const stored=JSON.parse(f.data.get('prilavok_products')).find(x=>x.id==='flour');assert.equal(stored._androidStockRevision,1);
+ assert.equal(await f.c.fixInventoryItem('flour'),false);assert.equal(JSON.parse(f.data.get('prilavok_products')).find(x=>x.id==='flour')._androidStockRevision,1);
+});
+test('sale after physical count prevents stale inventory fix and names product',async()=>{
+ const f=guardedInventoryFixture();countedFlour(f);await f.sale();const stock=f.c.getProduct('flour').stock,writes=f.writes.length;
+ assert.equal(await f.c.fixInventoryItem('flour'),false);assert.equal(f.c.getProduct('flour').stock,stock);assert.equal(f.writes.length,writes);assert.match(f.messages.at(-1),/Мука.*заново/);
+ f.c.updateInventoryActual('flour','2.8');assert.equal(await f.c.fixInventoryItem('flour'),true);near(f.c.getProduct('flour').stock,2.8);
+});
+test('sale followed by return still invalidates count despite equal stock balance',async()=>{
+ const f=guardedInventoryFixture();countedFlour(f);await f.sale();await f.c.processFullReturn(f.state.orders[0].id);near(f.c.getProduct('flour').stock,10);
+ assert.equal(await f.c.fixInventoryItem('flour'),false);assert.equal(f.state.inventoryDraft.items[0].fixedAt,undefined);
+ assert.equal(JSON.parse(f.data.get('prilavok_products')).find(x=>x.id==='flour')._androidStockRevision,2);
+});
+test('ordinary product edit and change back invalidate an earlier count',async()=>{
+ const f=guardedInventoryFixture();await f.c.PrilavokCore.Storage.set('products',f.state.products);countedFlour(f);
+ f.c.getProduct('flour').stock=9;await f.c.PrilavokCore.Storage.set('products',f.state.products);f.c.getProduct('flour').stock=10;await f.c.PrilavokCore.Storage.set('products',f.state.products);
+ assert.equal(await f.c.fixInventoryItem('flour'),false);
+});
+test('stock unit change invalidates count but cost-only edit does not',async()=>{
+ const f=guardedInventoryFixture();await f.c.PrilavokCore.Storage.set('products',f.state.products);countedFlour(f);
+ f.c.getProduct('flour').cost=8;await f.c.PrilavokCore.Storage.set('products',f.state.products);assert.equal(await f.c.fixInventoryItem('flour'),true);
+ const changed=guardedInventoryFixture();countedFlour(changed);changed.c.getProduct('flour').stockUnit='kg';assert.equal(await changed.c.fixInventoryItem('flour'),false);
+});
+test('legacy or restarted inventory draft requires a fresh entered count',async()=>{
+ const f=guardedInventoryFixture();f.state.inventoryDraft={id:'legacy',items:[{productId:'flour',name:'Мука',actual:3,expected:10}]};assert.equal(await f.c.fixInventoryItem('flour'),false);
+ f.c.updateInventoryActual('flour','3');const draft=plain(f.state.inventoryDraft);
+ const restarted=guardedInventoryFixture();restarted.state.inventoryDraft=draft;restarted.state.inventoryDraft.items[0]._androidCountBaseline.runtime='old-runtime';
+ assert.equal(await restarted.c.fixInventoryItem('flour'),false);restarted.c.updateInventoryActual('flour','3');assert.equal(await restarted.c.fixInventoryItem('flour'),true);
+});
+test('receiving after count prevents stale fix',async()=>{
+ const f=guardedInventoryFixture();countedFlour(f);f.c.finishReceivingPage=()=>{};f.c._receivingPending={draft:{supplierId:'',invoiceNumber:'TEST',invoiceDate:'2026-10-09',lines:[{productId:'flour',qtyInput:'1',totalInput:'2',unit:f.c.stockUnit(f.c.getProduct('flour'))}]}};
+ assert.equal(await f.c.applyReceivingDocument(),true);assert.equal(await f.c.fixInventoryItem('flour'),false);assert.equal(f.c.getProduct('flour').stock,11);
+});
+test('inventory cancellation preserves fixed movements and subsequent sale with an auditable history',async()=>{
+ const f=guardedInventoryFixture();countedFlour(f);assert.equal(await f.c.fixInventoryItem('flour'),true);await f.sale();const stock=f.c.getProduct('flour').stock,config=JSON.stringify(f.state.inventoryConfig);
+ assert.equal(await f.c.confirmCancelInventory(),true);assert.equal(f.c.getProduct('flour').stock,stock);assert.equal(JSON.stringify(f.state.inventoryConfig),config);assert.equal(f.state.inventoryDraft,null);
+ const record=f.state.inventoryHistory[0];assert.equal(record.status,'cancelled');assert.equal(record.items[0].difference,-7);assert.equal(record.items[0].actual,3);assert.equal(record.items.length,1);
+ assert.equal(await f.c.confirmCancelInventory(),false);assert.equal(f.state.inventoryHistory.length,1);assert.equal(JSON.parse(f.data.get('prilavok_inventoryHistory'))[0].status,'cancelled');
+ const history=f.state.inventoryHistory;assert.match(f.c.renderInventoryScreen(),/Отменена/);assert.match(f.c.renderInventoryScreen(),/10 → 3/);assert.strictEqual(f.state.inventoryHistory,history);
+});
+test('cancelled uncounted rows are separated and scheduled window is not marked completed',async()=>{
+ const f=guardedInventoryFixture();countedFlour(f);f.state.inventoryDraft.type='scheduled';assert.equal(await f.c.confirmCancelInventory(),true);
+ const record=f.state.inventoryHistory[0];assert.equal(record.items.length,0);assert.equal(record.unfixedItems.length,1);assert.equal(f.state.inventoryConfig.lastCompletedAt,null);assert.equal(f.c.getProduct('flour').stock,10);
+});
+test('non-admin and busy cancellation do not mutate draft or history',async()=>{
+ const f=guardedInventoryFixture();countedFlour(f);const before=JSON.stringify(f.state.inventoryDraft),writes=f.writes.length;f.c.currentShiftEmployeeIsAdmin=()=>false;
+ assert.equal(await f.c.confirmCancelInventory(),false);assert.equal(JSON.stringify(f.state.inventoryDraft),before);assert.equal(f.writes.length,writes);
+ f.c.currentShiftEmployeeIsAdmin=()=>true;vm.runInContext('criticalOperationBusy=true',f.c);assert.equal(await f.c.confirmCancelInventory(),false);assert.equal(f.writes.length,writes);
+});
+test('cancel failure leaves draft visible and recovery persists history and clears draft together',async()=>{
+ const f=guardedInventoryFixture();countedFlour(f);await f.c.fixInventoryItem('flour');const draft=JSON.stringify(f.state.inventoryDraft),set=f.c.localStorage.setItem;let fail=true;
+ f.c.localStorage.setItem=(key,value)=>{if(key==='prilavok_inventoryDraft'&&fail){fail=false;throw Error('injected cancellation failure')}return set(key,value)};
+ assert.equal(await f.c.confirmCancelInventory(),false);assert.equal(JSON.stringify(f.state.inventoryDraft),draft);assert.equal(f.state.inventoryHistory.length,0);
+ assert.equal(await f.c.recoverCriticalStorageJournal(),true);assert.equal(JSON.parse(f.data.get('prilavok_inventoryDraft')),null);assert.equal(JSON.parse(f.data.get('prilavok_inventoryHistory'))[0].status,'cancelled');assert.equal(f.c.getProduct('flour').stock,3);
+});
+test('recovery replays recorded stock revision once and unchanged catalogue does not increment',async()=>{
+ const f=guardedInventoryFixture();countedFlour(f);const set=f.c.localStorage.setItem;let fail=true;
+ f.c.localStorage.setItem=(key,value)=>{if(key==='prilavok_inventoryDraft'&&fail){fail=false;throw Error('injected fix failure')}return set(key,value)};
+ assert.equal(await f.c.fixInventoryItem('flour'),false);assert.equal(await f.c.recoverCriticalStorageJournal(),true);assert.equal(await f.c.recoverCriticalStorageJournal(),true);
+ const products=JSON.parse(f.data.get('prilavok_products'));assert.equal(products.find(x=>x.id==='flour')._androidStockRevision,1);
+ // Fresh process is simulated because broken runtime deliberately remains read-only.
+ const restarted=guardedInventoryFixture();for(const [key,value] of f.data)restarted.data.set(key,value);restarted.state.products=products;
+ await restarted.c.PrilavokCore.Storage.set('products',products);assert.equal(JSON.parse(restarted.data.get('prilavok_products')).find(x=>x.id==='flour')._androidStockRevision,1);
+});
+test('backup preparation invalidates unconfirmed count and preserves fixed rows',()=>{
+ const f=guardedInventoryFixture();countedFlour(f);const fixed={productId:'water',fixedAt:1,actual:2,_androidCountBaseline:{runtime:'old'}};f.state.inventoryDraft.items.push(fixed);
+ const writes=f.c.__androidPrepareStorageWrites('backup-import',{products:f.state.products,inventoryDraft:f.state.inventoryDraft});assert.equal(writes.inventoryDraft.items[0]._androidCountBaseline,undefined);assert.equal(writes.inventoryDraft.items[1]._androidCountBaseline.runtime,'old');assert.ok(f.state.inventoryDraft.items[0]._androidCountBaseline);
+});
+test('new inventory cannot silently replace an existing counted draft',()=>{
+ const f=guardedInventoryFixture();countedFlour(f);const before=JSON.stringify(f.state.inventoryDraft),writes=f.writes.length;assert.equal(f.c.startInventory('adhoc'),false);assert.equal(JSON.stringify(f.state.inventoryDraft),before);assert.equal(f.writes.length,writes);
+});

@@ -21,7 +21,8 @@
   function journalWrite(type,writes,restore=false){
     assertWritable(restore,true,type==='backup-import'&&importing);
     if(type==='backup-import'&&criticalOperationBusy)throw blocked('Выполняется сохранение другой операции. Дождитесь завершения и повторите действие');
-    const entries=criticalStorageWrites(writes);
+    const prepared=typeof global.__androidPrepareStorageWrites==='function'?global.__androidPrepareStorageWrites(type,writes):writes;
+    const entries=criticalStorageWrites(prepared);
     const journal={version:1,id:uid(),type:String(type||'critical'),createdAt:Date.now(),writes:entries};
     committing=true;
     try{
@@ -61,7 +62,7 @@
       if(!CRITICAL_STORAGE_KEYS.has(key))throw new Error('Неподдерживаемый ключ связанного сохранения');
       stage.writes[key]=storageSnapshot(value);return;
     }
-    try{rawWrite(key,value)}catch(error){markBroken(error);throw error}
+    try{const prepared=typeof global.__androidPrepareStorageWrites==='function'?global.__androidPrepareStorageWrites('ordinary',{[key]:value}):{[key]:value};rawWrite(key,prepared[key])}catch(error){markBroken(error);throw error}
   }
   core.Storage=Object.freeze({...originalStorage,
     set(key,value){try{write(key,value);return Promise.resolve()}catch(error){return Promise.reject(error)}},
@@ -123,7 +124,7 @@
   }
   for(const name of ['addConfiguredCartItem','changeQty','removeFromCart','saveCartItemOptions','setOrderType','selectDeliveryFee','saveOrderSettings','setLoyaltyRedemption','removeOrderCustomer'])atomicHandler(name,cartKeys);
   for(const name of ['saveCategory','toggleCategoryChannel','confirmDelete','toggleProductOnline','addLayoutTile','removeLayoutTile','onLayoutPointerUp','syncCategoryOrder'])atomicHandler(name,catalogueKeys);
-  for(const name of ['saveInventorySettings','startInventory','updateInventoryActual','confirmCancelInventory','pauseInventory'])atomicHandler(name,['inventoryConfig','inventoryDraft']);
+  for(const name of ['saveInventorySettings','startInventory','updateInventoryActual','pauseInventory'])atomicHandler(name,['inventoryConfig','inventoryDraft']);
   for(const name of ['createHallTable','confirmDeleteHallTable','rotateHallTable','saveHallTableEdits','saveNewBooking','cancelBooking','saveEditedBooking','hallPointerEnd'])atomicHandler(name,['hallTables','bookings']);
   for(const [name,keys] of [['setTheme',['theme']],['setDemandOverload',['demandOverload','operationalOutbox','operationalRevision']],['saveNetworkSettings',['network']],['saveCompanySettings',['company']],['savePrinterSettings',['printer']],['saveDeliveryRate',['deliveryRates']],['deleteDeliveryRate',['deliveryRates']],['saveDiscount',['discounts']],['deleteDiscount',['discounts']]])atomicHandler(name,keys);
   // Async editors already publish their snapshots after await Storage.set. Deny
