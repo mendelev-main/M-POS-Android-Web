@@ -2178,7 +2178,7 @@ test('large quantity allocation is bounded by cart lines without expanding every
  const f=netGiftFixture();f.cart('pizza',100000000);giftProgram(f);const allocation=f.c.loyaltyRewardAllocation();assert.equal(allocation.discount,10);assert.equal(allocation.allocations.gift[0].quantity,1);assert.equal(f.c.cartTotal(),999999990);
 });
 
-function isolatedParkedFixture(){const f=fixture();installRuntimeSafety(f);installLivePosStock(f);f.c.publishAvailability=async()=>true;f.c.publishPaidOrderLoyalty=async()=>true;f.state.loaded=true;return f;}
+function isolatedParkedFixture(){const f=fixture();installRuntimeSafety(f);installLivePosStock(f);f.c.showModal=()=>{};f.c.publishAvailability=async()=>true;f.c.publishPaidOrderLoyalty=async()=>true;f.state.loaded=true;return f;}
 test('missing product in a parked order no longer blocks an unrelated real payment',async()=>{
  const f=isolatedParkedFixture();f.state.parked=[{id:'broken',orderLabel:'Старый заказ',items:[{productId:'deleted',name:'Удалённый товар',qty:1,price:10}]}];f.cart('water');
  await f.c.finalizePayment([{method:'cash',amount:10}]);assert.equal(f.state.orders.length,1);assert.equal(f.c.getProduct('water').stock,9);assert.equal(f.state.parked.length,1);assert.equal(f.c.__androidParkedStockIssues()[0].line,'Удалённый товар');
