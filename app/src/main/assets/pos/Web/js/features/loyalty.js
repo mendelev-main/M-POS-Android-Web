@@ -70,12 +70,15 @@ function loyaltySummaryHtml(){
 }
 async function openCustomerPicker(){
  ++customerSearchSeq;
- showModal(`<div class="customer-picker-heading"><button class="icon-btn customer-picker-close" type="button" aria-label="Закрыть" title="Закрыть" onclick="closeModal()"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button><div class="modal-title">Клиент заказа</div><button class="icon-btn customer-picker-add" type="button" aria-label="Добавить нового клиента" title="Добавить нового клиента" onclick="openCreateCustomer()"><span class="ui-icon ui-icon-add" aria-hidden="true"></span></button></div><div class="field customer-search-field"><label for="customer-search">Последние 4 цифры телефона</label><div class="customer-phone-field"><input id="customer-search" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" enterkeyhint="search" placeholder="4567" aria-label="Последние четыре цифры номера телефона" oninput="customerSearchChanged(this.value)"></div></div><div id="customer-search-results" class="customer-picker-results"><div class="center-note">Введите последние 4 цифры номера</div></div>`,false);
+ showModal(`<div class="customer-picker-heading"><button class="icon-btn customer-picker-close" type="button" aria-label="Закрыть" title="Закрыть" onclick="closeModal()"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button><div class="modal-title">Клиент заказа</div><button class="icon-btn customer-picker-add" type="button" aria-label="Добавить нового клиента" title="Добавить нового клиента" onclick="openCreateCustomer()"><span class="ui-icon ui-icon-add" aria-hidden="true"></span></button></div><div class="field customer-search-field"><label for="customer-search">Последние 4 цифры телефона</label><div class="customer-phone-field"><input id="customer-search" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" enterkeyhint="search" placeholder="4567" aria-label="Последние четыре цифры номера телефона" oninput="customerSearchChanged(this.value)" onpaste="customerSearchPaste(event)"></div></div><div id="customer-search-results" class="customer-picker-results"><div class="center-note">Введите последние 4 цифры номера</div></div>`,false);
  document.querySelector('#modal-root .modal')?.classList.add('customer-picker-modal');
 }
 let customerSearchSeq=0;
 function customerPhoneDigits(value){
  return String(value||'').replace(/\D/g,'').slice(-4);
+}
+function customerSearchPaste(event){
+ const text=event.clipboardData?.getData('text');if(!text)return;event.preventDefault();void customerSearchChanged(customerPhoneDigits(text));
 }
 function customerInitial(name){return escapeHtml((String(name||'?').trim().charAt(0)||'?').toLocaleUpperCase('ru'))}
 function customerResultCards(rows){return rows.map(x=>`<button class="customer-result-card" data-customer-id="${escapeAttr(x.id)}"><span class="customer-result-avatar" aria-hidden="true">${customerInitial(x.name)}</span><span class="customer-result-copy"><strong>${escapeHtml(x.name)}</strong><small>${escapeHtml(x.normalized_phone)}</small></span><span class="customer-result-action">Выбрать</span></button>`).join('')}
