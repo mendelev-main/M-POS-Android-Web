@@ -1,3 +1,5 @@
+Подтверждение CI R01–R06: [444/444 тестов и подписанный APK 1.0.27-1](PARKED_RESERVATION_SAFETY_RU.md). Actions 37979969437 — success; физическая приёмка pending.
+
 Обновление R06 и CI: [изолированные резервы и исправление теста R05](PARKED_RESERVATION_SAFETY_RU.md). R01–R04 Actions success; новый запуск R05/R06 pending. Физическая приёмка ожидается.
 
 Обновление R05: [чистая стоимость подарка](LOYALTY_NET_PRICING_RU.md) реализована; CI и планшет ожидаются.
