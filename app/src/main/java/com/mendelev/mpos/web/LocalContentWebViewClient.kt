@@ -39,6 +39,14 @@ class LocalContentWebViewClient(
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val uri = request.url
         if (uri.scheme == "https" && uri.host == MainActivity.APP_HOST) return false
+        val telegramUsername = uri.path?.removePrefix("/")
+        if (uri.scheme == "https" && uri.host == "t.me" && uri.query == null &&
+            telegramUsername?.matches(Regex("[A-Za-z][A-Za-z0-9_]{3,31}")) == true) {
+            val telegramUri = android.net.Uri.parse("tg://resolve?domain=$telegramUsername")
+            runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, telegramUri)) }
+                .onFailure { runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, uri)) } }
+            return true
+        }
         runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
         return true
     }

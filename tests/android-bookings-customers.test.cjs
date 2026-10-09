@@ -47,3 +47,12 @@ test('closed or replaced customer cards cannot be reopened by a stale response',
 test('customer card refuses non-admin requests',async()=>{
  const f=fixture();f.c.currentShiftEmployeeIsAdmin=()=>false;await f.c.openCustomerAdminCard('customer');assert.equal(f.requests.length,0);assert.equal(f.shown.length,0);assert.match(f.messages[0],/администратора/);
 });
+
+test('customer Telegram button opens only a validated username and never sends a message',async()=>{
+ const f=fixture();f.c.loyaltyApi=async url=>url.endsWith('/loyalty')?{customer:{name:'Клиент',telegram_user_id:'123',telegram_username:'valid_user'},programs:[]}:{orders:[],ledger:[]};await f.c.openCustomerAdminCard('customer');assert.match(f.shown.at(-1).html,/href="https:\/\/t\.me\/valid_user"/);assert.match(f.shown.at(-1).html,/Написать в Telegram/);assert.equal(f.writes.length,0);
+});
+test('missing or unsafe customer username disables contact button without guessing user ID',async()=>{
+ for(const username of [null,'https://t.me/other_user','bad?start=x','<script>']){
+ const f=fixture();f.c.loyaltyApi=async url=>url.endsWith('/loyalty')?{customer:{telegram_user_id:'123',telegram_username:username},programs:[]}:{orders:[],ledger:[]};await f.c.openCustomerAdminCard('customer');const html=f.shown.at(-1).html;assert.match(html,/disabled>Написать в Telegram/);assert.doesNotMatch(html,/href="https:\/\/t\.me\//);
+ }
+});

@@ -78,3 +78,8 @@ test('Telegram native progress is correlated and activity closes its transport',
  const script=fs.readFileSync(path.join(assets,'android-integrations.js'),'utf8');
  assert.match(script,/__mposTelegramTestProgress=result=>\{if\(telegramTests.has\(result\?\.requestId\)\)/);
 });
+
+test('plain Telegram customer links prefer native resolve with HTTPS fallback',()=>{
+ const host=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/web/LocalContentWebViewClient.kt'),'utf8');
+ assert.match(host,/uri.host == "t.me" && uri.query == null/);assert.match(host,/tg:\/\/resolve\?domain=/);assert.match(host,/\.onFailure \{ runCatching \{ activity.startActivity\(Intent\(Intent.ACTION_VIEW, uri\)\)/);
+});
