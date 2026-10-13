@@ -1393,7 +1393,7 @@ test('live product search updates rows, counts and empty state then restores all
  f.c.clearProductsSearch();assert.ok(rows.every(r=>r.hidden===false));assert.equal(empty.hidden,true);assert.equal(table.hidden,false);assert.equal(clear.hidden,true);
 });
 test('rendered filtered product screen retains hidden rows for subsequent broader searches',()=>{
- const f=fixture();f.state.productsSearch='мука';const html=f.c.renderProductsScreen();assert.equal((html.match(/data-product-search=/g)||[]).length,4);assert.match(html,/id="products-search-empty"/);assert.match(html,/placeholder="Поиск товаров"/);assert.match(html,/products-search-icon/);assert.match(html,/products-total-count">Всего 4</);assert.doesNotMatch(html,/openProductImport/);assert.match(html,/>Добавить товар</);
+ const f=fixture();f.state.productsSearch='мука';const html=f.c.renderProductsScreen();assert.equal((html.match(/data-product-search=/g)||[]).length,4);assert.match(html,/id="products-search-empty"/);assert.match(html,/placeholder="Поиск товаров"/);assert.match(html,/products-search-icon/);assert.match(html,/products-title-separator[^>]*>·<\/span><span class="products-total-count">4</);assert.doesNotMatch(html,/openProductImport/);assert.match(html,/>Добавить товар</);
 });
 test('product category chips filter the catalogue and preserve search compatibility',()=>{
  const f=fixture();assert.equal(f.c.productMatchesCategory(f.c.getProduct('flour'),'Сырьё'),true);assert.equal(f.c.productMatchesCategory(f.c.getProduct('water'),'Сырьё'),false);

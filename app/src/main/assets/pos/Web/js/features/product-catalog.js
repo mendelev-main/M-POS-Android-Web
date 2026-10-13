@@ -146,7 +146,7 @@ function renderProductsScreen(){
   return `
   <div class="screen content-screen ${state.tab==='products'?'active':''}">
     <div class="content-head products-content-head">
-      <div class="products-title-group"><div class="content-title">Товары</div><span class="products-total-count">Всего ${state.products.length}</span></div>
+      <div class="content-title products-title-group"><span>Товары</span><span class="products-title-separator" aria-hidden="true">·</span><span class="products-total-count">${state.products.length}</span></div>
       <div class="products-search-wrap products-search-inline">
         <span class="ui-icon ui-icon-search products-search-icon" aria-hidden="true"></span>
         <input id="products-search" class="products-search-input" type="search" value="${escapeAttr(state.productsSearch||'')}" placeholder="Поиск товаров" aria-label="Поиск товаров по названию или категории" oninput="filterProductsScreen()" onsearch="filterProductsScreen()">
