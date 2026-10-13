@@ -1523,6 +1523,7 @@ test('employee deletion requires password for both administrator and ordinary op
 });
 test('administrator target is protected even with valid password; settings show aligned controls',async()=>{
  const f=adminDeletionFixture();f.state.employees[1].role='admin';f.fields['employee-delete-password']={value:html.match(/function confirmDelete[\s\S]*?pass!=='([^']+)'/)[1]};await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,2);assert.equal(f.writes.length,0);const view=f.c.renderSettingsScreen();assert.match(view,/employee-settings-row/);assert.equal((view.match(/employee-settings-edit/g)||[]).length,2);assert.equal((view.match(/Информация об администраторе/g)||[]).length,2);
+ assert.match(view,/<span class="admin-badge">Админ<\/span>/);assert.doesNotMatch(view,/>АДМИНИСТРАТОР</);
 });
 
 test('employee list abbreviation preserves full names and handles missing patronymic',()=>{
@@ -1556,6 +1557,7 @@ test('employee sales podium ranks three non-admin sellers by non-returned revenu
  const view=f.c.renderSettingsScreen();
  assert.equal((view.match(/class="employee-sales-crown/g)||[]).length,3);
  assert.match(view,/rank-1/);assert.match(view,/rank-2/);assert.match(view,/rank-3/);
+ const crown=f.c.employeeSalesCrown(f.state.employees[2],{rank:1,sales:220});assert.equal((crown.match(/<span/g)||[]).length,1);assert.match(view,/employee-settings-role[^>]*>[\s\S]*?employee-sales-crown[\s\S]*?employee-settings-edit/);
  assert.doesNotMatch(view,/1000\.00 Br/);
  assert.equal(f.writes.length,writes);
 });

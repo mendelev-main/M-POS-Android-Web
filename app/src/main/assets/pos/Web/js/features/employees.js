@@ -43,7 +43,7 @@ function employeeSalesCrown(employee,rankInfo){
   const rank=Number(rankInfo.rank);
   if(rank<1 || rank>3) return '';
   const label=`${rank} место по продажам · ${money(rankInfo.sales)}`;
-  return `<span class="employee-sales-crown rank-${rank}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.4 8 10.8 12 4l4 6.8 4.5-3.4-1.6 10.1H5.1L3.5 7.4Z"></path><path d="M5.5 20h13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg><span>${rank}</span></span>`;
+  return `<span class="employee-sales-crown rank-${rank}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.4 8 10.8 12 4l4 6.8 4.5-3.4-1.6 10.1H5.1L3.5 7.4Z"></path><path d="M5.5 20h13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg></span>`;
 }
 
 function openEmployeeModal(id=''){
