@@ -27,11 +27,12 @@ test('production UI uses only bundled Manrope font weights',()=>{
 
 test('button switches expose state to assistive technologies',()=>{
   const categories=featureSources.find(source=>source.includes('function openCategoriesModal'));
-  const catalog=featureSources.find(source=>source.includes('function renderProducts'));
+  const editor=featureSourceByName.get('product-editor.js');
   assert.match(categories,/class="web-switch[^\n]+role="switch"[^\n]+aria-checked=/);
   assert.match(categories,/id="cf-menu-toggle"[^\n]+role="switch"[^\n]+aria-checked=/);
   assert.match(categories,/id="cf-order-toggle"[^\n]+role="switch"[^\n]+aria-checked=/);
-  assert.match(catalog,/class="web-switch[^\n]+role="switch"[^\n]+aria-checked=/);
+  assert.match(editor,/id="pf-web-toggle"[^\n]+role="switch"[^\n]+aria-checked=/);
+  assert.match(editor,/id="pf-menu-toggle"[^\n]+role="switch"[^\n]+aria-checked=/);
 });
 
 test('primary controls use semantic colors and standard touch sizes',()=>{
