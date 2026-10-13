@@ -2,6 +2,11 @@
 (function(global){
   'use strict';
 
+  if(!Object.prototype.hasOwnProperty.call(global,'__mposWebReadyTransport')){
+    global.__mposWebReadyTransport=global.confirmWebOrderReady;
+    return;
+  }
+
   const sendCurrentReady=global.__mposWebReadyTransport;
   const confirmParkedReady=global.confirmWebOrderReady;
   try{delete global.__mposWebReadyTransport}catch(_error){}

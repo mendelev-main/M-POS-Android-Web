@@ -39,7 +39,7 @@ android_html = source_html.replace(
     '<script src="android-bridge.js"></script>\n<script src="android-network.js"></script>\n<script src="Web/js/core/storage.js"></script>',
 ).replace(
     '<script src="network-printer.js"></script>',
-    '<script src="network-printer.js"></script>\n<script>window.__mposWebReadyTransport=window.confirmWebOrderReady;</script>\n<script src="notification-native.js"></script>\n<script src="android-web-ready.js"></script>',
+    '<script src="network-printer.js"></script>\n<script src="android-web-ready.js"></script>\n<script src="notification-native.js"></script>\n<script src="android-web-ready.js"></script>',
 )
 android_html = android_html.replace(
     "<script>loadAll();</script>",
