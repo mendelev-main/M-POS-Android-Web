@@ -142,10 +142,10 @@ test('availability module loads before stock mutation features and owns its publ
  const f=fixture();for(const name of ['buildAvailabilityItems','publishAvailability','onAvailabilityAppState'])assert.equal(typeof f.c[name],'function',name);assert.equal(typeof f.c.startAvailabilitySchedule,'undefined');
 });
 test('catalog row actions preserve compatible product IDs as inert arguments',()=>{
- const f=fixture(),decode=value=>value.replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&'),id="catalog\"');injected();//";let injected=0,opened,toggled,stopped=0,prevented=0;
- f.state.products=[{id,name:'Особый товар',category:'Сырьё',type:'simple',stock:1,cost:1,price:1,availableOnline:true}];f.state.categoryOrder=['Сырьё'];f.c.injected=()=>injected++;f.c.openProductModal=value=>{opened=value};f.c.toggleProductOnline=value=>{toggled=value};f.c.event={key:'Enter',stopPropagation:()=>stopped++,preventDefault:()=>prevented++};
+ const f=fixture(),decode=value=>value.replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&'),id="catalog\"');injected();//";let injected=0,opened,prevented=0;
+ f.state.products=[{id,name:'Особый товар',category:'Сырьё',type:'simple',stock:1,cost:1,price:1,availableOnline:true}];f.state.categoryOrder=['Сырьё'];f.c.injected=()=>injected++;f.c.openProductModal=value=>{opened=value};f.c.event={key:'Enter',preventDefault:()=>prevented++};
  const markup=f.c.renderProductsScreen(),clicks=[...markup.matchAll(/onclick="([^"]*)"/g)].map(match=>decode(match[1])).filter(action=>action.includes('catalog')),keys=[...markup.matchAll(/onkeydown="([^"]*)"/g)].map(match=>decode(match[1])).filter(action=>action.includes('catalog'));
- assert.equal(clicks.length,2);for(const action of clicks)vm.runInContext(action,f.c);assert.equal(opened,id);assert.equal(toggled,id);assert.equal(stopped,1);
+ assert.equal(clicks.length,1);vm.runInContext(clicks[0],f.c);assert.equal(opened,id);
  assert.equal(keys.length,1);vm.runInContext(keys[0],f.c);assert.equal(opened,id);assert.equal(prevented,1);assert.equal(injected,0);
 });
 test('suppliers module loads after access helpers and before startup with its public API',()=>{
@@ -1416,7 +1416,7 @@ test('product sorting uses numbers, toggles direction and never changes stored p
 test('product sorting helpers remain compatible while table headers are static labels',()=>{
  const f=fixture();f.state.products=[{id:'a',name:'А',type:'composite',category:'Я',availableOnline:true,components:[]},{id:'b',name:'Б',type:'simple',category:'Б',availableOnline:false,stock:0}];
  for(const key of ['category','type','web']){f.c.sortProductsBy(key);assert.deepEqual(plain(f.c.sortedProductRows().map(p=>p.id)),['b','a']);}
- const h=f.c.renderProductsScreen();assert.equal((h.match(/class="products-table-label/g)||[]).length,7);assert.doesNotMatch(h,/products-sort-header|product-sort-mark|sortProductsBy\('/);assert.doesNotMatch(h,/products-table-sub/);
+ const h=f.c.renderProductsScreen();assert.equal((h.match(/class="products-table-label/g)||[]).length,6);assert.doesNotMatch(h,/products-sort-header|product-sort-mark|sortProductsBy\('/);assert.doesNotMatch(h,/products-table-sub/);
 });
 
 function adminDeletionFixture(){const f=fixture();f.state.employees=[{id:'admin',name:'Админ',role:'admin'},{id:'other',name:'Другой',role:'employee'}];f.state.shifts[0].employeeId='admin';return f;}
