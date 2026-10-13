@@ -10,6 +10,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -108,6 +109,12 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = LocalContentWebViewClient(this, loader, imageStore)
         val root = android.widget.FrameLayout(this)
         root.setBackgroundColor(android.graphics.Color.rgb(17, 17, 17))
+        // Edge-to-edge hosting must reserve the IME area so HTML lists can scroll above it.
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val keyboardBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, keyboardBottom)
+            insets
+        }
         root.addView(webView)
         startupView = android.widget.TextView(this).apply {
             text = "M POS"
