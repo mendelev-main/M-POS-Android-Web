@@ -37,6 +37,8 @@ const receiptsScript=fs.readFileSync(path.join(root,'app/src/main/assets/pos/Web
 const hallBookingsScript=fs.readFileSync(path.join(root,'app/src/main/assets/pos/Web/js/features/hall-bookings.js'),'utf8');
 const backupScript=fs.readFileSync(path.join(root,'app/src/main/assets/pos/Web/js/features/backup.js'),'utf8');
 const printerScript=fs.readFileSync(path.join(root,'app/src/main/assets/pos/network-printer.js'),'utf8');
+const notificationNativeScript=fs.readFileSync(path.join(root,'app/src/main/assets/pos/notification-native.js'),'utf8');
+const androidWebReadyScript=fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-web-ready.js'),'utf8');
 const androidActivity=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/MainActivity.kt'),'utf8');
 const androidBackup=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/backup/BackupManager.kt'),'utf8');
 const androidRouter=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/bridge/NativeBridgeRouter.kt'),'utf8');
@@ -57,7 +59,7 @@ function fixture(){
  async function sale(payments){cart();await c.finalizePayment(payments||[{method:'cash',amount:10}]);return state.orders[0];}
  return {c,state,data,messages,writes,fields,events,cart,sale};
 }
-test('all production JavaScript modules parse',()=>{new vm.Script(inline);new vm.Script(adapter);new vm.Script(shiftsScript);new vm.Script(employeesScript);new vm.Script(loyaltyScript);new vm.Script(productConfigurationScript);new vm.Script(productPhotoScript);new vm.Script(productPersistenceScript);new vm.Script(productEditorScript);new vm.Script(availabilityScript);new vm.Script(suppliersScript);new vm.Script(purchaseOrdersScript);new vm.Script(receivingUiScript);new vm.Script(receivingDraftsScript);new vm.Script(receivingScript);new vm.Script(webOrdersScript);new vm.Script(inventoryScript);new vm.Script(warehouseReportingScript);new vm.Script(analyticsScript);new vm.Script(productCatalogScript);new vm.Script(productCategoriesScript);new vm.Script(posNavigationScript);new vm.Script(cartPresentationScript);new vm.Script(cartCompositionScript);new vm.Script(parkedOrdersScript);new vm.Script(paymentScript);new vm.Script(receiptsScript);new vm.Script(hallBookingsScript);new vm.Script(backupScript);new vm.Script(printerScript);});
+test('all production JavaScript modules parse',()=>{new vm.Script(inline);new vm.Script(adapter);new vm.Script(shiftsScript);new vm.Script(employeesScript);new vm.Script(loyaltyScript);new vm.Script(productConfigurationScript);new vm.Script(productPhotoScript);new vm.Script(productPersistenceScript);new vm.Script(productEditorScript);new vm.Script(availabilityScript);new vm.Script(suppliersScript);new vm.Script(purchaseOrdersScript);new vm.Script(receivingUiScript);new vm.Script(receivingDraftsScript);new vm.Script(receivingScript);new vm.Script(webOrdersScript);new vm.Script(inventoryScript);new vm.Script(warehouseReportingScript);new vm.Script(analyticsScript);new vm.Script(productCatalogScript);new vm.Script(productCategoriesScript);new vm.Script(posNavigationScript);new vm.Script(cartPresentationScript);new vm.Script(cartCompositionScript);new vm.Script(parkedOrdersScript);new vm.Script(paymentScript);new vm.Script(receiptsScript);new vm.Script(hallBookingsScript);new vm.Script(backupScript);new vm.Script(printerScript);new vm.Script(notificationNativeScript);new vm.Script(androidWebReadyScript);});
 test('shifts module loads before dependent features and preserves its public API',()=>{
  const moduleTag='<script src="Web/js/features/shifts.js"></script>',paymentTag='<script src="Web/js/features/payment.js"></script>',startupTag='<script>loadAll();</script>';
  assert.ok(html.indexOf(moduleTag)>=0);assert.ok(html.indexOf(paymentTag)>html.indexOf(moduleTag));assert.ok(html.indexOf(startupTag)>html.indexOf(moduleTag));assert.doesNotMatch(inline,/function submitCloseShift\s*\(/);
@@ -689,6 +691,25 @@ test('WEB ready action has no retired production gate',()=>{
  assert.doesNotMatch(source,/currentProductionOrderId/);
  assert.doesNotMatch(source,/productionOrderById/);
  assert.doesNotMatch(source,/Сначала завершите приготовление на всех участвующих станциях/);
+});
+test('current WEB order ready action survives native parked-order controls and sends once',async()=>{
+ const f=fixture();
+ f.c.document.querySelectorAll=()=>[];f.c.document.body={};f.c.document.readyState='complete';
+ f.c.MutationObserver=class{observe(){}};
+ f.c.__mposWebReadyTransport=f.c.confirmWebOrderReady;
+ vm.runInContext(notificationNativeScript,f.c);
+ vm.runInContext(androidWebReadyScript,f.c);
+ let parkedConfirmation='';f.c.showModal=value=>{parkedConfirmation=value};f.c.confirmWebOrderReady('parked-1');assert.match(parkedConfirmation,/markWebOrderReady\('parked-1'\)/);
+ Object.assign(f.state,{currentOrderSource:'web',currentWebOrderId:'web-ready-1',currentWebOrderStatus:'accepted',network:{backendUrl:'https://backend.example',deviceKey:'device-key'}});
+ let calls=0,releaseRequest;
+ const requestGate=new Promise(resolve=>{releaseRequest=resolve});
+ f.c.fetch=async(url,options)=>{calls++;assert.equal(url,'https://backend.example/api/orders/web-ready-1/ready');assert.equal(options.method,'POST');assert.equal(options.headers['X-Device-Key'],'device-key');await requestGate;return {ok:true,json:async()=>({ok:true})}};
+ const first=f.c.markCurrentWebOrderReady(),duplicate=f.c.markCurrentWebOrderReady();
+ assert.equal(await duplicate,false);
+ releaseRequest();await first;assert.equal(calls,1);assert.equal(f.state.currentWebOrderStatus,'ready');
+ assert.equal(JSON.parse(f.data.get('prilavok_currentOrderSession')).webOrderStatus,'ready');
+ assert.deepEqual(JSON.parse(f.data.get('prilavok_webOrderReadyJournal')),{});
+ assert.match(f.messages.at(-1),/отмечен как готовый/);
 });
 test('web order context is cleared after payment and after removing the last cart item',async()=>{
  const paid=fixture();paid.state.orderComment='Комментарий с WEB';paid.state.currentOrderSource='web';paid.state.currentWebOrderId='web-1';paid.state.currentWebOrderStatus='accepted';
