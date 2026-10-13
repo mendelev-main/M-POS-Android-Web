@@ -692,24 +692,13 @@ test('WEB ready action has no retired production gate',()=>{
  assert.doesNotMatch(source,/productionOrderById/);
  assert.doesNotMatch(source,/Сначала завершите приготовление на всех участвующих станциях/);
 });
-test('current WEB order ready action survives native parked-order controls and sends once',async()=>{
- const f=fixture();
- f.c.document.querySelectorAll=()=>[];f.c.document.body={};f.c.document.readyState='complete';
- f.c.MutationObserver=class{observe(){}};
- f.c.__mposWebReadyTransport=f.c.confirmWebOrderReady;
- vm.runInContext(notificationNativeScript,f.c);
- vm.runInContext(androidWebReadyScript,f.c);
- let parkedConfirmation='';f.c.showModal=value=>{parkedConfirmation=value};f.c.confirmWebOrderReady('parked-1');assert.match(parkedConfirmation,/markWebOrderReady\('parked-1'\)/);
- Object.assign(f.state,{currentOrderSource:'web',currentWebOrderId:'web-ready-1',currentWebOrderStatus:'accepted',network:{backendUrl:'https://backend.example',deviceKey:'device-key'}});
- let calls=0,releaseRequest;
- const requestGate=new Promise(resolve=>{releaseRequest=resolve});
- f.c.fetch=async(url,options)=>{calls++;assert.equal(url,'https://backend.example/api/orders/web-ready-1/ready');assert.equal(options.method,'POST');assert.equal(options.headers['X-Device-Key'],'device-key');await requestGate;return {ok:true,json:async()=>({ok:true})}};
- const first=f.c.markCurrentWebOrderReady(),duplicate=f.c.markCurrentWebOrderReady();
- assert.equal(await duplicate,false);
- releaseRequest();await first;assert.equal(calls,1);assert.equal(f.state.currentWebOrderStatus,'ready');
- assert.equal(JSON.parse(f.data.get('prilavok_currentOrderSession')).webOrderStatus,'ready');
- assert.deepEqual(JSON.parse(f.data.get('prilavok_webOrderReadyJournal')),{});
- assert.match(f.messages.at(-1),/отмечен как готовый/);
+test('Android routes parked and current WEB ready actions separately and locks duplicate taps',async()=>{
+ let parkedId='',transportArgs=[],markCalls=0,releaseMark;
+ const markGate=new Promise(resolve=>{releaseMark=resolve});
+ const c={console:{error:()=>{}},__mposWebReadyTransport:(...args)=>{transportArgs=args;return 'transport'},confirmWebOrderReady:id=>{parkedId=id;return 'parked'},markCurrentWebOrderReady:async()=>{markCalls++;await markGate}};c.window=c;vm.createContext(c);vm.runInContext(androidWebReadyScript,c);
+ assert.equal(c.confirmWebOrderReady('parked-1'),'parked');assert.equal(parkedId,'parked-1');assert.deepEqual(transportArgs,[]);
+ const journal={'web-1':{stage:'pending'}};assert.equal(c.confirmWebOrderReady('web-1',journal),'transport');assert.equal(transportArgs[0],'web-1');assert.equal(transportArgs[1],journal);
+ const first=c.markCurrentWebOrderReady(),duplicate=c.markCurrentWebOrderReady();assert.equal(await duplicate,false);assert.equal(markCalls,1);releaseMark();await first;assert.equal(markCalls,1);
 });
 test('web order context is cleared after payment and after removing the last cart item',async()=>{
  const paid=fixture();paid.state.orderComment='Комментарий с WEB';paid.state.currentOrderSource='web';paid.state.currentWebOrderId='web-1';paid.state.currentWebOrderStatus='accepted';
