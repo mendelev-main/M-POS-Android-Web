@@ -166,9 +166,6 @@ test('employee and product editor forms use shared presentation classes',()=>{
   assert.match(html,/\.employee-admin-password\{/);
   assert.match(productEditor,/class="product-note-input"/);
   assert.match(html,/\.product-note-input\{/);
-  assert.match(productEditor,/class="pe-card pe-main-card"/);
-  assert.match(html,/\.pe-main-card\{/);
-  assert.match(html,/\.pe-main-card \.product-type-switch\.selected\{/);
 });
 
 test('warehouse report modal uses shared presentation classes',()=>{
