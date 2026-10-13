@@ -123,6 +123,12 @@ test('settings and suppliers use shared presentation classes',()=>{
   assert.match(suppliers,/row\.hidden=!show/);
   assert.match(html,/\.settings-nav-card\{/);
   assert.match(html,/\.settings-section-title\{/);
+  assert.match(html,/\.settings-main-action\{[^}]*border-radius:999px/);
+  assert.match(html,/\.settings-plus-btn\{[^}]*width:44px;[^}]*height:44px;[^}]*border-radius:999px/);
+  assert.match(html,/\.settings-inline-button,\.employee-settings-edit\{[^}]*min-height:42px;[^}]*border-radius:999px/);
+  assert.match(html,/\.settings-row-action,\.employee-settings-action\{[^}]*width:44px;[^}]*height:44px;[^}]*border-radius:999px/);
+  assert.match(html,/\.backup-actions \.btn\{[^}]*min-height:48px;[^}]*border-radius:999px/);
+  assert.equal((html.match(/class="icon-btn danger settings-row-action"/g)||[]).length,3);
   assert.match(html,/\.supplier-product-option\[hidden\]/);
 });
 
