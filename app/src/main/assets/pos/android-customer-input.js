@@ -9,11 +9,13 @@
     .modal.customer-picker-modal{display:flex;flex-direction:column;overflow:hidden}
     .customer-picker-heading,.customer-search-field{flex:none}
     .customer-picker-results{min-height:0;flex:1;overflow-y:auto;touch-action:pan-y}
-    .customer-phone-field.android-customer-phone{border-radius:999px}
+    .customer-phone-field.android-customer-phone{height:56px;border-radius:999px}
     .android-customer-phone>span{white-space:nowrap;flex:none;font-size:16px;font-weight:700}
-    .android-customer-phone input{width:100%;padding:12px!important;font-variant-numeric:tabular-nums}
-    .android-customer-phone.android-customer-suffix{width:max-content;max-width:100%}.android-customer-phone.android-customer-suffix input{max-width:160px;min-width:110px;letter-spacing:2px}
-    @media(max-width:480px){.android-customer-phone>span{padding:0 12px;font-size:14px}.android-customer-phone input{font-size:18px!important}}
+    .android-customer-phone input{width:100%;height:100%;min-height:0!important;padding:12px!important;font-variant-numeric:tabular-nums}
+    .android-customer-phone.android-customer-suffix{width:100%;max-width:100%;margin:0 auto}.android-customer-phone.android-customer-suffix input{flex:1;max-width:none;min-width:0;text-align:center;letter-spacing:2px}
+    #new-customer-name{width:100%;height:56px!important;min-height:56px!important;border:1.5px solid var(--border)!important;border-radius:999px!important;background:var(--bg)!important;padding:12px 16px!important;font-size:20px!important}
+    #new-customer-name:focus{border-color:var(--accent)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 13%,transparent)}
+    @media(max-width:480px){.android-customer-phone>span{padding:0 12px;font-size:14px}.android-customer-phone input,#new-customer-name{font-size:18px!important}}
   `;
   if(document.head){const style=document.createElement('style');style.id='android-customer-input-style';style.textContent=styles;document.head.appendChild(style)}
   function measure(){
