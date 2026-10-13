@@ -75,10 +75,14 @@ test('catalog and workspace navigation isolate dynamic presentation',()=>{
   assert.deepEqual(dynamicStyles,['${pos}','--category-color:${categoryColor}']);
   assert.match(html,/\.products-search-clear\[hidden\]/);
   assert.match(html,/\.products-head-action\{[^}]*border-radius:999px/);
+  assert.match(html,/\.products-categories-action\{border:1\.5px solid var\(--border\)/);
   assert.match(html,/\.products-search-inline\{[^}]*background:var\(--surface\);box-shadow:none/);
   assert.match(html,/\.products-search-input\{[^}]*color:var\(--ink\)!important;[^}]*-webkit-text-fill-color:var\(--ink\)!important/);
   assert.match(html,/\.products-search-input::placeholder\{[^}]*color:var\(--muted\);[^}]*-webkit-text-fill-color:var\(--muted\)/);
   assert.doesNotMatch(html,/\.products-search-inline\{[^}]*box-shadow:[^}]*inset/);
+  assert.match(catalog,/\['Товар','Категория','Тип','Цена','Себестоимость','Остаток'\]/);
+  assert.doesNotMatch(catalog,/products-web-cell/);
+  assert.doesNotMatch(html,/\.products-table-head,\.products-table-row\{grid-template-columns:[^}]*!important/);
   assert.match(html,/\.pos-folder-modal\[data-columns="4"\]/);
 });
 

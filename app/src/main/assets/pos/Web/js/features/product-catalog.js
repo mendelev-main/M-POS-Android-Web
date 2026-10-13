@@ -138,7 +138,6 @@ function renderProductsScreen(){
       <div class="products-table-cell"><span class="badge ${p.type==='composite'?'type-composite':''}">${typeLabel}</span></div>
       <div class="products-table-cell">${money(p.price)}</div>
       <div class="products-table-cell">${money(compositeCost(p))}</div>
-      <div class="products-table-cell products-web-cell"><button type="button" class="web-switch ${p.availableOnline!==false?'on':''}" role="switch" aria-label="Онлайн заказ для товара ${escapeAttr(p.name)}" aria-checked="${p.availableOnline!==false}" onclick="event.stopPropagation();toggleProductOnline(${productInlineArg(p.id)})" title="Онлайн заказ"><span></span><b>Заказ</b></button></div>
       <div class="products-table-cell products-stock">${p.noStockTracking?'—':stockLabel}</div>
     </div>`;
   }).join('');
@@ -153,7 +152,7 @@ function renderProductsScreen(){
         <button type="button" class="icon-btn products-search-clear" onclick="clearProductsSearch()" aria-label="Очистить поиск" ${query?'':'hidden'}><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button>
       </div>
       <div class="products-head-actions">
-        <button class="btn btn-secondary products-head-action" onclick="openCategoriesModal()">Категории</button>
+        <button class="btn btn-secondary products-head-action products-categories-action" onclick="openCategoriesModal()">Категории</button>
         <button class="btn btn-primary products-head-action products-add-action" onclick="openProductModal(null)">Добавить товар</button>
       </div>
     </div>
@@ -164,7 +163,7 @@ function renderProductsScreen(){
     </div>
     <div class="card">
       <div id="products-search-table" class="products-table" ${filteredProducts.length?'':'hidden'}>
-        <div class="products-table-head">${['Товар','Категория','Тип','Цена','Себестоимость','Онлайн заказ','Остаток'].map(label=>`<div class="products-table-label">${label}</div>`).join('')}</div>
+        <div class="products-table-head">${['Товар','Категория','Тип','Цена','Себестоимость','Остаток'].map(label=>`<div class="products-table-label">${label}</div>`).join('')}</div>
         ${rows}
       </div><div id="products-search-empty" class="center-note products-search-empty" ${filteredProducts.length?'hidden':''}>${state.products.length?'По вашему запросу товары не найдены.':'Пока нет товаров. Добавьте первый.'}</div>
     </div>
