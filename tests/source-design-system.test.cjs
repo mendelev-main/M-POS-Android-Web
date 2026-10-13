@@ -93,6 +93,8 @@ test('product recipe rows keep quantity and unit in one compact control',()=>{
   assert.match(html,/\.product-editor \.component-qty\{display:grid;grid-template-columns:76px 96px;/);
   assert.doesNotMatch(html,/\.product-editor \.component-qty\{flex-direction:column/);
   assert.match(html,/\.product-editor \.component-card\{grid-template-columns:[^}]+gap:8px;padding:8px 10px;/);
+  assert.match(html,/\.product-editor \.component-qty input\{[^}]+color:var\(--ink\)!important;[^}]+-webkit-text-fill-color:var\(--ink\)!important;/);
+  assert.match(html,/\.product-editor \.component-qty select\{[^}]+color:var\(--ink\)!important;[^}]+-webkit-text-fill-color:var\(--ink\)!important;/);
 });
 
 test('bookings isolate dynamic hall geometry from static presentation',()=>{

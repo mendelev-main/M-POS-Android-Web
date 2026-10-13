@@ -922,10 +922,11 @@
   :root[data-theme='dark'] .hall-table.available{background:#213C2A;border-color:#5EAF6C;color:#AEE6B6;}
   :root[data-theme='dark'] .booking-check{background:#202632;}
   .product-editor .component-selected{gap:6px;margin-bottom:12px;}
-  .product-editor .component-qty{display:grid;grid-template-columns:76px 96px;gap:0;align-items:stretch;overflow:hidden;background:var(--bg);border:1px solid var(--border);border-radius:11px;}
-  .product-editor .component-qty:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
-  .product-editor .component-qty input{width:76px!important;min-height:44px!important;padding:6px 8px!important;border:0!important;border-radius:0!important;background:transparent!important;text-align:center;font-size:15px!important;font-weight:700;box-shadow:none!important;}
-  .product-editor .component-qty select{width:96px;min-height:44px;padding:6px 24px 6px 9px;background:var(--surface);color:var(--ink);border:0;border-left:1px solid var(--border);border-radius:0;font:inherit;font-size:13px;font-weight:700;box-shadow:none;}
+  .product-editor .component-qty{display:grid;grid-template-columns:76px 96px;gap:0;align-items:stretch;overflow:hidden;background:var(--surface);border:1.5px solid var(--border);border-radius:11px;transition:border-color .15s,box-shadow .15s;}
+  .product-editor .component-qty:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 13%,transparent);}
+  .product-editor .component-qty input{width:76px!important;min-height:44px!important;padding:6px 8px!important;border:0!important;border-radius:0!important;background:var(--surface)!important;color:var(--ink)!important;-webkit-text-fill-color:var(--ink)!important;caret-color:var(--accent);text-align:center;font-size:15px!important;font-weight:700;box-shadow:none!important;opacity:1;}
+  .product-editor .component-qty select{width:96px;min-height:44px;padding:6px 24px 6px 9px;background:var(--surface);color:var(--ink)!important;-webkit-text-fill-color:var(--ink)!important;border:0;border-left:1px solid var(--border);border-radius:0;font:inherit;font-size:13px;font-weight:700;box-shadow:none;opacity:1;}
+  .product-editor .component-qty select option{background:var(--surface);color:var(--ink);}
   /* Product workspace: independent of app re-renders, below confirmation dialogs. */
   .product-editor{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);height:100vh;height:100dvh;}
   .pe-header{display:flex;align-items:center;gap:22px;padding:18px 28px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
