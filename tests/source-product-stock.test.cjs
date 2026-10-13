@@ -980,6 +980,13 @@ test('unit selector changes presentation without changing recipe consumption',()
  f.c.changeComponentDisplayUnit(0,'ml');near(f.c._pmComponents[0].qty,0.15);near(f.c.componentDisplayQty(f.c._pmComponents[0]),150);
  f.c.changeComponentDisplayUnit(0,'kg');assert.equal(f.c._pmComponents[0].displayUnit,'ml');
 });
+test('nested recipe unit switch hides floating-point tails without rewriting stored ratio',()=>{
+ const f=fixture(),dough=f.c.getProduct('dough');Object.assign(dough,{recipeYield:300,recipeUnit:'g'});
+ f.c._pmComponents=[{productId:'dough',qty:1,displayUnit:'kg'}];f.c.renderTypeFields=()=>{};
+ f.c.setComponentQty(0,'0.25');const stored=f.c._pmComponents[0].qty;near(stored,250/300);
+ f.c.changeComponentDisplayUnit(0,'g');assert.equal(f.c.componentDisplayQty(f.c._pmComponents[0]),250);assert.equal(f.c._pmComponents[0].qty,stored);
+ f.c.changeComponentDisplayUnit(0,'kg');assert.equal(f.c.componentDisplayQty(f.c._pmComponents[0]),0.25);assert.equal(f.c._pmComponents[0].qty,stored);
+});
 test('stock display conversion saves stock/cost/minimum in unchanged base units',async()=>{
  const f=editorFixture();Object.assign(f.c.getProduct('flour'),{stockUnit:'kg',stockDisplayUnit:'kg'});
  f.c._pmBaseUnit='kg';f.c._pmUnit='g';f.fields['pf-stock'].value='10000';f.fields['pf-cost'].value='0.002';f.fields['pf-min-stock']={value:'500'};

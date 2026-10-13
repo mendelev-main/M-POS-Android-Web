@@ -71,7 +71,14 @@ function captureSimpleProductDraft(){
   window._pmSimpleDraft={purchaseUnit:document.getElementById('pf-purchase-unit')?.value,packSize:document.getElementById('pf-pack-size')?.value,contentUnit:document.getElementById('pf-purchase-content-unit')?.value,cost:document.getElementById('pf-cost')?.value??'',stock:document.getElementById('pf-stock')?.value??'',minimum:document.getElementById('pf-min-stock')?.value??'',noStock:!!document.getElementById('pf-no-stock')?.checked};
 }
 function componentDisplayUnit(c){const p=getProduct(c.productId),base=stockUnit(p);return c.displayUnit||base;}
-function componentDisplayQty(c){const p=getProduct(c.productId),unit=componentDisplayUnit(c);if(p?.type==='composite')return convertProductQty(Number(c.qty||0)*compositeRecipeYield(p),p.recipeUnit||'piece',unit);return convertProductQty(c.qty,stockUnit(p),unit);}
+function componentDisplayQty(c){
+  const p=getProduct(c.productId),unit=componentDisplayUnit(c);
+  const value=p?.type==='composite'
+    ? convertProductQty(Number(c.qty||0)*compositeRecipeYield(p),p.recipeUnit||'piece',unit)
+    : convertProductQty(c.qty,stockUnit(p),unit);
+  // Inputs accept thousandths; remove binary floating-point tails from presentation only.
+  return roundStockQty(value);
+}
 function changeComponentDisplayUnit(idx,unit){
   const c=window._pmComponents[idx];if(!c)return;
   try{const p=getProduct(c.productId);convertProductQty(1,p?.type==='composite'?(p.recipeUnit||'piece'):stockUnit(p),unit);c.displayUnit=unit;renderTypeFields();}catch(e){flash(e.message);}
