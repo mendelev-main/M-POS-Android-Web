@@ -12,6 +12,40 @@ function employeeDisplayName(name){
   return parts[0]+' '+parts.slice(1,3).map(part=>part.split('-').filter(Boolean).map(piece=>Array.from(piece)[0].toLocaleUpperCase('ru')+'.').join('-')).join(' ');
 }
 
+function employeeSalesLeaderboard(){
+  const employees=Array.isArray(state.employees)?state.employees:[];
+  const eligible=new Map(employees.filter(employee=>employee?.role!=='admin').map(employee=>[String(employee.id),employee]));
+  const shiftEmployees=new Map((Array.isArray(state.shifts)?state.shifts:[]).map(shift=>[String(shift.id),String(shift.employeeId||'')]));
+  const totals=new Map([...eligible.keys()].map(id=>[id,0]));
+  for(const order of (Array.isArray(state.orders)?state.orders:[])){
+    if(!order || order.returnedAt) continue;
+    const employeeId=String(order.employeeId||shiftEmployees.get(String(order.shiftId))||'');
+    if(!eligible.has(employeeId)) continue;
+    const sale=Number(order.total);
+    if(!Number.isFinite(sale) || sale<=0) continue;
+    totals.set(employeeId,(totals.get(employeeId)||0)+sale);
+  }
+  return [...totals.entries()]
+    .filter(([,sales])=>sales>0)
+    .sort(([leftId,leftSales],[rightId,rightSales])=>rightSales-leftSales
+      || String(eligible.get(leftId)?.name||'').localeCompare(String(eligible.get(rightId)?.name||''),'ru',{sensitivity:'base',numeric:true})
+      || leftId.localeCompare(rightId))
+    .slice(0,3)
+    .map(([employeeId,sales],index)=>({employeeId,sales,rank:index+1}));
+}
+
+function employeeSalesRanks(){
+  return new Map(employeeSalesLeaderboard().map(entry=>[entry.employeeId,entry]));
+}
+
+function employeeSalesCrown(employee,rankInfo){
+  if(!rankInfo || employee?.role==='admin') return '';
+  const rank=Number(rankInfo.rank);
+  if(rank<1 || rank>3) return '';
+  const label=`${rank} место по продажам · ${money(rankInfo.sales)}`;
+  return `<span class="employee-sales-crown rank-${rank}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.4 8 10.8 12 4l4 6.8 4.5-3.4-1.6 10.1H5.1L3.5 7.4Z"></path><path d="M5.5 20h13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg><span>${rank}</span></span>`;
+}
+
 function openEmployeeModal(id=''){
   const employee=state.employees.find(e=>e.id===id);
   const editing=!!employee;

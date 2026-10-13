@@ -68,7 +68,7 @@ test('shifts module loads before dependent features and preserves its public API
 test('employees module loads after shifts and before startup with its public API',()=>{
  const shiftsTag='<script src="Web/js/features/shifts.js"></script>',moduleTag='<script src="Web/js/features/employees.js"></script>',startupTag='<script>loadAll();</script>';
  assert.ok(html.indexOf(moduleTag)>html.indexOf(shiftsTag));assert.ok(html.indexOf(startupTag)>html.indexOf(moduleTag));assert.doesNotMatch(inline,/function saveEmployee\s*\(/);
- const f=fixture();for(const name of ['employeeShortName','employeeDisplayName','openEmployeeModal','toggleEmployeeAdminPassword','saveEmployee','showEmployeeAdminInfo','employeeDeletionAllowed','deleteEmployee','confirmDeleteEmployee'])assert.equal(typeof f.c[name],'function',name);
+ const f=fixture();for(const name of ['employeeShortName','employeeDisplayName','employeeSalesLeaderboard','employeeSalesRanks','employeeSalesCrown','openEmployeeModal','toggleEmployeeAdminPassword','saveEmployee','showEmployeeAdminInfo','employeeDeletionAllowed','deleteEmployee','confirmDeleteEmployee'])assert.equal(typeof f.c[name],'function',name);
 });
 test('loyalty module loads after employees and before suppliers with its public API',()=>{
  const employeesTag='<script src="Web/js/features/employees.js"></script>',moduleTag='<script src="Web/js/features/loyalty.js"></script>',suppliersTag='<script src="Web/js/features/suppliers.js"></script>',startupTag='<script>loadAll();</script>';
@@ -1528,6 +1528,36 @@ test('administrator target is protected even with valid password; settings show 
 test('employee list abbreviation preserves full names and handles missing patronymic',()=>{
  const f=fixture();assert.equal(f.c.employeeDisplayName('  Иванов   Иван Иванович  '),'Иванов И. И.');assert.equal(f.c.employeeDisplayName('Петров Пётр'),'Петров П.');assert.equal(f.c.employeeDisplayName('Анна'),'Анна');assert.equal(f.c.employeeDisplayName(''),'');
  f.state.employees=[{id:'one',name:'Иванов Иван Иванович',role:'employee'}];const html=f.c.renderSettingsScreen();assert.match(html,/Иванов И\. И\./);assert.equal(f.state.employees[0].name,'Иванов Иван Иванович');
+});
+test('employee sales podium ranks three non-admin sellers by non-returned revenue',()=>{
+ const f=fixture();
+ f.state.employees=[
+  {id:'admin',name:'Администратор',role:'admin'},
+  {id:'one',name:'Иванов Иван',role:'employee'},
+  {id:'two',name:'Петров Пётр',role:'employee'},
+  {id:'three',name:'Сидоров Семён',role:'employee'},
+  {id:'four',name:'Фёдоров Фёдор',role:'employee'}
+ ];
+ f.state.shifts=[{id:'old-shift',employeeId:'three'}];
+ f.state.orders=[
+  {id:'admin-sale',employeeId:'admin',total:1000},
+  {id:'one-sale',employeeId:'one',total:100},
+  {id:'two-sale',employeeId:'two',total:220},
+  {id:'old-three-sale',shiftId:'old-shift',total:150},
+  {id:'four-sale',employeeId:'four',total:50},
+  {id:'returned-two-sale',employeeId:'two',total:500,returnedAt:1}
+ ];
+ const writes=f.writes.length;
+ assert.deepEqual(plain(f.c.employeeSalesLeaderboard()),[
+  {employeeId:'two',sales:220,rank:1},
+  {employeeId:'three',sales:150,rank:2},
+  {employeeId:'one',sales:100,rank:3}
+ ]);
+ const view=f.c.renderSettingsScreen();
+ assert.equal((view.match(/class="employee-sales-crown/g)||[]).length,3);
+ assert.match(view,/rank-1/);assert.match(view,/rank-2/);assert.match(view,/rank-3/);
+ assert.doesNotMatch(view,/1000\.00 Br/);
+ assert.equal(f.writes.length,writes);
 });
 test('folder products render same escaped sticker as main workspace',async()=>{
  const f=navigationFixture();f.state.products[0].tileSymbol='<&';await f.c.savePosFolder();const id=f.state.posNavigation.categories[0].items.find(i=>i.type==='folder').id;await f.c.movePosProduct('a',id);f.state.editMode=false;f.c.openPosFolder(id);
