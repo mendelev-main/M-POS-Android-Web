@@ -87,6 +87,14 @@ test('product configuration and categories isolate dynamic presentation',()=>{
   assert.match(html,/\.category-swatch\{/);
 });
 
+test('product recipe rows keep quantity and unit in one compact control',()=>{
+  const configuration=featureSourceByName.get('product-configuration.js');
+  assert.match(configuration,/<div class="component-qty">\s*<input[^>]+>\s*<select class="component-unit-select"/);
+  assert.match(html,/\.product-editor \.component-qty\{display:grid;grid-template-columns:76px 96px;/);
+  assert.doesNotMatch(html,/\.product-editor \.component-qty\{flex-direction:column/);
+  assert.match(html,/\.product-editor \.component-card\{grid-template-columns:[^}]+gap:8px;padding:8px 10px;/);
+});
+
 test('bookings isolate dynamic hall geometry from static presentation',()=>{
   const bookings=featureSourceByName.get('hall-bookings.js');
   const dynamicStyles=[...bookings.matchAll(/style="([^"]*)"/g)].map(match=>match[1]);
