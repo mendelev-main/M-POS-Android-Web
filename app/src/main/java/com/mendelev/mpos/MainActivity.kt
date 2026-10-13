@@ -109,10 +109,11 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = LocalContentWebViewClient(this, loader, imageStore)
         val root = android.widget.FrameLayout(this)
         root.setBackgroundColor(android.graphics.Color.rgb(17, 17, 17))
-        // Edge-to-edge hosting must reserve the IME area so HTML lists can scroll above it.
-        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+        // Keep the POS grid full-sized. Only HTML dialogs reserve space above the IME.
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             val keyboardBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-            view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, keyboardBottom)
+            val keyboardCssHeight = keyboardBottom / resources.displayMetrics.density
+            callJavaScript("window.__mposKeyboardInsets&&window.__mposKeyboardInsets($keyboardCssHeight);")
             insets
         }
         root.addView(webView)

@@ -93,9 +93,10 @@
   if(typeof originalClose==='function')global.closeLoyaltyAdminScreen=function(){searchSequence++;searchText='';return originalClose.apply(this,arguments)};
   function fitViewport(){
     const page=document.querySelector('.loyalty-page.active');if(!page)return;
-    const viewport=global.visualViewport,bottom=(viewport?.height||global.innerHeight)+(viewport?.offsetTop||0);
+    const viewport=global.visualViewport,bottom=(global.__mposVisibleViewportHeight??viewport?.height??global.innerHeight)+(viewport?.offsetTop||0);
     const available=Math.max(0,Math.floor(bottom-page.getBoundingClientRect().top));page.style.height=available+'px';
   }
+  global.androidLoyaltyFitViewport=fitViewport;
   const originalRender=global.render;
   if(typeof originalRender==='function')global.render=function(){const result=originalRender.apply(this,arguments);fitViewport();return result};
   global.addEventListener('resize',fitViewport);

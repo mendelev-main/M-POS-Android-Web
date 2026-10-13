@@ -31,7 +31,7 @@ test('server text is escaped and failed search remains retryable',async()=>{
  f.c.searchCustomers=async()=>{throw Error('offline')};await f.c.loyaltyAdminCustomerSearch('Анна');assert.match(f.list().innerHTML,/Не удалось загрузить клиентов/);assert.equal(f.list().attributes['aria-busy'],undefined);
 });
 test('Android hosting reserves the keyboard area without changing the reviewed source',()=>{
- const manifest=fs.readFileSync(path.join(root,'app/src/main/AndroidManifest.xml'),'utf8');assert.match(manifest,/windowSoftInputMode="adjustResize"/);
- const activity=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/MainActivity.kt'),'utf8');assert.match(activity,/WindowInsetsCompat.Type.ime\(\)/);assert.match(activity,/view.setPadding\(view.paddingLeft, view.paddingTop, view.paddingRight, keyboardBottom\)/);
+ const manifest=fs.readFileSync(path.join(root,'app/src/main/AndroidManifest.xml'),'utf8');assert.match(manifest,/windowSoftInputMode="adjustNothing"/);
+ const activity=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/MainActivity.kt'),'utf8');assert.match(activity,/WindowInsetsCompat.Type.ime\(\)/);assert.match(activity,/window\.__mposKeyboardInsets/);assert.doesNotMatch(activity,/view.setPadding\(view.paddingLeft, view.paddingTop, view.paddingRight, keyboardBottom\)/);
  const sync=fs.readFileSync(path.join(root,'scripts/sync-pos-assets.py'),'utf8');assert.match(sync,/android-loyalty-ui.js/);assert.doesNotMatch(code,/saveKey\(|localStorage\.|Storage\.set\(/);
 });
