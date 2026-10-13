@@ -23,9 +23,16 @@ jobs:
       - run: bash scripts/ci/setup-sdk.sh
       - name: JS source parity and transport tests
         run: |
-          set -o pipefail
           mkdir -p build/ci
+          set +e
           node --test tests/*.test.cjs 2>&1 | tee build/ci/js-tests.log
+          js_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$js_status" -ne 0 ]; then
+            js_summary=$(tail -n 80 build/ci/js-tests.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g' | cut -c1-4000)
+            echo "::error title=JavaScript regression failure::$js_summary"
+            exit "$js_status"
+          fi
       - name: Android compilation, tests and lint
         if: ${{ !cancelled() }}
         run: ./gradlew --no-daemon --max-workers=4 testDebugUnitTest lintDebug
