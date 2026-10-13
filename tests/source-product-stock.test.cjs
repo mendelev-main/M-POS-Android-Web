@@ -198,7 +198,7 @@ test('analytics module loads before startup and preserves its public API',()=>{
 test('product catalog module loads before startup and preserves its public API',()=>{
  const moduleTag='<script src="Web/js/features/product-catalog.js"></script>',startupTag='<script>loadAll();</script>';
  assert.ok(html.indexOf(moduleTag)>=0);assert.ok(html.indexOf(startupTag)>html.indexOf(moduleTag));
- const f=fixture();for(const name of ['parseProductCSV','planProductImport','confirmProductImport','productMatchesSearch','sortProductsBy','sortedProductRows','renderProductsScreen','filterProductsScreen','clearProductsSearch'])assert.equal(typeof f.c[name],'function',name);
+ const f=fixture();for(const name of ['parseProductCSV','planProductImport','confirmProductImport','productMatchesSearch','productMatchesCategory','setProductsCategoryFilter','sortProductsBy','sortedProductRows','renderProductsScreen','filterProductsScreen','clearProductsSearch'])assert.equal(typeof f.c[name],'function',name);
 });
 test('product categories module loads before startup and preserves its public API',()=>{
  const moduleTag='<script src="Web/js/features/product-categories.js"></script>',startupTag='<script>loadAll();</script>';
@@ -1385,15 +1385,20 @@ test('product search matches names and categories with Unicode and case normaliz
  const f=fixture();assert.ok(f.c.productMatchesSearch({name:'Айс-латте',category:'Горячие напитки'},f.c.productSearchText('АЙС')));assert.ok(f.c.productMatchesSearch({name:'Вода',category:'Сырьё'},f.c.productSearchText('  сырье  ')));assert.equal(f.c.productMatchesSearch({name:'Вода',category:'Напитки',price:123,sku:'secret'},'secret'),false);
 });
 test('live product search updates rows, counts and empty state then restores all rows without rerender',()=>{
- const f=fixture();const rows=[{dataset:{productSearch:'маргарита пицца'},style:{}},{dataset:{productSearch:'чай горячие напитки'},style:{}}],badge={},clear={style:{}},table={style:{}},empty={style:{}};
- const card={querySelectorAll:selector=>{assert.equal(selector,'.products-table-row');return rows;},querySelector:selector=>selector.includes('badge')?badge:clear};
+ const f=fixture();const rows=[{dataset:{productSearch:'маргарита пицца',productCategory:'Пицца'},style:{}},{dataset:{productSearch:'чай горячие напитки',productCategory:'Горячие напитки'},style:{}}],badge={},clear={style:{}},table={style:{}},empty={style:{}};
+ const card={querySelectorAll:selector=>{assert.equal(selector,'.products-table-row');return rows;},querySelector:selector=>selector==='.products-filter-count'?badge:clear};
  f.fields['products-search']={value:'пицца',closest:()=>card,focus:()=>{}};f.fields['products-search-table']=table;f.fields['products-search-empty']=empty;f.c.render=()=>{throw Error('must preserve input focus');};
  f.c.filterProductsScreen();assert.equal(rows[0].hidden,false);assert.equal(rows[1].hidden,true);assert.equal(badge.textContent,'1 / 4');
  f.fields['products-search'].value='ничего';f.c.filterProductsScreen();assert.equal(empty.hidden,false);assert.equal(table.hidden,true);
  f.c.clearProductsSearch();assert.ok(rows.every(r=>r.hidden===false));assert.equal(empty.hidden,true);assert.equal(table.hidden,false);assert.equal(clear.hidden,true);
 });
 test('rendered filtered product screen retains hidden rows for subsequent broader searches',()=>{
- const f=fixture();f.state.productsSearch='мука';const html=f.c.renderProductsScreen();assert.equal((html.match(/data-product-search=/g)||[]).length,4);assert.match(html,/id="products-search-empty"/);assert.match(html,/Название или категория/);
+ const f=fixture();f.state.productsSearch='мука';const html=f.c.renderProductsScreen();assert.equal((html.match(/data-product-search=/g)||[]).length,4);assert.match(html,/id="products-search-empty"/);assert.match(html,/placeholder="Поиск товаров"/);assert.doesNotMatch(html,/openProductImport/);assert.match(html,/>Добавить товар</);
+});
+test('product category chips filter the catalogue and preserve search compatibility',()=>{
+ const f=fixture();assert.equal(f.c.productMatchesCategory(f.c.getProduct('flour'),'Сырьё'),true);assert.equal(f.c.productMatchesCategory(f.c.getProduct('water'),'Сырьё'),false);
+ let renders=0;f.c.render=()=>renders++;f.c.setProductsCategoryFilter('Сырьё');assert.equal(f.c._productsCategory,'Сырьё');assert.equal(renders,1);
+ const html=f.c.renderProductsScreen();assert.match(html,/products-category-tabs/);assert.match(html,/products-category-tab selected[^>]*aria-pressed="true"[^>]*>Сырьё</);assert.match(html,/data-product-category="Сырьё"/);assert.match(html,/products-filter-count">1 \/ 4</);
 });
 
 test('product sorting uses numbers, toggles direction and never changes stored product order',()=>{

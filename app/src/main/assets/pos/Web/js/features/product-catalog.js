@@ -83,6 +83,8 @@ async function confirmProductImport(){
 
 function productSearchText(value){return String(value||'').normalize('NFC').toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/\s+/g,' ').trim();}
 function productMatchesSearch(product,query){return !query||(productSearchText(product.name)+' '+productSearchText(productCategoryKey(product))).includes(query);}
+function productMatchesCategory(product,category){return category==='Все'||productCategoryKey(product)===category;}
+function setProductsCategoryFilter(category){window._productsCategory=String(category||'Все');render();}
 function sortProductsBy(key){
   if(!['name','category','type','price','cost','web','stock'].includes(key))return;
   const previous=window._productsSort||{key:'name',direction:1};
@@ -113,16 +115,18 @@ function productSortHeader(key,label){
 
 function renderProductsScreen(){
   syncCategoryOrder();
-  const cats = state.categoryOrder.slice();
   const query = productSearchText(state.productsSearch);
   const sortedProducts = sortedProductRows();
-  const filteredProducts = sortedProducts.filter(p=>productMatchesSearch(p,query));
+  const categories=['Все',...Array.from(new Set(sortedProducts.map(productCategoryKey))).sort((a,b)=>a.localeCompare(b,'ru'))];
+  const selectedCategory=categories.includes(window._productsCategory)?window._productsCategory:'Все';
+  window._productsCategory=selectedCategory;
+  const filteredProducts = sortedProducts.filter(p=>productMatchesSearch(p,query)&&productMatchesCategory(p,selectedCategory));
   const rows = sortedProducts.map(p=>{
     const avail = availableStock(p);
     const typeLabel = p.type==='composite'?'Составной':'Простой';
     const stockLabel = avail===Infinity ? 'Не учитывается' : stockQtyText(avail)+' '+unitLabel(stockUnit(p))+(p.type==='simple' && p.minStock!=null && avail<=p.minStock?' · низкий':'');
     return `
-    <div class="products-table-row" data-product-search="${escapeAttr(productSearchText(p.name)+' '+productSearchText(productCategoryKey(p)))}" ${productMatchesSearch(p,query)?'':'hidden'} role="button" tabindex="0" onclick="openProductModal(${productInlineArg(p.id)})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openProductModal(${productInlineArg(p.id)})}" aria-label="Открыть товар ${escapeAttr(p.name)}">
+    <div class="products-table-row" data-product-search="${escapeAttr(productSearchText(p.name)+' '+productSearchText(productCategoryKey(p)))}" data-product-category="${escapeAttr(productCategoryKey(p))}" ${productMatchesSearch(p,query)&&productMatchesCategory(p,selectedCategory)?'':'hidden'} role="button" tabindex="0" onclick="openProductModal(${productInlineArg(p.id)})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openProductModal(${productInlineArg(p.id)})}" aria-label="Открыть товар ${escapeAttr(p.name)}">
       <div class="products-table-main">
         <div class="products-table-name">${escapeHtml(p.name)}</div>
         <div class="products-table-sub">${escapeHtml(productCategoryKey(p))}</div>
@@ -142,25 +146,24 @@ function renderProductsScreen(){
 
   return `
   <div class="screen content-screen ${state.tab==='products'?'active':''}">
-    <div class="content-head">
+    <div class="content-head products-content-head">
       <div class="content-title">Товары</div>
+      <div class="products-search-wrap products-search-inline">
+        <input id="products-search" class="products-search-input" type="search" value="${escapeAttr(state.productsSearch||'')}" placeholder="Поиск товаров" aria-label="Поиск товаров по названию или категории" oninput="filterProductsScreen()" onsearch="filterProductsScreen()">
+        <button type="button" class="icon-btn products-search-clear" onclick="clearProductsSearch()" aria-label="Очистить поиск" ${query?'':'hidden'}><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button>
+      </div>
       <div class="products-head-actions">
-        <button class="btn btn-secondary products-head-action" onclick="openProductImport()">Импорт</button>
         <button class="btn btn-secondary products-head-action" onclick="openCategoriesModal()">Категории</button>
         <button class="btn btn-primary products-head-action products-add-action" onclick="openProductModal(null)">Добавить товар</button>
       </div>
     </div>
-    <div class="card products-search-card">
-      <div class="field products-search-field">
-        <label>Поиск товаров</label>
-        <div class="products-search-wrap">
-          <input id="products-search" class="products-search-input" type="search" value="${escapeAttr(state.productsSearch||'')}" placeholder="Название или категория" oninput="filterProductsScreen()" onsearch="filterProductsScreen()">
-          <button type="button" class="icon-btn products-search-clear" onclick="clearProductsSearch()" aria-label="Очистить поиск" ${query?'':'hidden'}><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button>
-        </div>
+    <div class="products-filter-row">
+      <div class="component-category-tabs products-category-tabs" aria-label="Фильтр товаров по категории">
+        ${categories.map(category=>`<button type="button" class="component-category-tab products-category-tab ${selectedCategory===category?'selected':''}" aria-pressed="${selectedCategory===category}" onclick="setProductsCategoryFilter(${productInlineArg(category)})">${escapeHtml(category)}</button>`).join('')}
       </div>
+      <span class="badge products-filter-count">${query||selectedCategory!=='Все'?filteredProducts.length+' / ':''}${state.products.length}</span>
     </div>
     <div class="card">
-      <div class="section-mini-head"><div class="products-section-title">Товары</div><span class="badge">${query?filteredProducts.length+' / ':''}${state.products.length}</span></div>
       <div id="products-search-table" class="products-table" ${filteredProducts.length?'':'hidden'}>
         <div class="products-table-head">${[['name','Товар'],['category','Категория'],['type','Тип'],['price','Цена'],['cost','Себестоимость'],['web','Онлайн заказ'],['stock','Остаток']].map(([key,label])=>productSortHeader(key,label)).join('')}</div>
         ${rows}
@@ -179,15 +182,16 @@ function filterProductsScreen(){
   let visible=0;
   rows.forEach(row=>{
     const text=row.dataset.productSearch;
-    const show=!query || text.includes(query);
+    const category=window._productsCategory||'Все';
+    const show=(!query || text.includes(query))&&(category==='Все'||row.dataset.productCategory===category);
     row.hidden=!show;
     if(show) visible++;
   });
   const table=document.getElementById('products-search-table'),empty=document.getElementById('products-search-empty');
   if(table)table.hidden=!visible;
   if(empty)empty.hidden=!!visible;
-  const badge=card.querySelector('.section-mini-head .badge');
-  if(badge) badge.textContent=query?`${visible} / ${state.products.length}`:String(state.products.length);
+  const badge=card.querySelector('.products-filter-count'),category=window._productsCategory||'Все';
+  if(badge) badge.textContent=query||category!=='Все'?`${visible} / ${state.products.length}`:String(state.products.length);
   const clear=card.querySelector('[aria-label="Очистить поиск"]');
   if(clear) clear.hidden=!query;
 }
