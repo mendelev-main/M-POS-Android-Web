@@ -74,7 +74,7 @@ function resetCurrentOrderState(){
   state.cart=[];
   state.orderLabel='';
   state.orderType='На месте';
-  state.deliveryFee=0;state.deliveryTariffSelected=false;
+  state.deliveryFee=0;state.deliveryTariffSelected=false;state.deliveryTariff=null;
   state.customer={name:'',phone:'',address:'',id:''};
   state.loyaltyPrograms=[];
   state.loyaltyRedemptions={};

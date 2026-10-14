@@ -45,7 +45,7 @@ async function parkOrderNow(){
   const parked = {
     id:uid(), receiptDisplayNumber:'#'+(state.parked.length+1),
     items: state.cart.map(i=>{const product=getProduct(i.productId);return {...JSON.parse(JSON.stringify(i)),category:product?.category||i.category||''}}),
-    total:cartTotal(), subtotal:cartSubtotal(), deliveryTariffSelected:!!state.deliveryTariffSelected, deliveryFee:state.orderType==='Доставка'?Number(state.deliveryFee||0):0,
+    total:cartTotal(), subtotal:cartSubtotal(), deliveryTariffSelected:!!state.deliveryTariffSelected,deliveryTariff:storageSnapshot(state.deliveryTariff||null), deliveryFee:state.orderType==='Доставка'?Number(state.deliveryFee||0):0,
     orderLabel:state.orderLabel, orderType:state.orderType, customer:JSON.parse(JSON.stringify(state.customer)),
     comment:state.orderComment||'', source:state.currentOrderSource||'', webOrderId:state.currentWebOrderId||'', webOrderStatus:state.currentWebOrderStatus||'',
     employeeName:employee?.name||employee?.fullName||'Сотрудник',registerName:'POS 1',timestamp:Date.now(),createdAt:Date.now(),kitchenPrinted:!!window.__currentOrderKitchenPrinted,
@@ -91,7 +91,7 @@ async function resumeParked(id){
   const o=state.parked.find(x=>x.id===id);if(!o)return false;
   const items=storageSnapshot(o.items||[]),customer=Object.assign({name:'',phone:'',address:''},storageSnapshot(o.customer||{}));
   const printedItems=Array.isArray(o.printedItems)?storageSnapshot(o.printedItems):(o.kitchenPrinted?kitchenPrintedSnapshot(o.items):[]);
-  const session={items,orderLabel:o.orderLabel||'',orderType:o.orderType||'На месте',customer,deliveryFee:Number(o.deliveryFee||0),deliveryTariffSelected:o.deliveryTariffSelected===true,orderComment:o.comment||'',source:o.source||'',webOrderId:o.webOrderId||'',webOrderStatus:o.webOrderStatus||'',kitchenPrinted:!!o.kitchenPrinted,printedItems,updatedAt:Date.now()};
+  const session={items,orderLabel:o.orderLabel||'',orderType:o.orderType||'На месте',customer,deliveryFee:Number(o.deliveryFee||0),deliveryTariffSelected:o.deliveryTariffSelected===true,deliveryTariff:storageSnapshot(o.deliveryTariff||null),orderComment:o.comment||'',source:o.source||'',webOrderId:o.webOrderId||'',webOrderStatus:o.webOrderStatus||'',kitchenPrinted:!!o.kitchenPrinted,printedItems,updatedAt:Date.now()};
   const nextParked=state.parked.filter(x=>x.id!==id).map(storageSnapshot);
   criticalOperationBusy=true;
   try{await commitCriticalStorage('resume-parked',{currentOrderSession:session,parked:nextParked})}
@@ -99,7 +99,7 @@ async function resumeParked(id){
   finally{criticalOperationBusy=false}
   state.cart=items;state.orderLabel=session.orderLabel;state.orderType=session.orderType;
   state.loyaltyPrograms=[];state.loyaltyRedemptions={};state.customer=customer;
-  state.deliveryFee=session.deliveryFee;state.deliveryTariffSelected=session.deliveryTariffSelected;
+  state.deliveryFee=session.deliveryFee;state.deliveryTariffSelected=session.deliveryTariffSelected;state.deliveryTariff=session.deliveryTariff||null;
   state.orderComment=session.orderComment;state.currentOrderSource=session.source;state.currentWebOrderId=session.webOrderId;state.currentWebOrderStatus=session.webOrderStatus;
   window.__currentOrderKitchenPrinted=session.kitchenPrinted;window.__currentOrderPrintedItems=printedItems;
   state.parked=nextParked;

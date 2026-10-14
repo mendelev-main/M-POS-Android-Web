@@ -18,3 +18,7 @@ Actions сначала выполняет тесты/проверку неизм
 `web-source-manifest.json` содержит commit и SHA-256 всех 33 исходных файлов. `python3 scripts/sync-pos-assets.py /path/to/prilavok-pos-ipad` обновляет исходник; только вставки Android bridge/network/notification scripts разрешены в HTML. Перенесены JS-тесты iPad, кроме проверок Swift-принтера; Android bridge/transport проверяются отдельно.
 
 Статус переноса и ожидаемые проверки: [docs/ANDROID_WEB_PORT_RU.md](docs/ANDROID_WEB_PORT_RU.md). Локальные tests/lint/APK не запускались по указанию пользователя. Готовность к эксплуатации подтверждается Actions и физическими проверками, а не одним наличием кода.
+
+## Тарифы доставки на сайте
+
+[Требования](docs/DELIVERY_TARIFFS_WEB_REQUIREMENTS_RU.md) и [реализация/включение](docs/DELIVERY_TARIFFS_IMPLEMENTATION_RU.md): варианты из настроек планшета автоматически публикуются в backend; сайт предлагает выбор, а заказ сохраняет выбранный тариф. Для включения нужны миграция backend, назначение устройства-источника и обновление приложения. Production-развёртывание и физическая приёмка ещё не выполнены.

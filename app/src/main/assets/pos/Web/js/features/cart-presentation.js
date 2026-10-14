@@ -107,14 +107,15 @@ function openOrderSettings(){
     <div class="field"><label>Имя клиента</label><input id="customer-name" value="${escapeAttr(state.customer.name)}" placeholder="Необязательно"></div>
     <div class="field"><label>Телефон</label><input id="customer-phone" inputmode="tel" value="${escapeAttr(state.customer.phone)}" placeholder="Необязательно"></div>
     ${state.orderType==='Доставка'?`<div class="field delivery-address-field"><label>Адрес доставки</label><input id="customer-address" type="text" autocomplete="street-address" value="${escapeAttr(state.customer.address)}" placeholder="Введите адрес доставки"></div>
-      <div class="field"><label>Стоимость доставки</label>
-        ${state.deliveryRates.length ? `<div class="radio-row">${state.deliveryRates.map(r=>`<button class="radio-opt ${state.deliveryTariffSelected&&Number(state.deliveryFee||0)===Number(r.amount)?'selected':''}" onclick="selectDeliveryFee(${Number(r.amount)||0})">${escapeHtml(r.name)} · ${money(r.amount)}</button>`).join('')}</div>` : `<div class="settings-note">Стоимость доставки пока не настроена. Добавьте варианты во вкладке Настройки.</div>`}
+      <div class="field"><label>Стоимость доставки</label>${state.currentOrderSource==='web'&&state.deliveryTariff?`<div class="settings-note">Тариф заказа: ${escapeHtml(state.deliveryTariff.name)} · ${money(state.deliveryFee)}</div>`:''}
+        ${state.deliveryRates.length ? `<div class="radio-row">${state.deliveryRates.map(r=>`<button class="radio-opt ${state.deliveryTariffSelected&&state.deliveryTariff?.id===r.id?'selected':''}" onclick="selectDeliveryTariff(decodeURIComponent('${encodeURIComponent(r.id).replace(/'/g,'%27')}'))">${escapeHtml(r.name)} · ${money(r.amount)}</button>`).join('')}</div>` : `<div class="settings-note">Стоимость доставки пока не настроена. Добавьте варианты во вкладке Настройки.</div>`}
       </div>
       <div class="field delivery-total-field"><label>Итого заказа</label><div class="delivery-total-value">${fullMoney(cartTotal())}</div></div>`:''}
     <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="saveOrderSettings()">Сохранить</button></div>`);
 }
-function setOrderType(t){ if(state.orderType!==t)state.deliveryTariffSelected=false;state.orderType=t; if(t!=='Доставка') state.deliveryFee=0; saveCurrentOrderSession(); render(); openOrderSettings(); }
-function selectDeliveryFee(amount){ if(!state.deliveryRates.some(r=>Number(r.amount)===Number(amount)))return;state.deliveryTariffSelected=true;state.deliveryFee=Number(amount)||0; saveCurrentOrderSession(); render(); openOrderSettings(); }
+function setOrderType(t){ if(state.orderType!==t){state.deliveryTariffSelected=false;state.deliveryTariff=null;}state.orderType=t; if(t!=='Доставка') state.deliveryFee=0; saveCurrentOrderSession(); render(); openOrderSettings(); }
+function selectDeliveryTariff(id){const rate=state.deliveryRates.find(r=>r.id===id);if(!rate)return;state.deliveryTariffSelected=true;state.deliveryFee=Number(rate.amount);state.deliveryTariff={id:rate.id,name:rate.name,amount:Number(rate.amount)};saveCurrentOrderSession();render();openOrderSettings();}
+function selectDeliveryFee(amount){const matches=state.deliveryRates.filter(r=>Number(r.amount)===Number(amount));if(matches.length!==1){flash('Выберите тариф по названию');return;}selectDeliveryTariff(matches[0].id);}
 function saveOrderSettings(){
   state.orderLabel=(document.getElementById('order-label')?.value||'').trim();
   state.customer.name=(document.getElementById('customer-name')?.value||'').trim();

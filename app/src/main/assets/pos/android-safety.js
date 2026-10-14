@@ -80,7 +80,7 @@
   };
   global.saveCurrentOrderSession=function(){return global.saveKey('currentOrderSession',currentOrderSessionSnapshot())};
   global.clearCurrentOrderSession=function(){return global.saveKey('currentOrderSession',emptyCurrentOrderSession())};
-  const cartKeys=['cart','orderLabel','orderType','deliveryFee','deliveryTariffSelected','customer','loyaltyPrograms','loyaltyRedemptions','loyaltyCustomerId','loyaltyLoadingCustomerId','loyaltyLoadError','orderComment','currentOrderSource','currentWebOrderId','currentWebOrderStatus','_splitPayments','_splitCount','_splitPaymentTotalCents'];
+  const cartKeys=['cart','orderLabel','orderType','deliveryFee','deliveryTariffSelected','deliveryTariff','customer','loyaltyPrograms','loyaltyRedemptions','loyaltyCustomerId','loyaltyLoadingCustomerId','loyaltyLoadError','orderComment','currentOrderSource','currentWebOrderId','currentWebOrderStatus','_splitPayments','_splitCount','_splitPaymentTotalCents'];
   const catalogueKeys=['products','posNavigation','layoutTiles','categoryOrder','categoryColors','categorySymbols','categoryOnlineOrder','categoryOnlineMenu'];
   const uiKeys=['tab','selectedHallTableId','posFolder','posPath'];
   function snapshot(keys){
@@ -122,14 +122,14 @@
       return result;
     };
   }
-  for(const name of ['addConfiguredCartItem','changeQty','removeFromCart','saveCartItemOptions','setOrderType','selectDeliveryFee','saveOrderSettings','setLoyaltyRedemption','removeOrderCustomer'])atomicHandler(name,cartKeys);
+  for(const name of ['addConfiguredCartItem','changeQty','removeFromCart','saveCartItemOptions','setOrderType','selectDeliveryFee','selectDeliveryTariff','saveOrderSettings','setLoyaltyRedemption','removeOrderCustomer'])atomicHandler(name,cartKeys);
   for(const name of ['saveCategory','toggleCategoryChannel','confirmDelete','toggleProductOnline','addLayoutTile','removeLayoutTile','onLayoutPointerUp','syncCategoryOrder'])atomicHandler(name,catalogueKeys);
   for(const name of ['saveInventorySettings','startInventory','updateInventoryActual','pauseInventory'])atomicHandler(name,['inventoryConfig','inventoryDraft']);
   for(const name of ['createHallTable','confirmDeleteHallTable','rotateHallTable','saveHallTableEdits','saveNewBooking','cancelBooking','saveEditedBooking','hallPointerEnd'])atomicHandler(name,['hallTables','bookings']);
-  for(const [name,keys] of [['setTheme',['theme']],['setDemandOverload',['demandOverload','operationalOutbox','operationalRevision']],['saveNetworkSettings',['network']],['saveCompanySettings',['company']],['savePrinterSettings',['printer']],['saveDeliveryRate',['deliveryRates']],['deleteDeliveryRate',['deliveryRates']],['saveDiscount',['discounts']],['deleteDiscount',['discounts']]])atomicHandler(name,keys);
+  for(const [name,keys] of [['setTheme',['theme']],['setDemandOverload',['demandOverload','operationalOutbox','operationalRevision']],['saveNetworkSettings',['network']],['saveCompanySettings',['company']],['savePrinterSettings',['printer']],['saveDiscount',['discounts']],['deleteDiscount',['discounts']]])atomicHandler(name,keys);
   // Async editors already publish their snapshots after await Storage.set. Deny
   // entry before they alter UI/drafts; the Storage facade also rechecks after await.
-  for(const name of ['saveProduct','confirmProductImport','saveEmployee','confirmDeleteEmployee','confirmDeleteSupplier','saveSupplier','updatePosNavigation','openReceivingDocument','saveReceivingDraft','acceptWebOrder','saveLegacyWebReadyEstimate','markCurrentWebOrderReady','saveTelegramSettings']){
+  for(const name of ['saveProduct','confirmProductImport','saveEmployee','confirmDeleteEmployee','confirmDeleteSupplier','saveSupplier','updatePosNavigation','openReceivingDocument','saveReceivingDraft','acceptWebOrder','saveLegacyWebReadyEstimate','markCurrentWebOrderReady','saveTelegramSettings','saveDeliveryRate','deleteDeliveryRate']){
     const original=global[name];if(typeof original!=='function')continue;
     global[name]=async function(...args){try{assertWritable()}catch(error){global.flash(error.message);return false}return original.apply(this,args)};
   }

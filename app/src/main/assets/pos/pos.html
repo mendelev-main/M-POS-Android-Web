@@ -1263,6 +1263,7 @@ let state = {
   deliveryRates: [],
   deliveryFee: 0,
   deliveryTariffSelected: false,
+  deliveryTariff: null,
   _splitPayments: [],
   _splitCount: 0,
   _splitPaymentTotalCents: null,
@@ -1486,6 +1487,7 @@ async function loadAll(){
     state.customer = Object.assign({name:'',phone:'',address:''}, storageRecord(safeCurrentOrder.customer,'currentOrderSession.customer',{}));
     state.deliveryFee = Number(safeCurrentOrder.deliveryFee || 0);
     state.deliveryTariffSelected = safeCurrentOrder.deliveryTariffSelected===true;
+    state.deliveryTariff = safeCurrentOrder.deliveryTariff || null;
     state.orderComment = safeCurrentOrder.orderComment || '';
     state.currentOrderSource = safeCurrentOrder.source || '';
     state.currentWebOrderId = safeCurrentOrder.webOrderId || '';
@@ -1537,6 +1539,7 @@ async function loadAll(){
   }
 
   state.loaded = true;
+  void initializeDeliveryTariffs();
   render();
   if(hasPaidSplitPayment())setTimeout(()=>openPaymentModal(),0);
   startWebOrderEvents();
@@ -1693,6 +1696,7 @@ function currentOrderSessionSnapshot(paymentDraft){
     customer: JSON.parse(JSON.stringify(state.customer || {name:'',phone:'',address:''})),
     deliveryFee: Number(state.deliveryFee || 0),
     deliveryTariffSelected: !!state.deliveryTariffSelected,
+    deliveryTariff: storageSnapshot(state.deliveryTariff||null),
     orderComment: state.orderComment || '',
     source: state.currentOrderSource || '',
     webOrderId: state.currentWebOrderId || '',
@@ -1718,7 +1722,7 @@ function saveCurrentOrderSession(){
 }
 
 function emptyCurrentOrderSession(){
-  return {items:[],orderLabel:'',orderType:'На месте',customer:{name:'',phone:'',address:''},deliveryFee:0,deliveryTariffSelected:false,orderComment:'',source:'',webOrderId:'',webOrderStatus:'',kitchenPrinted:false,printedItems:[],loyaltyPrograms:[],loyaltyRedemptions:{},loyaltyCustomerId:'',updatedAt:Date.now()};
+  return {items:[],orderLabel:'',orderType:'На месте',customer:{name:'',phone:'',address:''},deliveryFee:0,deliveryTariffSelected:false,deliveryTariff:null,orderComment:'',source:'',webOrderId:'',webOrderStatus:'',kitchenPrinted:false,printedItems:[],loyaltyPrograms:[],loyaltyRedemptions:{},loyaltyCustomerId:'',updatedAt:Date.now()};
 }
 function clearCurrentOrderSession(){
   saveKey('currentOrderSession',emptyCurrentOrderSession());
@@ -2076,7 +2080,7 @@ function renderSettingsScreen(){
       </div>
       <div class="settings-card">
         <div class="settings-section-head"><div class="settings-section-title">Стоимость доставки</div>${canEditCompanySettings()?`<button class="settings-plus-btn" aria-label="Добавить стоимость доставки" onclick="openDeliveryRateModal()"><span class="ui-icon ui-icon-add" aria-hidden="true"></span></button>`:`<button class="settings-plus-btn settings-info-btn" aria-label="Информация о доступе" onclick="showAdminOnlyInfo('Стоимость доставки')"><span class="ui-icon ui-icon-info" aria-hidden="true"></span></button>`}</div>
-        <div class="setting-sub">Настройте варианты стоимости. При выборе «Доставка» кассир сможет выбрать один из них.</div>
+        <div class="setting-sub">Настройте варианты стоимости. Они отправляются на сайт после сохранения.</div><div id="delivery-tariff-sync-status" class="setting-sub" role="status">${escapeHtml(deliveryTariffStatus())}</div>${canEditCompanySettings()?`<button class="btn btn-secondary" onclick="retryDeliveryTariffs()">Повторить синхронизацию</button>`:''}
         <div class="settings-list">${state.deliveryRates.length ? state.deliveryRates.map(r=>`<div class="list-row"><div class="settings-list-main"><div class="list-row-name">${escapeHtml(r.name)}</div><div class="list-row-sub">${money(r.amount)}</div></div>${canEditCompanySettings()?`<button class="btn btn-secondary settings-inline-button" onclick="openDeliveryRateModal('${escapeAttr(r.id)}')">Изменить</button><button class="icon-btn danger settings-row-action" aria-label="Удалить стоимость доставки" onclick="deleteDeliveryRate('${escapeAttr(r.id)}')"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button>`:''}</div>`).join('') : '<div class="center-note">Варианты доставки пока не добавлены.</div>'}</div>
       </div>
       <div class="settings-card">
@@ -2099,19 +2103,20 @@ function openDeliveryRateModal(id){
     <div class="field"><label>Стоимость, Br</label><input id="delivery-rate-amount" type="number" min="0" step="0.01" inputmode="decimal" value="${editing?Number(editing.amount):''}" placeholder="Например: 5"></div>
     <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="saveDeliveryRate('${escapeAttr(id||'')}')">Сохранить</button></div>`);
 }
-function saveDeliveryRate(id){
-  const name=(document.getElementById('delivery-rate-name')?.value||'').trim();
-  const amount=parseFloat(document.getElementById('delivery-rate-amount')?.value);
-  if(!name){flash('Введите название');return;}
-  if(!Number.isFinite(amount)||amount<0){flash('Введите корректную стоимость');return;}
-  if(id){ const r=state.deliveryRates.find(x=>x.id===id); if(r){r.name=name;r.amount=amount;} }
-  else state.deliveryRates.push({id:uid(),name,amount});
-  saveKey('deliveryRates',state.deliveryRates); closeModal(); render();
+async function saveDeliveryRate(id){
+  if(!canEditCompanySettings()){flash('Только администратор может менять тарифы');return;}
+  const name=(document.getElementById('delivery-rate-name')?.value||'').trim(),amount=parseFloat(document.getElementById('delivery-rate-amount')?.value);
+  if(!name||name.length>100){flash('Введите название до 100 символов');return;}
+  if(!Number.isFinite(amount)||amount<0||amount>9999999.99||Math.abs(amount*100-Math.round(amount*100))>0.00001){flash('Введите стоимость с точностью до копейки');return;}
+  try{
+    await saveDeliveryTariffList(rates=>{if(id){const rate=rates.find(r=>r.id===id);if(!rate)throw new Error('Тариф больше не существует');rate.name=name;rate.amount=amount;}else rates.push({id:uid(),name,amount});return rates});
+    closeModal();render();void flushDeliveryTariffs();
+  }catch(error){flash('Не удалось сохранить тариф: '+error.message)}
 }
-function deleteDeliveryRate(id){
-  state.deliveryRates=state.deliveryRates.filter(r=>r.id!==id);
-  if(state.orderType==='Доставка' && !state.deliveryRates.some(r=>Number(r.amount)===Number(state.deliveryFee))) state.deliveryFee=0;
-  saveKey('deliveryRates',state.deliveryRates); render();
+async function deleteDeliveryRate(id){
+  if(!canEditCompanySettings()){flash('Только администратор может менять тарифы');return;}
+  try{await saveDeliveryTariffList(rates=>rates.filter(r=>r.id!==id));render();void flushDeliveryTariffs()}
+  catch(error){flash('Не удалось удалить тариф: '+error.message)}
 }
 
 function openDiscountModal(){
@@ -2184,6 +2189,7 @@ async function syncMenuToBackend(){
     saveKey('network',state.network);
     render();
     flash('Меню успешно синхронизировано');
+    void flushDeliveryTariffs();
     void publishAvailability();
   }catch(e){
     state.network.lastSyncStatus='Ошибка синхронизации: '+(e?.message||'неизвестная ошибка');
@@ -2530,6 +2536,7 @@ document.addEventListener('touchmove',function(e){
 <script src="Web/js/features/product-persistence.js"></script>
 <script src="Web/js/features/product-editor.js"></script>
 <script src="Web/js/features/availability.js"></script>
+<script src="Web/js/features/delivery-tariffs.js"></script>
 <script src="Web/js/features/suppliers.js"></script>
 <script src="Web/js/features/purchase-orders.js"></script>
 <script src="Web/js/features/receiving-ui.js"></script>

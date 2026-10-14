@@ -20,7 +20,12 @@ function cashQuickValues(total){
   return [...new Set(vals)];
 }
 function hasDeliveryTariff(){
- return state.orderType!=='Доставка'||(state.deliveryTariffSelected===true&&Number.isFinite(Number(state.deliveryFee))&&Number(state.deliveryFee)>=0&&state.deliveryRates.some(r=>Number(r.amount)===Number(state.deliveryFee)));
+ if(state.orderType!=='Доставка')return true;
+ if(state.deliveryTariffSelected!==true||!Number.isFinite(Number(state.deliveryFee))||Number(state.deliveryFee)<0)return false;
+ if(state.currentOrderSource==='web'&&state.currentWebOrderId&&deliveryTariffSnapshotValid(state.deliveryTariff,state.deliveryFee))return true;
+ if(state.deliveryTariff)return state.deliveryRates.some(r=>r.id===state.deliveryTariff.id&&Number(r.amount)===Number(state.deliveryFee));
+ // Legacy local sessions retain the old amount-based validation until reselected.
+ return state.deliveryRates.some(r=>Number(r.amount)===Number(state.deliveryFee));
 }
 function requireDeliveryTariff(){
  if(hasDeliveryTariff())return true;
@@ -516,7 +521,7 @@ async function finalizePayment(payments){
     const requested=Math.max(0,Math.trunc(Number(value)||0)),allocated=(rewardAllocation.allocations[programId]||[]).reduce((sum,item)=>sum+Number(item.quantity||0),0);
     if(requested!==allocated){flash('Недостаточно подходящих товаров для выбранного подарка');return}
   }
-  const order={id:uid(),loyaltyRedemptions:storageSnapshot(state.loyaltyRedemptions||{}),loyaltyRewardAllocations:rewardAllocation.allocations,loyaltyDiscount:loyaltyReceipt.discount,loyaltyProgramsApplied:storageSnapshot(loyaltyReceipt.programs),productDiscountTotal,subtotalBeforeDiscounts,shiftId:shift.id,receiptNumber:receiptSequence,receiptDisplayNumber:`#${receiptSequence}`,employeeId:shift.employeeId||'',employeeName:shiftEmployee?.name||shiftEmployee?.fullName||'Сотрудник',registerName:'POS 1',method,total,payments:clean,cashGiven:method==='cash'?clean[0].cashGiven:null,change:method==='cash'?clean[0].change:null,orderLabel:state.orderLabel||'',orderType:state.orderType,deliveryFee:deliveryFee,customer:storageSnapshot(state.customer),source:state.currentOrderSource||'',webOrderId:state.currentWebOrderId||'',webOrderStatus:state.currentWebOrderStatus||'',items:state.cart.map(i=>{const d=state.discounts.find(x=>x.id===i.discountId),product=getProduct(i.productId);return {...i,category:product?.category||i.category||'',discountName:d?.name||'',discountType:d?.type||'',discountValue:Number(d?.value)||0,cost:product?(product.type==='simple'?product.cost:compositeCost(product)):0};}),timestamp:Date.now(),kitchenPrinted,printedItems:storageSnapshot(window.__currentOrderPrintedItems||[])};
+  const order={id:uid(),loyaltyRedemptions:storageSnapshot(state.loyaltyRedemptions||{}),loyaltyRewardAllocations:rewardAllocation.allocations,loyaltyDiscount:loyaltyReceipt.discount,loyaltyProgramsApplied:storageSnapshot(loyaltyReceipt.programs),productDiscountTotal,subtotalBeforeDiscounts,shiftId:shift.id,receiptNumber:receiptSequence,receiptDisplayNumber:`#${receiptSequence}`,employeeId:shift.employeeId||'',employeeName:shiftEmployee?.name||shiftEmployee?.fullName||'Сотрудник',registerName:'POS 1',method,total,payments:clean,cashGiven:method==='cash'?clean[0].cashGiven:null,change:method==='cash'?clean[0].change:null,orderLabel:state.orderLabel||'',orderType:state.orderType,deliveryFee:deliveryFee,deliveryTariff:storageSnapshot(state.deliveryTariff||null),customer:storageSnapshot(state.customer),source:state.currentOrderSource||'',webOrderId:state.currentWebOrderId||'',webOrderStatus:state.currentWebOrderStatus||'',items:state.cart.map(i=>{const d=state.discounts.find(x=>x.id===i.discountId),product=getProduct(i.productId);return {...i,category:product?.category||i.category||'',discountName:d?.name||'',discountType:d?.type||'',discountValue:Number(d?.value)||0,cost:product?(product.type==='simple'?product.cost:compositeCost(product)):0};}),timestamp:Date.now(),kitchenPrinted,printedItems:storageSnapshot(window.__currentOrderPrintedItems||[])};
   order.stockConsumption=stockConsumption;
   if(order.customer?.id)order.loyaltySync={status:'pending',at:Date.now(),attempts:0};
   const nextProducts=storageSnapshot(state.products),nextOrders=storageSnapshot(state.orders),nextShifts=storageSnapshot(state.shifts);

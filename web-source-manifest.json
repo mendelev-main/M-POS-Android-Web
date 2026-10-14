@@ -1,8 +1,8 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "57b3dbfc2233b4ac7536f5ad2943ce4806a79150",
+  "sourceCommit": "3a1c50233a8f0f06a6d991af0ed004de964f3b7f",
   "files": {
-    "pos.html": "f182d033c7f2ef9b8f2c05d55a6296ee96bc590f28f3bee75645c3f3c9e297d5",
+    "pos.html": "85a4bc0a2b5e7ea1a64378dfe126c14e11787540e74e191e5f680e1db539dcfa",
     "network-printer.js": "f32d11114c31775cb46ed803fd44c28aa6ccbea6e9bfbad279bca7785e072cd6",
     "notification-native.js": "d14a707f108f4ffd192a660a3a0f2dd87f2d9484c8309e6105a76e8935a40ca1",
     "Web/fonts/Manrope-Variable.ttf": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
@@ -10,15 +10,16 @@
     "Web/js/core/storage.js": "4e9d29d56f1a1cbf663f21bedada61bce46236ee322efe44756b18dbec4d92db",
     "Web/js/features/analytics.js": "e47103546bf22a5ed92c77641cce17d11a28e3a0d2f5b6b7f4fc4eaca3d0bd8b",
     "Web/js/features/availability.js": "2a46389555a12b7b66d602a6311444b5d0bf751e12e20198043b2c44c7cc4967",
-    "Web/js/features/backup.js": "5523d9e43a3cf2f101f29c603bc8432b4354167f2cd4f78552de04f2d9acedcb",
-    "Web/js/features/cart-composition.js": "ceb1b859d955c6084305507a2c4ca71d436df321a052408b819d0d24ada3897d",
-    "Web/js/features/cart-presentation.js": "a24e96607c116847b17e612ff1d7b550f789484c968ccabdd629baec85859392",
+    "Web/js/features/backup.js": "0d66fdc650ac7bc8eb4a89b93f4be36cb815e342fbf051e538c11acbc8253850",
+    "Web/js/features/cart-composition.js": "5c6fe4c7cae9c9cd2d6baeb5ce5c1f5c5fbbaf995c76d59a27e835e9089dd0f3",
+    "Web/js/features/cart-presentation.js": "6d333b7808db2682248d225aadcab161b5f1f7e33276f48c976508682037d3fc",
+    "Web/js/features/delivery-tariffs.js": "5d99a1e69ed4bc62780ec5903f56a6c1d097783dab6072d5d5e05ed932801f01",
     "Web/js/features/employees.js": "df8d79ad5df5a6e4a1b3a04b721ebc67724d8a9a763fdf1d7505c34a7dccf240",
     "Web/js/features/hall-bookings.js": "44d342fdd3e0c81011b23f02fefb9e3221dcf08872eacbbb5938e0e4e52a53e8",
     "Web/js/features/inventory.js": "7fcd358c563585e4c5c35af3d346091a74579cecda493fb03f45449e75a89335",
     "Web/js/features/loyalty.js": "6c6bca14b9e8951cbed7345997706f666f6fb82de60d9a3297639d8fc0133e65",
-    "Web/js/features/parked-orders.js": "fd2cac81d62ec56fa396a1dd973250fd7fe0fe5c5cb6dfa9138f36718b4a72f7",
-    "Web/js/features/payment.js": "6f38fdb6699f0d7ac5dc03853161bb37cd6c6df59781b382e24fdd00008bd3f4",
+    "Web/js/features/parked-orders.js": "72bf2fa253e016c9cbcdfa363269605eda642b1246ffc1f0a458fcf1c28274b4",
+    "Web/js/features/payment.js": "28c909776b2b6b6ec4c8d38de2e52a82f0e2acb8aeeef2586489e97319286450",
     "Web/js/features/pos-navigation.js": "cf099f0648311af8311f116cb0b588a1397348531630c1439378981edab0ec7c",
     "Web/js/features/product-catalog.js": "483cb159abfb08cba593383801036244c70ee52886882f1f5cbf1207a84eb309",
     "Web/js/features/product-categories.js": "a6577a14c96269cc0cd9e22c19ad06bf8978cc68e4ffa455234a96ff24d08679",
@@ -34,6 +35,6 @@
     "Web/js/features/shifts.js": "8eb3a07878fab6ac4b6afd5eb13adeff5a7e84f5d4569306159b5a5d0051b279",
     "Web/js/features/suppliers.js": "c0a0fcd26818e9e4be9447363c39e573f59dfde86bbf1c46b79de8ed96f3faba",
     "Web/js/features/warehouse-reporting.js": "93f59d35ea961f5053da8a9623293ed1f6ad6188820ec10b395c5e7806ca6dc4",
-    "Web/js/features/web-orders.js": "a6ecf28258e08f88f3189f81a2e8e6fb07f86b5eaa563de02ee97392e60e0d9e"
+    "Web/js/features/web-orders.js": "74a2300121d14267275a632787fc3bab16705d6a8a11320b35737ec3bf0ccd1d"
   }
 }
