@@ -21,8 +21,8 @@ async function saveDeliveryTariffList(makeRates){
     refreshDeliveryTariffStatus();return true;
   });
 }
-async function deliveryTariffRequest(method,payload){
-  const n=networkConfigFromState(),controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+async function deliveryTariffRequest(method,payload,n=networkConfigFromState()){
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
   try{
     const response=await fetch(String(n.backendUrl||'').replace(/\/+$/,'')+'/api/device/delivery-tariffs',{method,headers:{'Content-Type':'application/json','X-Device-Key':n.deviceKey},...(payload?{body:JSON.stringify(payload)}:{}),cache:'no-store',signal:controller.signal});
     const body=await response.json().catch(()=>({}));
@@ -34,10 +34,10 @@ async function retryDeliveryTariffs(){
   if(!canEditCompanySettings()){flash('Только администратор может публиковать тарифы');return false}
   if(deliveryTariffFlushBusy){flash('Дождитесь завершения отправки тарифов');return false}
   if(!state.loaded||storageBroken||criticalStorageRecoveryPending)return false;
-  deliveryTariffFlushBusy=true;const target=deliveryTariffTarget();
+  deliveryTariffFlushBusy=true;const target=deliveryTariffTarget(),connection=storageSnapshot(networkConfigFromState());
   try{
     // Read the current version only after the user's explicit synchronization action.
-    const server=await deliveryTariffRequest('GET');
+    const server=await deliveryTariffRequest('GET',null,connection);
     if(!Number.isSafeInteger(server.version)||server.version<0)throw new Error('Сервер вернул некорректную версию тарифов');
     let job;
     await serializeDeliveryTariffWrite(async()=>{
@@ -46,7 +46,7 @@ async function retryDeliveryTariffs(){
       const next=storageSnapshot(state.network);next.deliveryTariffSync={target,version:server.version,status:'Отправка тарифов…',pending:job,dirty:true};
       await persistDeliveryTariffNetwork(next);
     });
-    const result=await deliveryTariffRequest('PUT',job);
+    const result=await deliveryTariffRequest('PUT',job,connection);
     if(result.ok!==true||!Number.isSafeInteger(result.version))throw new Error('Сервер не подтвердил публикацию тарифов');
     await serializeDeliveryTariffWrite(async()=>{
       if(target!==deliveryTariffTarget())throw new Error('Настройки подключения изменились. Повторите синхронизацию');

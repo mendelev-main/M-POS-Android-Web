@@ -61,3 +61,9 @@ test('network synchronization waits for tariff result and exposes partial succes
  vm.runInContext(html.slice(start,end),f.context);await f.context.syncMenuToBackend();assert.equal(tariffs,1);assert.match(f.state.network.lastSyncStatus,/Ошибка синхронизации тарифов/);
  f.context.retryDeliveryTariffs=async()=>true;await f.context.syncMenuToBackend();assert.match(f.state.network.lastSyncStatus,/Тарифы доставки синхронизированы/);
 });
+test('connection changes during synchronization cannot publish to the new backend',async()=>{
+ const f=fixture(),fetch=f.context.fetch;
+ f.context.fetch=async(url,options)=>{const response=await fetch(url,options);if(options.method==='GET')f.state.network.backendUrl='https://other.test';return response};
+ assert.equal(await f.context.retryDeliveryTariffs(),false);assert.equal(f.calls.filter(c=>c.options.method==='PUT').length,0);
+ assert.ok(f.calls.every(c=>c.url.startsWith('https://backend.test/')));
+});
