@@ -2081,7 +2081,7 @@ function renderSettingsScreen(){
       </div>
       <div class="settings-card">
         <div class="settings-section-head"><div class="settings-section-title">Стоимость доставки</div>${canEditCompanySettings()?`<button class="settings-plus-btn" aria-label="Добавить стоимость доставки" onclick="openDeliveryRateModal()"><span class="ui-icon ui-icon-add" aria-hidden="true"></span></button>`:`<button class="settings-plus-btn settings-info-btn" aria-label="Информация о доступе" onclick="showAdminOnlyInfo('Стоимость доставки')"><span class="ui-icon ui-icon-info" aria-hidden="true"></span></button>`}</div>
-        <div class="setting-sub">Настройте варианты стоимости. Они отправляются на сайт после сохранения.</div><div id="delivery-tariff-sync-status" class="setting-sub" role="status">${escapeHtml(deliveryTariffStatus())}</div>${canEditCompanySettings()?`<button class="btn btn-secondary" onclick="retryDeliveryTariffs()">Повторить синхронизацию</button>`:''}
+        <div class="setting-sub">Настройте варианты стоимости. Они отправляются на сайт только кнопкой «Синхронизация с бэкендом» в сетевых настройках.</div><div id="delivery-tariff-sync-status" class="setting-sub" role="status">${escapeHtml(deliveryTariffStatus())}</div>
         <div class="settings-list">${state.deliveryRates.length ? state.deliveryRates.map(r=>`<div class="list-row"><div class="settings-list-main"><div class="list-row-name">${escapeHtml(r.name)}</div><div class="list-row-sub">${money(r.amount)}</div></div>${canEditCompanySettings()?`<button class="btn btn-secondary settings-inline-button" onclick="openDeliveryRateModal('${escapeAttr(r.id)}')">Изменить</button><button class="icon-btn danger settings-row-action" aria-label="Удалить стоимость доставки" onclick="deleteDeliveryRate('${escapeAttr(r.id)}')"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button>`:''}</div>`).join('') : '<div class="center-note">Варианты доставки пока не добавлены.</div>'}</div>
       </div>
       <div class="settings-card">
@@ -2111,12 +2111,12 @@ async function saveDeliveryRate(id){
   if(!Number.isFinite(amount)||amount<0||amount>9999999.99||Math.abs(amount*100-Math.round(amount*100))>0.00001){flash('Введите стоимость с точностью до копейки');return;}
   try{
     await saveDeliveryTariffList(rates=>{if(id){const rate=rates.find(r=>r.id===id);if(!rate)throw new Error('Тариф больше не существует');rate.name=name;rate.amount=amount;}else rates.push({id:uid(),name,amount});return rates});
-    closeModal();render();void flushDeliveryTariffs();
+    closeModal();render();
   }catch(error){flash('Не удалось сохранить тариф: '+error.message)}
 }
 async function deleteDeliveryRate(id){
   if(!canEditCompanySettings()){flash('Только администратор может менять тарифы');return;}
-  try{await saveDeliveryTariffList(rates=>rates.filter(r=>r.id!==id));render();void flushDeliveryTariffs()}
+  try{await saveDeliveryTariffList(rates=>rates.filter(r=>r.id!==id));render();}
   catch(error){flash('Не удалось удалить тариф: '+error.message)}
 }
 
@@ -2171,8 +2171,11 @@ function buildMenuSyncPayload(){
   })).filter(p=>p.name);
   return {deviceKey:networkConfigFromState().deviceKey,deviceName:networkConfigFromState().deviceName,categories,products};
 }
+let menuBackendSyncBusy=false;
 async function syncMenuToBackend(){
+  if(menuBackendSyncBusy)return;
   if(!saveNetworkSettings()) return;
+  menuBackendSyncBusy=true;
   const n=networkConfigFromState();
   const payload=buildMenuSyncPayload();
   setNetworkStatus('network-sync-status','Синхронизация…');
@@ -2186,18 +2189,18 @@ async function syncMenuToBackend(){
     const data=await r.json().catch(()=>null);
     if(!r.ok) throw new Error(data?.error||('HTTP '+r.status));
     state.network.lastSyncAt=Date.now();
-    state.network.lastSyncStatus=`Синхронизировано: ${Number(data?.categories||0)} категорий, ${Number(data?.products||0)} товаров.`;
+    const tariffsSynced=await retryDeliveryTariffs();
+    state.network.lastSyncStatus=`Меню синхронизировано: ${Number(data?.categories||0)} категорий, ${Number(data?.products||0)} товаров. `+(tariffsSynced?'Тарифы доставки синхронизированы.':deliveryTariffStatus());
     saveKey('network',state.network);
     render();
-    flash('Меню успешно синхронизировано');
-    void flushDeliveryTariffs();
+    flash(tariffsSynced?'Меню и тарифы доставки синхронизированы':'Меню обновлено. Тарифы доставки не синхронизированы — проверьте статус');
     void publishAvailability();
   }catch(e){
     state.network.lastSyncStatus='Ошибка синхронизации: '+(e?.message||'неизвестная ошибка');
     saveKey('network',state.network);
     render();
     flash('Ошибка синхронизации меню');
-  }
+  }finally{menuBackendSyncBusy=false}
 }
 
 function renderNetworkScreen(){

@@ -1,8 +1,8 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "6bbcaf5b0672672e769ea666d8ce16a81b824d13",
+  "sourceCommit": "f15d7254872e822bdae01a15dafc07ef68b4b102",
   "files": {
-    "pos.html": "3912d30b2bede24f8c00d7c8e5bacbb0bceaff607419facd330eb0131d089b73",
+    "pos.html": "f87eb7d4a1ecfb6f978438e047c5f356a99a5e71145fa4b332f83bab28127f5b",
     "network-printer.js": "f32d11114c31775cb46ed803fd44c28aa6ccbea6e9bfbad279bca7785e072cd6",
     "notification-native.js": "d14a707f108f4ffd192a660a3a0f2dd87f2d9484c8309e6105a76e8935a40ca1",
     "Web/fonts/Manrope-Variable.ttf": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
@@ -13,7 +13,7 @@
     "Web/js/features/backup.js": "0d66fdc650ac7bc8eb4a89b93f4be36cb815e342fbf051e538c11acbc8253850",
     "Web/js/features/cart-composition.js": "5c6fe4c7cae9c9cd2d6baeb5ce5c1f5c5fbbaf995c76d59a27e835e9089dd0f3",
     "Web/js/features/cart-presentation.js": "6d333b7808db2682248d225aadcab161b5f1f7e33276f48c976508682037d3fc",
-    "Web/js/features/delivery-tariffs.js": "5d99a1e69ed4bc62780ec5903f56a6c1d097783dab6072d5d5e05ed932801f01",
+    "Web/js/features/delivery-tariffs.js": "a0ce2432a609a8688378128be54f98e8c7ce88125d17a9a10379d88152a50982",
     "Web/js/features/employees.js": "df8d79ad5df5a6e4a1b3a04b721ebc67724d8a9a763fdf1d7505c34a7dccf240",
     "Web/js/features/hall-bookings.js": "44d342fdd3e0c81011b23f02fefb9e3221dcf08872eacbbb5938e0e4e52a53e8",
     "Web/js/features/inventory.js": "7fcd358c563585e4c5c35af3d346091a74579cecda493fb03f45449e75a89335",
@@ -35,6 +35,6 @@
     "Web/js/features/shifts.js": "8eb3a07878fab6ac4b6afd5eb13adeff5a7e84f5d4569306159b5a5d0051b279",
     "Web/js/features/suppliers.js": "c0a0fcd26818e9e4be9447363c39e573f59dfde86bbf1c46b79de8ed96f3faba",
     "Web/js/features/warehouse-reporting.js": "93f59d35ea961f5053da8a9623293ed1f6ad6188820ec10b395c5e7806ca6dc4",
-    "Web/js/features/web-orders.js": "74a2300121d14267275a632787fc3bab16705d6a8a11320b35737ec3bf0ccd1d"
+    "Web/js/features/web-orders.js": "09d659e0e6f92655a73a04fd78624906f6d5f35eb06e5fe7bfc9aa25247efb38"
   }
 }
