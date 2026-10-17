@@ -163,6 +163,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         if (::startupView.isInitialized) startupView.removeCallbacks(startupTimeout)
+        if (::printer.isInitialized) printer.close()
         if (::network.isInitialized) network.close()
         if (::telegram.isInitialized) telegram.close()
         if (::webView.isInitialized) {
@@ -212,6 +213,7 @@ class MainActivity : AppCompatActivity() {
     fun handlePrinter(payload: JSONObject) {
         when (payload.optString("action")) {
             "print" -> printer.handle(payload)
+            "openDrawer" -> printer.openDrawer(payload)
             "status" -> printer.ready()
             "shareWarehouseReport" -> payload.optJSONObject("report")?.let(shares::warehousePdf)
             "shareWarehouseExcel" -> payload.optJSONObject("report")?.let(shares::warehouseExcel)

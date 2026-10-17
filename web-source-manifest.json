@@ -1,9 +1,9 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "e81a44f514abcad912f8fa13e2d25183cecc447d",
+  "sourceCommit": "50d47d51aa0e65b744b8e6360f9e3d5ada8b54a4",
   "files": {
     "pos.html": "f87eb7d4a1ecfb6f978438e047c5f356a99a5e71145fa4b332f83bab28127f5b",
-    "network-printer.js": "f32d11114c31775cb46ed803fd44c28aa6ccbea6e9bfbad279bca7785e072cd6",
+    "network-printer.js": "163f799eee115efb0abbeb9897a832afc2783e3a0459ee9e369eca69d0c37628",
     "notification-native.js": "d14a707f108f4ffd192a660a3a0f2dd87f2d9484c8309e6105a76e8935a40ca1",
     "Web/fonts/Manrope-Variable.ttf": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
     "Web/fonts/OFL.txt": "58172e0c0fac2cda8a37b348164bb55e44b0e69051e557e92b1d3f6910141f7b",
@@ -28,11 +28,11 @@
     "Web/js/features/product-persistence.js": "ba2d7af117c6716a142b108af0f1c94295ebe24c488c9f3a64f45b3dfc00b854",
     "Web/js/features/product-photo.js": "a3eacce4e8c560e4e8b98e8c68726eee05220aa3e763a6d9cd9f8fced95f2294",
     "Web/js/features/purchase-orders.js": "701547ea50ccc64de909a91702993fa1b26e59f87f3e6d1edb5aaf301fd31eae",
-    "Web/js/features/receipts.js": "03ff3b7a9116154ce474e42108847a03dc7a2b140760fcd81dff42cabba07da1",
+    "Web/js/features/receipts.js": "b019a3a0936c5b344ffcff6f833490b733c2c2cb121bbe3773357e855d0e9768",
     "Web/js/features/receiving-drafts.js": "83a590b9875b582c17b25e9a60977354b8f2bc6d3a11757615175bcb953ee9e6",
     "Web/js/features/receiving-ui.js": "7491c32aa99080a247fc263bf2ad8e160c7d92724d516998c431ce037875a393",
     "Web/js/features/receiving.js": "39ba95e0e9e652b8464fcccb635e994ccb15ccf3958a94cf9b55dbf4a7e4dbe2",
-    "Web/js/features/shifts.js": "8eb3a07878fab6ac4b6afd5eb13adeff5a7e84f5d4569306159b5a5d0051b279",
+    "Web/js/features/shifts.js": "0bf53f6c7930697076ac54be18435a3afc9fc7541f1595bdcdd96df5a30e780d",
     "Web/js/features/suppliers.js": "c0a0fcd26818e9e4be9447363c39e573f59dfde86bbf1c46b79de8ed96f3faba",
     "Web/js/features/warehouse-reporting.js": "93f59d35ea961f5053da8a9623293ed1f6ad6188820ec10b395c5e7806ca6dc4",
     "Web/js/features/web-orders.js": "09d659e0e6f92655a73a04fd78624906f6d5f35eb06e5fe7bfc9aa25247efb38"

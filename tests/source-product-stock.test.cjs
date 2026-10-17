@@ -2286,3 +2286,25 @@ test('parked diagnostics name affected order and line and escape markup without 
 test('deleting a broken parked order releases its conservative reservation through journal',async()=>{
  const f=isolatedParkedFixture();f.state.parked=[{id:'broken',items:[{productId:'flour',qty:'unknown'}]}];assert.throws(()=>f.c.checkedStockConsumption([{productId:'flour',qty:1}]),/Не определён резерв/);assert.equal(await f.c.deleteParked('broken'),true);assert.doesNotThrow(()=>f.c.checkedStockConsumption([{productId:'flour',qty:1}]));assert.deepEqual(JSON.parse(f.data.get('prilavok_parked')),[]);
 });
+
+test('cash drawer shift and cash movement events follow durable commits; failed storage never dispatches',async()=>{
+ const f=fixture(),calls=[];f.state.shifts=[];f.state.employees=[{id:'employee',name:'Сотрудник',role:'employee'}];f.fields['sf-employee']={value:'employee'};
+ f.c.sendTelegramShiftOpened=()=>{};f.c.maybeSendMonthlyWarehouseReport=()=>{};
+ f.c.requestCashDrawer=(reason,id)=>{const saved=JSON.parse(f.data.get('prilavok_shifts'));assert.ok(saved.length);if(reason==='cash-in'||reason==='cash-out')assert.ok(saved[0].cashMovements.some(m=>m.id===id));calls.push(reason)};
+ assert.equal(await f.c.submitOpenShift(),true);assert.deepEqual(calls,['shift-open']);
+ f.fields['cash-movement-amount']={value:'20'};assert.equal(await f.c.submitCashMovement('deposit'),true);assert.equal(calls.at(-1),'cash-in');
+ f.fields['cash-movement-amount']={value:'5'};assert.equal(await f.c.submitCashMovement('withdrawal'),true);assert.equal(calls.at(-1),'cash-out');
+ const count=calls.length;f.c.localStorage.setItem=()=>{throw Error('full')};assert.equal(await f.c.submitCashMovement('deposit'),false);assert.equal(calls.length,count);
+});
+test('cash refund drawer event follows saved refund; card refunds never dispatch',async()=>{
+ for(const method of ['cash','card']){const f=fixture(),calls=[];const order=await f.sale([{method,amount:10}]);f.c.requestCashDrawer=(reason,id)=>{assert.ok(JSON.parse(f.data.get('prilavok_orders'))[0].returnedAt);calls.push(reason)};await f.c.processFullReturn(order.id);assert.deepEqual(calls,method==='cash'?['refund']:[])}
+});
+
+test('close-shift counting dialog opens deliberately; saving closure reuses that request ID',async()=>{
+ const f=fixture(),events=[];let id=0;f.c.crypto.randomUUID=()=>`count-${++id}`;
+ f.c.showModal=()=>{};f.c.sendTelegramShiftClosed=()=>{};f.c.printShiftCloseReceipt=()=>true;
+ f.c.requestCashDrawer=(reason,eventId)=>events.push({reason,eventId});
+ f.c.openCloseShiftModal();f.c.openCloseShiftModal();assert.equal(events.length,2);assert.notEqual(events[0].eventId,events[1].eventId);
+ f.fields['sf-counted']={value:'100'};assert.equal(await f.c.submitCloseShift(),true);
+ assert.equal(events.length,3);assert.equal(events[2].eventId,events[1].eventId);assert.ok(events.every(e=>e.reason==='shift-count'));
+});

@@ -1,3 +1,4 @@
+let cashDrawerCloseEvent=null;
 function currentShift(){
   return state.shifts.find(s=>s.status==='open') || null;
 }
@@ -90,6 +91,7 @@ function renderShiftScreen(shift){
       <div class="card shift-summary-card">
         <div class="shift-summary-actions">
           <button class="btn btn-success shift-summary-action" onclick="openCashMovementModal('deposit')">Внести наличные</button>
+          ${window.__MPOS_PLATFORM__==='android'&&currentShiftEmployeeIsAdmin()?`<button class="btn btn-secondary shift-summary-action" onclick="openCashDrawer()">Открыть кассовый ящик</button>`:''}
           <button class="btn btn-danger shift-summary-action" onclick="openCashMovementModal('withdrawal')">Изъять наличные</button>
         </div>
 
@@ -215,6 +217,7 @@ async function submitOpenShift(){
   catch(e){flash('Смена не открыта: '+(e?.message||e));return false}
   finally{criticalOperationBusy=false}
   state.shifts=nextShifts;
+  window.requestCashDrawer?.('shift-open',newShift.id);
   closeModal();
   render();
   try{sendTelegramShiftOpened(newShift);maybeSendMonthlyWarehouseReport()}
@@ -254,6 +257,7 @@ async function submitCashMovement(type){
   catch(e){flash('Операция с наличными не сохранена: '+(e?.message||e));return false}
   finally{criticalOperationBusy=false}
   state.shifts=nextShifts;
+  window.requestCashDrawer?.(type==='deposit'?'cash-in':'cash-out',nextShift.cashMovements[nextShift.cashMovements.length-1].id);
   closeModal();render();
   flash(type==='deposit'?'Наличные внесены в кассу':'Наличные изъяты из кассы');
   return true;
@@ -265,6 +269,8 @@ function openCloseShiftModal(){
   const t = shiftTotals(shift.id);
   const expected = cashDrawerBalance(shift,t);
   if(!Number.isFinite(expected)||expected<0){flash('Некорректные данные кассовой смены');return;}
+  cashDrawerCloseEvent={shiftId:shift.id,eventId:uid()};
+  window.requestCashDrawer?.('shift-count',cashDrawerCloseEvent.eventId);
   showModal(`
     <div class="modal-title">Закрыть смену</div>
     <div class="field"><label>Ожидается в кассе (наличные)</label>
@@ -295,6 +301,8 @@ async function submitCloseShift(){
   catch(e){flash('Смена не закрыта: '+(e?.message||e));return false}
   finally{criticalOperationBusy=false}
   state.shifts=nextShifts;
+  const drawerEvent=cashDrawerCloseEvent?.shiftId===closedShift.id?cashDrawerCloseEvent.eventId:uid();
+  window.requestCashDrawer?.('shift-count',drawerEvent);cashDrawerCloseEvent=null;
   closeModal();
   render();
   try{sendTelegramShiftClosed(closedShift)}catch(e){console.error('Смена закрыта, но Telegram-отчёт не отправлен:',e)}

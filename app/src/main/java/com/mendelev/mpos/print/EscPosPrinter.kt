@@ -11,10 +11,55 @@ import java.io.ByteArrayOutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
 import kotlin.math.ceil
 
 class EscPosPrinter(private val onEvent: (JSONObject) -> Unit) {
-    private val executor = Executors.newCachedThreadPool()
+    private val executors = mutableMapOf<String, ExecutorService>()
+    private val drawerRequests = DrawerRequestGate()
+    private var closed = false
+
+    private fun execute(ip: String, port: Int, task: () -> Unit) {
+        synchronized(executors) {
+            if (closed) return
+            executors.getOrPut("$ip:$port") { Executors.newSingleThreadExecutor() }.execute(task)
+        }
+    }
+
+    fun close() {
+        synchronized(executors) {
+            closed = true
+            executors.values.forEach { it.shutdownNow() }
+            executors.clear()
+        }
+    }
+
+    fun openDrawer(payload: JSONObject) {
+        val order = payload.optJSONObject("order") ?: return
+        val ip = order.optString("__networkPrinterIp").trim()
+        val port = order.optInt("__networkPrinterPort", 9100)
+        if (!validIpv4(ip) || port !in 1..65535) return event("printError", "drawer_error", "Неверный адрес принтера кассового ящика")
+        val command = runCatching {
+            require(order.optString("__drawerReason") in setOf("sale", "refund", "shift-open", "shift-count", "shift-close", "cash-in", "cash-out", "test", "manual"))
+            CashDrawerCommand.encode(order.optJSONObject("__printerConfig")?.optString("drawerCommand", CashDrawerCommand.DEFAULT) ?: CashDrawerCommand.DEFAULT)
+        }.getOrElse { return event("printError", "drawer_error", it.message ?: "Некорректная команда ящика") }
+        val accepted = runCatching { drawerRequests.accept(order.optString("__drawerRequestId")) }
+            .getOrElse { return event("printError", "drawer_error", it.message ?: "Некорректный запрос ящика") }
+        if (!accepted) return
+        execute(ip, port) {
+            runCatching {
+                Socket().use { socket ->
+                    socket.connect(InetSocketAddress(ip, port), 10_000)
+                    socket.soTimeout = 10_000
+                    socket.getOutputStream().use { output -> output.write(command); output.flush() }
+                }
+            }.onSuccess {
+                event("drawerSent", "drawer_sent", "Команда открытия кассового ящика отправлена")
+            }.onFailure {
+                event("printError", "drawer_error", "Не удалось подтвердить отправку команды ящика. Проверьте ящик и сеть; автоматического повтора нет")
+            }
+        }
+    }
 
     fun handle(payload: JSONObject) {
         val order = payload.optJSONObject("order") ?: return
@@ -25,7 +70,7 @@ class EscPosPrinter(private val onEvent: (JSONObject) -> Unit) {
         val ip = order.optString("__networkPrinterIp").trim()
         val port = order.optInt("__networkPrinterPort", 9100)
         if (!validIpv4(ip) || port !in 1..65535) return event("printError", "network_error", "Неверный IP-адрес принтера")
-        executor.execute {
+        execute(ip, port) {
             runCatching {
                 Socket().use { socket ->
                     socket.connect(InetSocketAddress(ip, port), 10_000)
