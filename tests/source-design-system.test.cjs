@@ -244,7 +244,9 @@ test('inventory surfaces use shared responsive presentation',()=>{
   const inventory=featureSourceByName.get('inventory.js');
   assert.doesNotMatch(inventory,/style="/);
   assert.doesNotMatch(inventory,/style\.display/);
-  assert.match(inventory,/row\.hidden=!!q&&!String\(row\.dataset\.inventoryProductName\|\|''\)\.includes\(q\)/);
+  assert.match(inventory,/row\.hidden=/);
+  assert.match(inventory,/row\.dataset\.inventoryProductCategory!==category/);
+  assert.match(inventory,/id="inventory-product-category"/);
   assert.match(inventory,/class="inventory-item-difference \$\{diff<0\?'is-shortage':diff>0\?'is-surplus':'is-balanced'\}"/);
   assert.match(html,/\.inventory-product-row\[hidden\]\{display:none;/);
   assert.match(html,/\.inventory-work-actions\{/);
