@@ -2352,3 +2352,15 @@ test('inventory history includes cancelled counts in its original order with ret
  assert.match(screen,/data-inventory-category=""/);assert.match(screen,/component-category-tab products-category-tab selected/);assert.doesNotMatch(screen,/<select/);assert.match(screen,/Отменена/);assert.match(screen,/10 → 3/);assert.match(screen,/Фиксации сохранены: 1; не зафиксировано: 1/);assert.doesNotMatch(screen,/Отменённые пересчёты/);assert.strictEqual(f.state.inventoryHistory,history);
  assert.ok(screen.indexOf('Отменена')<screen.indexOf('0 товаров · расхождений'));
 });
+
+test('inventory work groups mixed categories without losing rows or fixation controls',()=>{
+ const f=fixture();f.c.currentShiftEmployeeIsAdmin=()=>true;
+ f.state.products=[{id:'a',name:'Мука',type:'simple',category:'Сырьё',stock:10},{id:'b',name:'Сок',type:'simple',category:'Напитки',stock:4},{id:'c',name:'Сахар',type:'simple',category:'Сырьё',stock:2}];
+ f.state.inventoryDraft={items:[{productId:'a',name:'Мука',unit:'kg',actual:null},{productId:'b',name:'Сок',unit:'pcs',actual:3,expected:4,difference:-1,fixedAt:1},{productId:'c',name:'Сахар',unit:'kg',actual:1}]};
+ const before=JSON.stringify(f.state.inventoryDraft),screen=f.c.renderInventoryWorkScreen();
+ assert.equal((screen.match(/class="inventory-category-group"/g)||[]).length,2);assert.equal((screen.match(/class="list-row inventory-work-row"/g)||[]).length,3);
+ assert.match(screen,/<h3>Сырьё<\/h3><span class="inventory-category-count">2<\/span>/);assert.match(screen,/<h3>Напитки<\/h3>/);
+ assert.ok(screen.indexOf('Сахар')<screen.indexOf('<h3>Напитки'));
+ assert.match(screen,/for="inventory-actual-a"/);assert.match(screen,/id="inventory-actual-a"/);assert.match(screen,/Зафиксированный остаток/);assert.match(screen,/Разница: -1/);assert.equal(JSON.stringify(f.state.inventoryDraft),before);
+ f.state.products[0].category='';f.c.currentShiftEmployeeIsAdmin=()=>false;const staff=f.c.renderInventoryWorkScreen();assert.match(staff,/<h3>Без категории<\/h3>/);assert.doesNotMatch(staff,/Учётный остаток|Отменить инвентаризацию/);
+});

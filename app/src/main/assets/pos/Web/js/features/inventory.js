@@ -157,15 +157,18 @@ function renderInventoryScreen(){
 
 function renderInventoryWorkScreen(){
  const d=state.inventoryDraft;
- if(!d)return `<div class="screen content-screen ${state.tab==='inventoryWork'?'active':''}"><div class="center-note inventory-empty-state">Нет активной инвентаризации.</div></div>`;
+ if(!d)return `<div class="screen content-screen inventory-work-screen ${state.tab==='inventoryWork'?'active':''}"><div class="center-note inventory-empty-state">Нет активной инвентаризации.</div></div>`;
  const isAdmin=currentShiftEmployeeIsAdmin(),fixed=d.items.filter(x=>!!x.fixedAt).length;
- const rows=d.items.map(x=>{
+ const groups=new Map();
+ d.items.forEach(item=>{const category=productCategoryKey(getProduct(item.productId)||{});if(!groups.has(category))groups.set(category,[]);groups.get(category).push(item);});
+ const renderItem=x=>{
    const unit=unitLabel(x.unit),done=!!x.fixedAt,p=getProduct(x.productId),currentExpected=done?roundStockQty(Number(x.expected)||0):roundStockQty(Number(p?.stock)||0),diff=roundStockQty(Number(x.difference||0)),diffText=diff>0?'+'+stockQtyText(diff):stockQtyText(diff);
    const before=done?`<div class="setting-sub inventory-item-expected">Расчётный остаток: ${stockQtyText(currentExpected)} ${unit}</div><div class="inventory-item-difference ${diff<0?'is-shortage':diff>0?'is-surplus':'is-balanced'}">Разница: ${diffText} ${unit}</div>`:(isAdmin?`<div class="setting-sub">Учётный остаток: ${stockQtyText(currentExpected)} ${unit}</div>`:'');
-   const control=done?`<div class="inventory-fixed-summary"><div class="setting-sub">Зафиксированный остаток</div><div class="inventory-fixed-value">${stockQtyText(x.actual)} ${unit}</div></div>`:`<div class="inventory-entry"><div class="setting-sub inventory-entry-label">Остаток, ${escapeHtml(unit)}</div><div class="inventory-entry-controls"><input class="inventory-actual-input" type="number" min="0" step="0.001" inputmode="decimal" value="${x.actual===null?'':escapeAttr(String(x.actual))}" placeholder="0" onchange="updateInventoryActual('${escapeAttr(x.productId)}',this.value)"><button class="btn btn-primary inventory-fix-button" onclick="fixInventoryItem('${escapeAttr(x.productId)}')">Фиксировать</button></div></div>`;
-   return `<div class="list-row inventory-work-row"><div class="inventory-row-main"><div class="list-row-name">${escapeHtml(x.name)}</div>${before}</div>${control}</div>`;
- }).join('');
- return `<div class="screen content-screen ${state.tab==='inventoryWork'?'active':''}">
+   const control=done?`<div class="inventory-fixed-summary"><div class="setting-sub">Зафиксированный остаток</div><div class="inventory-fixed-value">${stockQtyText(x.actual)} ${unit}</div></div>`:`<div class="inventory-entry"><label class="setting-sub inventory-entry-label" for="inventory-actual-${escapeAttr(x.productId)}">Факт, ${escapeHtml(unit)}</label><div class="inventory-entry-controls"><input id="inventory-actual-${escapeAttr(x.productId)}" class="inventory-actual-input" type="number" min="0" step="0.001" inputmode="decimal" value="${x.actual===null?'':escapeAttr(String(x.actual))}" placeholder="0" onchange="updateInventoryActual('${escapeAttr(x.productId)}',this.value)"><button class="btn btn-primary inventory-fix-button" onclick="fixInventoryItem('${escapeAttr(x.productId)}')">Фиксировать</button></div></div>`;
+   return `<div class="list-row inventory-work-row"><div class="inventory-row-main"><div class="list-row-name">${escapeHtml(x.name)}</div><div class="inventory-item-meta">${before}</div></div>${control}</div>`;
+ };
+ const rows=[...groups].map(([category,items])=>`<section class="inventory-category-group"><div class="inventory-category-heading"><h3>${escapeHtml(category)}</h3><span class="inventory-category-count">${items.length}</span></div>${items.map(renderItem).join('')}</section>`).join('');
+ return `<div class="screen content-screen inventory-work-screen ${state.tab==='inventoryWork'?'active':''}">
    <div class="content-head inventory-work-head"><div><div class="content-title">${d.type==='adhoc'?'Внеплановая инвентаризация':'Инвентаризация'}</div><div class="setting-sub">Зафиксировано: ${fixed} из ${d.items.length}</div></div>${isAdmin?'<button class="btn btn-danger inventory-cancel-button" onclick="requestCancelInventory()">Отменить инвентаризацию</button>':''}</div>
    <div class="inventory-work-layout">
      <div class="card inventory-work-list">${rows||'<div class="center-note">Нет товаров для пересчёта</div>'}</div>
