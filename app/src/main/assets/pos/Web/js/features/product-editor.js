@@ -10,7 +10,7 @@ function openProductModal(id){
   window._pmNoStockUnlocked=window._pmStockUnlocked;
   window._pmBaseUnit=editing?.stockUnit||'';window._pmUnit=editing?.stockDisplayUnit||window._pmBaseUnit;
   const factor=convertProductQty(1,window._pmBaseUnit,window._pmUnit);
-  window._pmSimpleDraft={purchaseUnit:editing?.purchaseUnit??window._pmBaseUnit,packSize:editing?.purchasePackSize??'',contentUnit:editing?.purchaseContentUnit??window._pmBaseUnit,cost:editing?.cost==null?'':editing.cost/factor,stock:editing?.stock==null?'':convertProductQty(editing.stock,window._pmBaseUnit,window._pmUnit),minimum:editing?.minStock==null?'':convertProductQty(editing.minStock,window._pmBaseUnit,window._pmUnit),noStock:!!editing?.noStockTracking};
+  window._pmSimpleDraft={purchaseUnit:editing?.purchaseUnit??window._pmBaseUnit,packSize:editing?.purchasePackSize??'',contentUnit:editing?.purchaseContentUnit??window._pmBaseUnit,cost:editing?.cost==null?'':editing.cost/factor,stock:editing?.stock==null?'':convertProductQty(editing.stock,window._pmBaseUnit,window._pmUnit),minimum:editing?.minStock==null?'':convertProductQty(editing.minStock,window._pmBaseUnit,window._pmUnit),noStock:editing?.type==='simple'&&!!editing?.noStockTracking};
   window._pmType=editing?.type||'simple';window._pmEditingId=editing?.id||null;window._pmRecipeYield=editing?.recipeYield??1;window._pmRecipeUnit=editing?.recipeUnit||'piece';window._pmRecipeYieldManual=editing?.recipeYieldManual===true;
   window._pmImageData=null;window._pmLocalImageId=null;window._pmRemoveImage=false;window._pmOnline=editing?.availableOnline!==false;window._pmOnlineMenu=editing?.availableInOnlineMenu!==false;
   window._pmSaving=false;window._pmSession=(window._pmSession||0)+1;

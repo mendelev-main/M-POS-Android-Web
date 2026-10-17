@@ -175,7 +175,7 @@ function renderPosScreen(shift){
         ${editing&&currentCategory?`<button class="navigation-action" onclick="event.stopPropagation();openPosTileMove(${escapeAttr(JSON.stringify(p.id))})">Переместить</button>`:''}
         ${renderProductTileSymbol(p)}
         <div class="pcard-name">${escapeHtml(p.name)}</div>
-        <div class="pcard-bottom"><div><div class="pcard-price">${money(p.price)}</div><div class="pcard-stock ${p.noStockTracking?'':(avail<=3?'low':'')}">${p.type==='simple' ? (p.noStockTracking ? 'Остаток: ∞' : 'Остаток: '+stockQtyText(avail)+' '+unitLabel(stockUnit(p))) : (avail===Infinity?'Остаток: ∞':'Доступно: '+avail)}</div></div></div>
+        <div class="pcard-bottom"><div><div class="pcard-price">${money(p.price)}</div><div class="pcard-stock ${p.type==='simple'&&p.noStockTracking?'':(avail<=3?'low':'')}">${p.type==='simple' ? (p.noStockTracking ? 'Остаток: ∞' : 'Остаток: '+stockQtyText(avail)+' '+unitLabel(stockUnit(p))) : (avail===Infinity?'Остаток: ∞':'Доступно: '+avail)}</div></div></div>
       </div>
     </div>`;
   }).join('');
