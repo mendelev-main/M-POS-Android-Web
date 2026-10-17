@@ -12,7 +12,7 @@ async function saveProduct(editingId){
   const category = document.getElementById('pf-category').value.trim();
   const price = parseFloat(document.getElementById('pf-price').value) || 0;
   const tileSymbol = limitTileSymbol(document.getElementById('pf-symbol')?.value||'');
-  const noStockTracking = !!document.getElementById('pf-no-stock')?.checked;
+  const noStockTracking = window._pmType==='simple' && !!document.getElementById('pf-no-stock')?.checked;
   const canEditOnline = canEditProductWebSetting();
   const onlineDescription = document.getElementById('pf-description')?.value.trim()||'';
   if(!name){ flash('Введите название'); return; }

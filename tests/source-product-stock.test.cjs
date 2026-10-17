@@ -2308,3 +2308,26 @@ test('close-shift counting dialog opens deliberately; saving closure reuses that
  f.fields['sf-counted']={value:'100'};assert.equal(await f.c.submitCloseShift(),true);
  assert.equal(events.length,3);assert.equal(events[2].eventId,events[1].eventId);assert.ok(events.every(e=>e.reason==='shift-count'));
 });
+
+test('one untracked ingredient never disables composite availability or tracked sibling consumption',async()=>{
+ const f=fixture();f.c.getProduct('flour').noStockTracking=true;f.c.getProduct('flour').stock=0;
+ const pizza=f.c.getProduct('pizza'),water=f.c.getProduct('water');
+ assert.equal(f.c.availableStock(pizza),100);assert.equal(pizza.noStockTracking,undefined);assert.equal(water.noStockTracking,undefined);
+ const published=f.c.buildAvailabilityItems(f.state.products);assert.equal(published.find(p=>p.externalId==='pizza').quantity,100);assert.equal(published.find(p=>p.externalId==='flour').quantity,null);
+ const order=await f.sale();assert.deepEqual(plain(order.stockConsumption.items),[{productId:'water',qty:0.1}]);near(f.c.getProduct('water').stock,9.9);assert.equal(f.c.getProduct('flour').stock,0);
+ assert.equal(f.c.availableStock(f.c.getProduct('pizza')),99);f.c.restoreOrderStock(order);near(f.c.getProduct('water').stock,10);assert.equal(f.c.getProduct('flour').stock,0);
+ f.c.getProduct('water').stock=0;assert.equal(f.c.availableStock(f.c.getProduct('pizza')),0);assert.throws(()=>f.c.checkedStockConsumption([{productId:'pizza',qty:1}]),/Недостаточно/);
+});
+test('legacy composite noStockTracking flag cannot hide a finite calculated stock in product catalogue',()=>{
+ const f=fixture(),pizza=f.c.getProduct('pizza');pizza.noStockTracking=true;f.c.getProduct('flour').noStockTracking=true;
+ const html=f.c.renderProductsScreen(),row=html.slice(html.indexOf('Открыть товар Пицца'));
+ assert.ok(row.length<html.length);assert.match(row,/products-stock">100 шт\./);assert.doesNotMatch(row.split('</div>\n    </div>')[0],/products-stock">—/);
+ f.c.getProduct('water').stock=0;const empty=f.c.renderProductsScreen();assert.match(empty.slice(empty.indexOf('Открыть товар Пицца')),/products-stock">0 шт\./);
+});
+test('saving composite ignores a stale ingredient checkbox and keeps each ingredient tracking flag',async()=>{
+ const f=fixture();f.c.getProduct('flour').noStockTracking=true;f.c.getProduct('pizza').noStockTracking=true;
+ Object.assign(f.fields,{'pf-name':{value:'Пицца'},'pf-category':{value:'Пицца'},'pf-price':{value:'10'},'pf-no-stock':{checked:true},'pf-recipe-yield':{value:'1'},'pf-recipe-unit':{value:'piece'}});
+ f.c._pmType='composite';f.c._pmComponents=plain(f.c.getProduct('pizza').components);f.c._pmModifierGroups=[];f.c.canEditProductWebSetting=()=>true;f.c.publishAvailability=async()=>true;
+ await f.c.saveProduct('pizza');assert.equal(f.c.getProduct('pizza').noStockTracking,false);assert.equal(f.c.getProduct('flour').noStockTracking,true);assert.equal(f.c.getProduct('water').noStockTracking,undefined);assert.equal(f.c.availableStock(f.c.getProduct('pizza')),100);
+ assert.equal(JSON.parse(f.data.get('prilavok_products')).find(p=>p.id==='pizza').noStockTracking,false);
+});

@@ -97,7 +97,7 @@ function sortedProductRows(){
     if(key==='category')return productCategoryKey(p);
     if(key==='type')return p.type==='composite'?'Составной':'Простой';
     if(key==='web')return p.availableOnline!==false?1:0;
-    if(key==='stock'){const n=p.noStockTracking?Infinity:availableStock(p);return Number.isFinite(n)?n:null;}
+    if(key==='stock'){const n=(p.type==='simple'&&p.noStockTracking)?Infinity:availableStock(p);return Number.isFinite(n)?n:null;}
     if(key==='price'||key==='cost'){const n=Number(key==='cost'?compositeCost(p):p.price);return Number.isFinite(n)?n:null;}
     return p.name;
   };
@@ -131,14 +131,14 @@ function renderProductsScreen(){
         <div class="products-table-name">${escapeHtml(p.name)}</div>
         <div class="products-mobile-meta">
           <span class="badge ${p.type==='composite'?'type-composite':''}">${typeLabel}</span>
-          <span class="badge">${p.noStockTracking?'Остаток: ∞':'Остаток '+stockLabel}</span>
+          <span class="badge">${(p.type==='simple'&&p.noStockTracking)?'Остаток: ∞':'Остаток '+stockLabel}</span>
         </div>
       </div>
       <div class="products-table-cell products-table-muted">${escapeHtml(productCategoryKey(p))}</div>
       <div class="products-table-cell"><span class="badge ${p.type==='composite'?'type-composite':''}">${typeLabel}</span></div>
       <div class="products-table-cell">${money(p.price)}</div>
       <div class="products-table-cell">${money(compositeCost(p))}</div>
-      <div class="products-table-cell products-stock">${p.noStockTracking?'—':stockLabel}</div>
+      <div class="products-table-cell products-stock">${(p.type==='simple'&&p.noStockTracking)?'—':stockLabel}</div>
     </div>`;
   }).join('');
 
