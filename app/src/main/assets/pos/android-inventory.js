@@ -80,13 +80,4 @@
     state.inventoryHistory=history;state.inventoryDraft=null;state.tab='inventory';
     global.closeModal();global.render();global.flash('Пересчёт отменён. Зафиксированные остатки сохранены в истории');return true;
   };
-  const screen=global.renderInventoryScreen;
-  global.renderInventoryScreen=function(){
-    const history=state.inventoryHistory||[],cancelled=history.filter(x=>x.status==='cancelled').slice(0,50);
-    let result;state.inventoryHistory=history.filter(x=>x.status!=='cancelled');
-    try{result=screen.apply(this,arguments)}finally{state.inventoryHistory=history}
-    if(!cancelled.length)return result;
-    const audit='<div class="card inventory-card-spaced"><div class="inventory-card-title">Отменённые пересчёты</div>'+cancelled.map(record=>'<div class="list-row"><div class="inventory-row-main"><div class="list-row-name">'+escapeHtml(fmtDate(record.cancelledAt))+' · Отменена</div><div class="setting-sub">Фиксации сохранены: '+record.items.length+'; не зафиксировано: '+(record.unfixedItems||[]).length+'</div>'+record.items.map(x=>'<div class="setting-sub">'+escapeHtml(x.name)+': '+escapeHtml(stockQtyText(x.expected))+' → '+escapeHtml(stockQtyText(x.actual))+' '+escapeHtml(unitLabel(x.unit))+'</div>').join('')+'</div></div>').join('')+'</div>';
-    return result.replace('<div class="card"><div class="inventory-history-head">',audit+'<div class="card"><div class="inventory-history-head">');
-  };
 })(window);

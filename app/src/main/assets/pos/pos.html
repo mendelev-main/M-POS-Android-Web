@@ -1104,6 +1104,10 @@
   .inventory-frequency-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px;}
   .inventory-full-action{width:100%;}
   .inventory-products-description{margin:4px 0 12px;line-height:1.5;}
+  .inventory-product-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;}
+  .inventory-history-cancelled{color:var(--muted);font-weight:600;}
+  #inventory-filter-empty[hidden]{display:none;}
+  @media(max-width:700px){.inventory-product-filters{grid-template-columns:1fr;gap:0;}}
   .inventory-search{width:100%;min-height:44px;padding:11px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;margin-bottom:10px;}
   .inventory-product-list{max-height:360px;overflow:auto;border-top:1px solid var(--border);}
   .inventory-product-row{cursor:pointer;gap:12px;}
