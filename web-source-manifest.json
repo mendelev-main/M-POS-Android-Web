@@ -1,8 +1,8 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "88d9c6c06f669198ccc9b489e35ff101673e7649",
+  "sourceCommit": "d9649b5e02c7689e8c671d9865653f9a2c8596bf",
   "files": {
-    "pos.html": "bf49578b58f651cb27d5f9ada2bb3f65a1c673968fc7ad60ede3949d46dde3de",
+    "pos.html": "b9edc5cbbafbee862748cc988b1e889ebea589f6a13da38b25fd7953424b7735",
     "network-printer.js": "163f799eee115efb0abbeb9897a832afc2783e3a0459ee9e369eca69d0c37628",
     "notification-native.js": "d14a707f108f4ffd192a660a3a0f2dd87f2d9484c8309e6105a76e8935a40ca1",
     "Web/fonts/Manrope-Variable.ttf": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
@@ -16,7 +16,7 @@
     "Web/js/features/delivery-tariffs.js": "3fccee015f94aff434550593796278c50a0efe9270169d7fbc878e91f02def6f",
     "Web/js/features/employees.js": "df8d79ad5df5a6e4a1b3a04b721ebc67724d8a9a763fdf1d7505c34a7dccf240",
     "Web/js/features/hall-bookings.js": "44d342fdd3e0c81011b23f02fefb9e3221dcf08872eacbbb5938e0e4e52a53e8",
-    "Web/js/features/inventory.js": "63a1bcb7444acb540f9bf6a6ba0340dc7e637804112422313b0ffd0aa66a69a9",
+    "Web/js/features/inventory.js": "1d03e5582a357796793c85067776e36b83183bd5369f12b604e78be063382b67",
     "Web/js/features/loyalty.js": "6c6bca14b9e8951cbed7345997706f666f6fb82de60d9a3297639d8fc0133e65",
     "Web/js/features/parked-orders.js": "72bf2fa253e016c9cbcdfa363269605eda642b1246ffc1f0a458fcf1c28274b4",
     "Web/js/features/payment.js": "28c909776b2b6b6ec4c8d38de2e52a82f0e2acb8aeeef2586489e97319286450",

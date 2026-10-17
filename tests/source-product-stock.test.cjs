@@ -2335,18 +2335,20 @@ test('saving composite ignores a stale ingredient checkbox and keeps each ingred
 test('inventory category and search filters intersect without clearing selected hidden products',()=>{
  const f=fixture();
  const rows=[{dataset:{inventoryProductName:'мука',inventoryProductCategory:'Сырьё'},checked:true},{dataset:{inventoryProductName:'молоко',inventoryProductCategory:'Сырьё'},checked:false},{dataset:{inventoryProductName:'мука фасованная',inventoryProductCategory:'Магазин'},checked:true}];
- const search={value:' МУКА '},category={value:'Сырьё'},empty={hidden:true};
- f.c.document.getElementById=id=>({'inventory-product-search':search,'inventory-product-category':category,'inventory-filter-empty':empty}[id]);
+ const search={value:' МУКА '},empty={hidden:true};f.c._inventoryCategory='Сырьё';
+ f.c.document.getElementById=id=>({'inventory-product-search':search,'inventory-filter-empty':empty}[id]);
  f.c.document.querySelectorAll=()=>rows;
  f.c.filterInventoryProducts();assert.deepEqual(rows.map(x=>x.hidden),[false,true,true]);assert.equal(rows[2].checked,true);assert.equal(empty.hidden,true);
- category.value='Магазин';f.c.filterInventoryProducts();assert.deepEqual(rows.map(x=>x.hidden),[true,true,false]);
+ const buttons=['','Сырьё','Магазин'].map(category=>({dataset:{inventoryCategory:category},classList:{toggle(name,value){this.selected=value}},setAttribute(name,value){this[name]=value}}));
+ f.c.document.querySelectorAll=selector=>selector==='[data-inventory-category]'?buttons:rows;
+ f.c.setInventoryCategoryFilter('Магазин');assert.deepEqual(rows.map(x=>x.hidden),[true,true,false]);assert.equal(buttons[2]['aria-pressed'],'true');assert.equal(buttons[1].classList.selected,false);assert.equal(search.value,' МУКА ');
  search.value='нет совпадений';f.c.filterInventoryProducts();assert.equal(empty.hidden,false);
- search.value='';category.value='';f.c.filterInventoryProducts();assert.deepEqual(rows.map(x=>x.hidden),[false,false,false]);assert.equal(empty.hidden,true);
+ search.value='';f.c._inventoryCategory='';f.c.filterInventoryProducts();assert.deepEqual(rows.map(x=>x.hidden),[false,false,false]);assert.equal(empty.hidden,true);
 });
 test('inventory history includes cancelled counts in its original order with retained fixed quantities',()=>{
  const f=fixture();f.state.inventoryConfig={frequency:'monthly',productIds:[]};
  f.state.inventoryHistory=[{id:'cancel',status:'cancelled',cancelledAt:2,completedAt:2,items:[{name:'Мука',expected:10,actual:3,unit:'kg',difference:-7}],unfixedItems:[{name:'Молоко'}]},{id:'done',completedAt:1,items:[]}];
  const history=f.state.inventoryHistory,screen=f.c.renderInventoryScreen();
- assert.match(screen,/Все категории/);assert.match(screen,/Отменена/);assert.match(screen,/10 → 3/);assert.match(screen,/Фиксации сохранены: 1; не зафиксировано: 1/);assert.doesNotMatch(screen,/Отменённые пересчёты/);assert.strictEqual(f.state.inventoryHistory,history);
+ assert.match(screen,/data-inventory-category=""/);assert.match(screen,/component-category-tab products-category-tab selected/);assert.doesNotMatch(screen,/<select/);assert.match(screen,/Отменена/);assert.match(screen,/10 → 3/);assert.match(screen,/Фиксации сохранены: 1; не зафиксировано: 1/);assert.doesNotMatch(screen,/Отменённые пересчёты/);assert.strictEqual(f.state.inventoryHistory,history);
  assert.ok(screen.indexOf('Отменена')<screen.indexOf('0 товаров · расхождений'));
 });
