@@ -1316,7 +1316,7 @@ const LS_PREFIX = 'prilavok_';
 let storageBroken = false;
 let storageCheckedOnce = false;
 const CRITICAL_STORAGE_JOURNAL_KEY = 'criticalStorageJournal';
-const CRITICAL_STORAGE_KEYS = new Set(['products','orders','shifts','employees','parked','purchaseOrders','receivings','receivingDraft','suppliers','discounts','layout','posNavigation','company','deliveryRates','hallTables','bookings','inventoryConfig','inventoryHistory','inventoryDraft','currentOrderSession','printer','theme','telegram','network','demandOverload','operationalOutbox','operationalRevision','webEvents','webOrderAcceptances']);
+const CRITICAL_STORAGE_KEYS = new Set(['products','orders','shifts','employees','parked','purchaseOrders','receivings','receivingDraft','suppliers','discounts','layout','posNavigation','company','deliveryRates','hallTables','bookings','inventoryConfig','inventoryHistory','inventoryDraft','currentOrderSession','printer','theme','telegram','network','demandOverload','operationalOutbox','operationalRevision','webEvents','webOrderAcceptances','privacyRules']);
 let criticalStorageRecoveryPending = false;
 let criticalOperationBusy = false;
 
@@ -1561,6 +1561,7 @@ async function loadAll(){
   queueOperationalSnapshot();
   void flushOperationalOutbox();
   startOperationalSchedule();
+  if(typeof initializePrivacy==='function')void initializePrivacy();
   void recoverWebAcceptanceJournal().catch(e=>console.warn('WEB acceptance recovery:',e));
 }
 function categoryLayoutSnapshot(){
@@ -1922,7 +1923,7 @@ async function flushOperationalOutbox(){
 }
 function operationalReconnect(){
   if(!state.loaded||document.hidden||window._availabilityAppActive===false)return;
-  operationalFailures=0;void recoverWebAcceptanceJournal();void retryPendingLoyalty();
+  operationalFailures=0;void recoverWebAcceptanceJournal();void retryPendingLoyalty();if(typeof synchronizePrivacy==='function')void synchronizePrivacy();
   if((state.operationalOutbox||[]).some(x=>x.type==='snapshot'))void flushOperationalOutbox();
 }
 function startOperationalSchedule(){
@@ -2553,6 +2554,7 @@ document.addEventListener('touchmove',function(e){
 <script src="Web/js/features/shifts.js"></script>
 <script src="Web/js/features/employees.js"></script>
 <script src="Web/js/features/loyalty.js"></script>
+<script src="Web/js/features/privacy.js"></script>
 <script src="Web/js/features/product-configuration.js"></script>
 <script src="Web/js/features/product-photo.js"></script>
 <script src="Web/js/features/product-persistence.js"></script>

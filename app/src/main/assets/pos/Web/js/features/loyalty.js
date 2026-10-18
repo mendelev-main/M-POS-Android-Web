@@ -7,7 +7,7 @@ async function loyaltyApi(path,options={}){
  const timeout=setTimeout(()=>controller.abort(),LOYALTY_API_TIMEOUT_MS);
  try{
   const r=await fetch(n.backendUrl+path,{...options,signal:controller.signal,headers:{'Content-Type':'application/json','X-Device-Key':n.deviceKey,...(options.headers||{})},cache:'no-store'});
-  const d=await r.json().catch(()=>null);if(!r.ok)throw new Error(d?.error||('HTTP '+r.status));return d;
+  const d=await r.json().catch(()=>null);if(!r.ok){const error=new Error(d?.error||('HTTP '+r.status));error.code=d?.code;throw error;}return d;
  }catch(e){
   if(e?.name==='AbortError'&&!externalSignal?.aborted)throw new Error('Сервер не ответил вовремя');
   throw e;
@@ -26,7 +26,7 @@ async function loadCustomerLoyalty(customerId){
  try{
   const data=await loyaltyApi('/api/customers/'+encodeURIComponent(customerId)+'/loyalty');
   if(state.customer!==selectedCustomer||String(state.customer?.id)!==String(customerId))return;
-  state.customer={...state.customer,id:data.customer.id,name:data.customer.name,phone:data.customer.normalized_phone,telegram_username:data.customer.telegram_username||null};
+  state.customer={...state.customer,id:data.customer.id,name:data.customer.name,phone:data.customer.normalized_phone,telegram_username:data.customer.telegram_username||null,membership:data.membership||{active:false,version:null}};
   state.loyaltyPrograms=data.programs||[];state.loyaltyRedemptions={};state.loyaltyCustomerId=String(customerId);state.loyaltyLoadingCustomerId='';state.loyaltyLoadError='';saveCurrentOrderSession();render();if(typeof refreshOrderCustomerModal==='function')refreshOrderCustomerModal();
  }catch(e){
   if(state.customer===selectedCustomer&&String(state.customer?.id)===String(customerId)){state.loyaltyLoadingCustomerId='';state.loyaltyLoadError=String(e?.message||e);if(typeof refreshOrderCustomerModal==='function')refreshOrderCustomerModal()}
@@ -113,8 +113,8 @@ async function publishPaidOrderLoyalty(order){
  if(!order?.customer?.id||order.loyaltySync?.status==='sending')return;
  order.loyaltySync={...(order.loyaltySync||{}),status:'sending',attemptedAt:Date.now()};
  try{await window.PrilavokCore.Storage.set('orders',state.orders)}catch(e){order.loyaltySync={...(order.loyaltySync||{}),status:'pending',error:'local-persist-before-send',at:Date.now()};markStorageBroken(e);return}
- try{const data=await loyaltyApi('/api/loyalty/sales',{method:'POST',body:JSON.stringify({orderId:order.id,customerId:order.customer.id,items:(order.items||[]).map(x=>({productId:x.productId,quantity:x.qty})),redemptions:order.loyaltyRedemptions||{},rewardAllocations:order.loyaltyRewardAllocations||{}})});order.loyaltySync={status:'synced',at:Date.now(),events:data.events||[]};await window.PrilavokCore.Storage.set('orders',state.orders);if(order.returnedAt&&order.loyaltyReversal?.status==='pending')await reverseOrderLoyalty(order)}
- catch(e){order.loyaltySync={status:'pending',error:String(e?.message||e),at:Date.now()};try{await window.PrilavokCore.Storage.set('orders',state.orders)}catch(storageError){markStorageBroken(storageError)}}
+ try{const data=await loyaltyApi('/api/loyalty/sales',{method:'POST',body:JSON.stringify({orderId:order.id,customerId:order.customer.id,consentVersion:order.loyaltyConsentVersion??null,occurredAt:Number.isFinite(order.timestamp)?new Date(order.timestamp).toISOString():null,items:(order.items||[]).map(x=>({productId:x.productId,quantity:x.qty})),redemptions:order.loyaltyRedemptions||{},rewardAllocations:order.loyaltyRewardAllocations||{}})});order.loyaltySync={status:'synced',at:Date.now(),events:data.events||[],skipped:data.skipped||null};await window.PrilavokCore.Storage.set('orders',state.orders);if(order.returnedAt&&order.loyaltyReversal?.status==='pending')await reverseOrderLoyalty(order)}
+ catch(e){order.loyaltySync={status:['LOYALTY_CONSENT_REQUIRED','LOYALTY_EVENT_TIME_INVALID'].includes(e?.code)?'consent_required':'pending',error:String(e?.message||e),at:Date.now()};try{await window.PrilavokCore.Storage.set('orders',state.orders)}catch(storageError){markStorageBroken(storageError)}}
 }
 async function reverseOrderLoyalty(order){
  if(!order?.customer?.id||order.loyaltyReversal?.status==='sending'||order.loyaltyReversal?.status==='synced')return;

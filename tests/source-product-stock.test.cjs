@@ -648,12 +648,12 @@ test('loyalty API aborts a stalled request and payment can continue without a gi
 
 test('split payment validates a selected loyalty gift before creating parts',async()=>{
  const f=fixture();f.cart('pizza',2);f.state.customer={id:'customer'};f.state.loyaltyPrograms=[{id:'reward',loyalty_reward_products:[{product_id:'pizza'}]}];f.state.loyaltyRedemptions={reward:1};let calls=0,renders=0;
- f.c.loyaltyApi=async()=>{calls++;return {programs:[{id:'reward',rewards:1,loyalty_reward_products:[{product_id:'pizza'}]}]}};f.c.renderPaymentScreen=()=>{};f.c.renderSplitPayment=()=>renders++;
+ f.c.loyaltyApi=async()=>{calls++;return {membership:{active:true,version:1},programs:[{id:'reward',rewards:1,loyalty_reward_products:[{product_id:'pizza'}]}]}};f.c.renderPaymentScreen=()=>{};f.c.renderSplitPayment=()=>renders++;
  assert.equal(await f.c.openSplitPayment(),true);assert.equal(calls,1);assert.equal(renders,1);assert.equal(f.state._splitPayments.reduce((sum,p)=>sum+p.amount,0),10);assert.equal(f.state._splitPaymentTotalCents,1000);
 });
 
 test('unavailable loyalty gift blocks split creation before money acceptance',async()=>{
- const f=fixture();f.cart('pizza',2);f.state.customer={id:'customer'};f.state.loyaltyPrograms=[{id:'reward',loyalty_reward_products:[{product_id:'pizza'}]}];f.state.loyaltyRedemptions={reward:1};f.c.loyaltyApi=async()=>({programs:[{id:'reward',rewards:0}]});f.c.renderPaymentScreen=()=>{throw Error('must not refresh')};f.c.renderSplitPayment=()=>{throw Error('must not render')};
+ const f=fixture();f.cart('pizza',2);f.state.customer={id:'customer'};f.state.loyaltyPrograms=[{id:'reward',loyalty_reward_products:[{product_id:'pizza'}]}];f.state.loyaltyRedemptions={reward:1};f.c.loyaltyApi=async()=>({membership:{active:true,version:1},programs:[{id:'reward',rewards:0}]});f.c.renderPaymentScreen=()=>{throw Error('must not refresh')};f.c.renderSplitPayment=()=>{throw Error('must not render')};
  await f.c.openSplitPayment();assert.equal(f.state._splitPayments.length,0);assert.match(f.messages.at(-1),/Подарок уже недоступен/);
 });
 
@@ -669,7 +669,7 @@ test('cancelling offline loyalty choice clears deferred payment action',async()=
 });
 
 test('duplicate split taps share one in-flight loyalty validation',async()=>{
- const f=fixture();f.cart('pizza',2);f.state.customer={id:'customer'};f.state.loyaltyPrograms=[{id:'reward',loyalty_reward_products:[{product_id:'pizza'}]}];f.state.loyaltyRedemptions={reward:1};let calls=0,release,renders=0;const gate=new Promise(resolve=>{release=resolve});f.c.loyaltyApi=async()=>{calls++;await gate;return {programs:[{id:'reward',rewards:1,loyalty_reward_products:[{product_id:'pizza'}]}]}};f.c.renderPaymentScreen=()=>{};f.c.renderSplitPayment=()=>renders++;
+ const f=fixture();f.cart('pizza',2);f.state.customer={id:'customer'};f.state.loyaltyPrograms=[{id:'reward',loyalty_reward_products:[{product_id:'pizza'}]}];f.state.loyaltyRedemptions={reward:1};let calls=0,release,renders=0;const gate=new Promise(resolve=>{release=resolve});f.c.loyaltyApi=async()=>{calls++;await gate;return {membership:{active:true,version:1},programs:[{id:'reward',rewards:1,loyalty_reward_products:[{product_id:'pizza'}]}]}};f.c.renderPaymentScreen=()=>{};f.c.renderSplitPayment=()=>renders++;
  const first=f.c.openSplitPayment(),second=f.c.openSplitPayment();assert.equal(await second,false);assert.equal(calls,1);release();assert.equal(await first,true);assert.equal(renders,1);
 });
 
@@ -2390,4 +2390,13 @@ test('session exit rechecks product deletion, product saves, employee changes an
 
 test('administration deletes an unfinished purchase order without a shift and records administrator identity',async()=>{
  const f=fixture(false);f.state.employees=[{id:'admin',name:'Администратор',role:'admin'}];f.state.shifts=[];f.state.purchaseOrders=[{id:'purchase',status:'pending',items:[]}];f.state.receivings=[];f.fields['administration-password']={value:'test-administration'};f.c.confirmAdministrationSession();assert.equal(await f.c.deletePurchaseOrderAsAdmin('purchase'),true);assert.equal(f.state.purchaseOrders[0].deletedByEmployeeId,'admin');assert.equal(f.state.shifts.length,0);
+});
+
+test('gift redemption requires active membership even when a stale gift balance is returned',async()=>{
+ const f=fixture();f.cart('pizza',2);f.state.customer={id:'customer'};f.state.loyaltyPrograms=[{id:'reward',loyalty_reward_products:[{product_id:'pizza'}]}];f.state.loyaltyRedemptions={reward:1};f.c.loyaltyApi=async()=>({membership:{active:false,version:2},programs:[{id:'reward',rewards:1}]});
+ assert.equal(await f.c.revalidateSelectedLoyaltyReward(),false);assert.equal(f.state._splitPayments.length,0);
+});
+test('queued sale sends its captured consent instead of a later customer enrollment',async()=>{
+ const f=fixture();const order={id:'paid',timestamp:Date.now(),customer:{id:'customer'},loyaltyConsentVersion:7,items:[],loyaltySync:{status:'pending'}};f.state.orders=[order];f.state.customer={id:'customer',membership:{active:true,version:9}};let body;f.c.loyaltyApi=async(p,o)=>{body=JSON.parse(o.body);return {events:[],skipped:'consent_required'}};
+ await f.c.publishPaidOrderLoyalty(order);assert.equal(body.consentVersion,7);assert.equal(order.loyaltySync.skipped,'consent_required');assert.equal(body.occurredAt,new Date(order.timestamp).toISOString());
 });
