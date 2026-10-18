@@ -1876,8 +1876,8 @@ test('Android empty or background demand flush does not report a sync or start p
 });
 
 function installAndroidAdmin(f){vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-admin.js'),'utf8'),f.c);}
-test('Android hides admin entry for cashier shift and clears stale administrator screens',()=>{
- const f=fixture();f.state.employees=[{id:'cashier',name:'Кассир',role:'employee'}];f.state.shifts[0].employeeId='cashier';f.state.settingsAdminPanel=true;f.state.loyaltyAdminScreen=true;installAndroidAdmin(f);
+test('Android offers session login to a cashier and clears stale administrator screens',()=>{
+ const f=fixture(false);f.state.employees=[{id:'cashier',name:'Кассир',role:'employee'}];f.state.shifts[0].employeeId='cashier';f.state.settingsAdminPanel=true;f.state.loyaltyAdminScreen=true;installAndroidAdmin(f);
  const markup=f.c.renderSettingsScreen();assert.doesNotMatch(markup,/onclick="openAdminPanel\(\)"/);assert.match(markup,/Резервная копия/);assert.match(markup,/onclick="setTab\('products'\)"/);assert.equal(f.state.settingsAdminPanel,false);assert.equal(f.state.loyaltyAdminScreen,false);assert.equal(f.c.renderAdminPanel(),'');assert.equal(f.writes.length,0);
 });
 test('Android administrator sees all five original actions with monochrome vector icons',()=>{
@@ -1886,9 +1886,9 @@ test('Android administrator sees all five original actions with monochrome vecto
  for(const action of ['openLoyaltyAdminScreen()',"setTab('network')",'openCompanyDetailsModal()',"setTab('inventory')",'openWarehousePage()'])assert.ok(panel.includes(`onclick="${action}"`));
  assert.equal((panel.match(/class="android-admin-action"/g)||[]).length,5);assert.equal((panel.match(/class="android-admin-icon"/g)||[]).length,5);assert.match(panel,/stroke="currentColor"/);assert.doesNotMatch(panel,/\p{Extended_Pictographic}/u);assert.match(panel,/aria-hidden="true"/);assert.equal(f.writes.length,0);
 });
-test('Android hides admin entry after administrator shift closes',()=>{
- const f=fixture();f.state.employees=[{id:'admin',name:'Администратор',role:'admin'}];f.state.shifts[0].employeeId='admin';installAndroidAdmin(f);assert.match(f.c.renderSettingsScreen(),/openAdminPanel\(\)/);
- f.state.shifts[0].status='closed';assert.doesNotMatch(f.c.renderSettingsScreen(),/onclick="openAdminPanel\(\)"/);assert.equal(f.c.renderAdminPanel(),'');
+test('Android administration survives cashier shift closure and ends on explicit logout',()=>{
+ const f=fixture(false);f.state.employees=[{id:'admin',name:'Администратор',role:'admin'}];f.state.shifts[0].employeeId='admin';f.fields['administration-password']={value:'test-administration'};f.c.confirmAdministrationSession();installAndroidAdmin(f);assert.match(f.c.renderSettingsScreen(),/openAdminPanel\(\)/);
+ f.state.shifts[0].status='closed';assert.match(f.c.renderSettingsScreen(),/openAdminPanel\(\)/);assert.match(f.c.renderAdminPanel(),/Сетевые настройки/);f.c.closeAdministrationSession();assert.doesNotMatch(f.c.renderSettingsScreen(),/onclick="openAdminPanel\(\)"/);assert.equal(f.c.renderAdminPanel(),'');
 });
 
 
