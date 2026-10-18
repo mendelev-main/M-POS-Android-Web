@@ -1,13 +1,8 @@
-function canAdminDeletePurchaseOrder(){
-  const shift=currentShift();
-  if(!shift)return false;
-  const employee=state.employees.find(e=>e.id===shift.employeeId);
-  return employee?.role==='admin';
-}
+function canAdminDeletePurchaseOrder(){return currentShiftEmployeeIsAdmin();}
 
 function openDeletePurchaseOrderModal(orderId){
   if(!canAdminDeletePurchaseOrder()){
-    flash('Удалять приёмки может только администратор при открытой им смене');
+    flash('Удалять приёмки может только администратор в активной сессии администрирования');
     return;
   }
   const order=state.purchaseOrders.find(o=>o.id===orderId);
@@ -29,7 +24,7 @@ async function deletePurchaseOrderAsAdmin(orderId){
   if(criticalOperationBusy){flash('Сохранение операции ещё не завершено');return false;}
   if(!canAdminDeletePurchaseOrder()){
     closeModal();
-    flash('Удалять приёмки может только администратор при открытой им смене');
+    flash('Удалять приёмки может только администратор в активной сессии администрирования');
     return false;
   }
   const order=state.purchaseOrders.find(o=>o.id===orderId);
@@ -39,12 +34,11 @@ async function deletePurchaseOrderAsAdmin(orderId){
     flash('Принятую приёмку удалить нельзя');
     return false;
   }
-  const shift=currentShift();
-  const employee=state.employees.find(e=>e.id===shift.employeeId);
+  const employee=state.employees.find(e=>e.role==='admin');
   const nextPurchaseOrders=storageSnapshot(state.purchaseOrders),nextReceivings=storageSnapshot(state.receivings),nextOrder=nextPurchaseOrders.find(o=>o.id===orderId),deletedAt=Date.now();
   nextOrder.deletedAt=deletedAt;
   nextOrder.deletedByEmployeeId=employee?.id||'';
-  nextOrder.deletedByEmployeeName=employee?.name||shift.employeeName||'Администратор';
+  nextOrder.deletedByEmployeeName=employee?.name||'Администратор';
   nextOrder.status='deleted';
   nextOrder.receivingIncomplete=false;
   delete nextOrder.receivingDraft;

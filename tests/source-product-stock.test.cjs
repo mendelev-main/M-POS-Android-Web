@@ -2387,3 +2387,7 @@ test('session exit rechecks product deletion, product saves, employee changes an
  const f=fixture(false);f.state.shifts=[];f.fields['administration-password']={value:'test-administration'};f.c.confirmAdministrationSession();f.state.products.push({id:'unused',type:'simple',name:'Товар'});f.c.showModal=()=>{};f.c.requestDelete('product','unused');f.c.closeAdministrationSession();
  f.c.confirmDelete('product','unused');assert.ok(f.c.getProduct('unused'));assert.equal(await f.c.saveProduct('unused'),false);assert.equal(await f.c.saveEmployee(),false);assert.equal(f.c.saveNetworkSettings(),false);assert.equal(f.c.saveInventorySettings(),false);assert.equal(f.writes.length,0);
 });
+
+test('administration deletes an unfinished purchase order without a shift and records administrator identity',async()=>{
+ const f=fixture(false);f.state.employees=[{id:'admin',name:'Администратор',role:'admin'}];f.state.shifts=[];f.state.purchaseOrders=[{id:'purchase',status:'pending',items:[]}];f.state.receivings=[];f.fields['administration-password']={value:'test-administration'};f.c.confirmAdministrationSession();assert.equal(await f.c.deletePurchaseOrderAsAdmin('purchase'),true);assert.equal(f.state.purchaseOrders[0].deletedByEmployeeId,'admin');assert.equal(f.state.shifts.length,0);
+});

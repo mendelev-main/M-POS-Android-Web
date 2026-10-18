@@ -37,7 +37,7 @@ function filterSupplierProducts(value){
 
 function deleteSupplier(id){
   if(!canEditCompanySettings()){
-    flash('Удалять поставщиков может только администратор при открытой им смене');
+    flash('Удалять поставщиков может только администратор в активной сессии администрирования');
     return;
   }
   const supplier=state.suppliers.find(s=>s.id===id);
@@ -55,7 +55,7 @@ async function confirmDeleteSupplier(id){
   if(window._supplierDeleteBusy)return false;
   if(!canEditCompanySettings()){
     closeModal();
-    flash('Удалять поставщиков может только администратор при открытой им смене');
+    flash('Удалять поставщиков может только администратор в активной сессии администрирования');
     return false;
   }
   if(!state.suppliers.some(s=>s.id===id))return false;

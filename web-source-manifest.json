@@ -1,6 +1,6 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "71eb650eab260ad03cb21cf93adbf54a9ff1bee0",
+  "sourceCommit": "e742d5e9b83dd3fa0933358ebbc14c70f5fc7812",
   "files": {
     "pos.html": "7bd5a614f33d0bed8c7213d5e2e00352aedea0d9304eb8557ec6150a5f8649cd",
     "network-printer.js": "5a34855b1f3b62f8110c25bb64f573ebe69325167e8ce8b57ab1ec54bb78e9f2",
@@ -24,16 +24,16 @@
     "Web/js/features/product-catalog.js": "cd54217955de5453c2b56c9e573694a33f13e4527918e82c503145ef50fdb34d",
     "Web/js/features/product-categories.js": "c36f27ecb191fd6611bee4b745352f15bca03632f1741819947292624382f90d",
     "Web/js/features/product-configuration.js": "faaeeff7f6bfd3ec6ce0e225a16c62a1f6d0db70cbaba3b7a04df1007dca1b8f",
-    "Web/js/features/product-editor.js": "3bc8d860fde7038f7331affd04dd9124e40b9f978480ff0ca57372d71485baa5",
+    "Web/js/features/product-editor.js": "27785ca6ea155786bb2297131b14df70168f866d7d029771b843a7783ab2df99",
     "Web/js/features/product-persistence.js": "0dfaf7e7f4cc312c1230afbc02c4e99ad68bb3e585e74485336f71fa921f42ea",
     "Web/js/features/product-photo.js": "a3eacce4e8c560e4e8b98e8c68726eee05220aa3e763a6d9cd9f8fced95f2294",
-    "Web/js/features/purchase-orders.js": "701547ea50ccc64de909a91702993fa1b26e59f87f3e6d1edb5aaf301fd31eae",
+    "Web/js/features/purchase-orders.js": "a3b48d8051eda459be6af8c4a4972195794bb33823d5566a61089b4ade7e0505",
     "Web/js/features/receipts.js": "b019a3a0936c5b344ffcff6f833490b733c2c2cb121bbe3773357e855d0e9768",
     "Web/js/features/receiving-drafts.js": "83a590b9875b582c17b25e9a60977354b8f2bc6d3a11757615175bcb953ee9e6",
     "Web/js/features/receiving-ui.js": "7491c32aa99080a247fc263bf2ad8e160c7d92724d516998c431ce037875a393",
     "Web/js/features/receiving.js": "39ba95e0e9e652b8464fcccb635e994ccb15ccf3958a94cf9b55dbf4a7e4dbe2",
     "Web/js/features/shifts.js": "e8af6aef74b54075f9218b8efb937d8f352252509edd52713013db040c2d2710",
-    "Web/js/features/suppliers.js": "21907dc97284a4e629b55cb22d982537a1a7a35ee987086c458ef7d4937cc457",
+    "Web/js/features/suppliers.js": "5e1886d91695d0c8525ba5b619c4c0c22eb035bb60b770c5de89859354674392",
     "Web/js/features/warehouse-reporting.js": "93f59d35ea961f5053da8a9623293ed1f6ad6188820ec10b395c5e7806ca6dc4",
     "Web/js/features/web-orders.js": "09d659e0e6f92655a73a04fd78624906f6d5f35eb06e5fe7bfc9aa25247efb38"
   }
