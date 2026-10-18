@@ -2400,3 +2400,5 @@ test('queued sale sends its captured consent instead of a later customer enrollm
  const f=fixture();const order={id:'paid',timestamp:Date.now(),customer:{id:'customer'},loyaltyConsentVersion:7,items:[],loyaltySync:{status:'pending'}};f.state.orders=[order];f.state.customer={id:'customer',membership:{active:true,version:9}};let body;f.c.loyaltyApi=async(p,o)=>{body=JSON.parse(o.body);return {events:[],skipped:'consent_required'}};
  await f.c.publishPaidOrderLoyalty(order);assert.equal(body.consentVersion,7);assert.equal(order.loyaltySync.skipped,'consent_required');assert.equal(body.occurredAt,new Date(order.timestamp).toISOString());
 });
+
+test('refund reconciles a sale whose acknowledgement was lost before consent withdrawal',async()=>{const f=fixture();const order={id:'paid',customer:{id:'customer'},items:[],returnedAt:Date.now(),loyaltySync:{status:'consent_required'},loyaltyReversal:{status:'pending'}};f.state.orders=[order];let route;f.c.loyaltyApi=async p=>{route=p;return {}};await f.c.settleReturnedOrderLoyalty(order);assert.equal(route,'/api/loyalty/reversal');assert.equal(order.loyaltyReversal.status,'synced')});

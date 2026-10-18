@@ -51,6 +51,8 @@ async function privacyLoadRules({replay=false,network}={}){
  throw Error('Не удалось завершить проверку очистки');
 }
 async function privacySanitizeBackup(next){
+ const draft=next.currentOrderSession;
+ if(draft?.paymentDraft?.parts?.some(p=>p?.paid===true)&&Object.values(draft.loyaltyRedemptions||{}).some(n=>Number(n)>0))throw Error('В копии есть незавершённая раздельная оплата с подарком. Требуется отдельное восстановление оплаты: автоматический сброс подарка изменит уже принятую сумму');
  // A backup can outlive the device's local task cursor: replay from the server.
  const network=next.network||networkConfigFromState();
  if(!network.backendUrl||!network.deviceKey)throw Error('Для восстановления нужна связь с настроенным бэкендом: необходимо проверить отозванные согласия и удалённые контакты');
