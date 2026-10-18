@@ -186,8 +186,8 @@ test('employee and product editor forms use shared presentation classes',()=>{
   const productEditor=featureSourceByName.get('product-editor.js');
   assert.doesNotMatch(employees,/style="/);
   assert.doesNotMatch(productEditor,/style="/);
-  assert.match(employees,/id="ef-admin-password-wrap"[^>]+hidden/);
-  assert.match(employees,/wrap\.hidden=!changed/);
+  assert.doesNotMatch(employees,/id="ef-admin-password/);
+  assert.match(employees,/requireAdministration/);
   assert.match(html,/\.employee-admin-row\{/);
   assert.match(html,/\.employee-admin-password\{/);
   assert.match(productEditor,/class="product-note-input"/);
@@ -232,8 +232,8 @@ test('shift surfaces use shared presentation and semantic visibility',()=>{
   const shifts=featureSourceByName.get('shifts.js');
   assert.doesNotMatch(shifts,/style="/);
   assert.doesNotMatch(shifts,/style\.display/);
-  assert.match(shifts,/id="sf-admin-password-wrap" class="field shift-admin-password" hidden/);
-  assert.match(shifts,/wrap\.hidden=!isAdmin/);
+  assert.doesNotMatch(shifts,/id="sf-admin-password/);
+  assert.match(shifts,/id="administration-password"/);
   assert.match(shifts,/class="badge shift-difference-badge \$\{Math\.abs\(diff\)<0\.01\?'is-balanced':'has-difference'\}"/);
   assert.match(html,/\.shift-movements-card\{/);
   assert.match(html,/\.shift-admin-password\[hidden\]\{display:none;/);

@@ -1065,7 +1065,7 @@ test('supplier delete persists first and preserves historical order snapshots',a
 });
 test('supplier delete failure and access recheck never remove the local row',async()=>{
  const f=supplierFixture();f.state.suppliers=[{id:'supplier',name:'Поставщик',productIds:[]}];const before=JSON.stringify(f.state.suppliers);f.c.localStorage.setItem=()=>{throw Error('quota')};assert.equal(await f.c.confirmDeleteSupplier('supplier'),false);assert.equal(JSON.stringify(f.state.suppliers),before);assert.equal(f.fields['supplier-delete-confirm'].disabled,false);assert.match(f.messages.at(-1),/Не удалось удалить поставщика/);
- const g=supplierFixture();g.state.suppliers=[{id:'supplier',name:'Поставщик',productIds:[]}];g.state.employees[0].role='employee';assert.equal(await g.c.confirmDeleteSupplier('supplier'),false);assert.equal(g.state.suppliers.length,1);assert.equal(g.writes.length,0);
+ const g=supplierFixture();g.state.suppliers=[{id:'supplier',name:'Поставщик',productIds:[]}];g.c.currentShiftEmployeeIsAdmin=()=>false;assert.equal(await g.c.confirmDeleteSupplier('supplier'),false);assert.equal(g.state.suppliers.length,1);assert.equal(g.writes.length,0);
 });
 
 test('supplier requests preserve packages independently from expected warehouse quantity',()=>{

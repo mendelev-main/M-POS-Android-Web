@@ -168,6 +168,7 @@ function openLoyaltyAdjustment(customerId,programId,programName){
 async function saveLoyaltyAdjustment(customerId,programId){if(!currentShiftEmployeeIsAdmin())return flash('Требуются права администратора');const credentials=administrationSession.credentials();if(!credentials)return;try{await loyaltyApi('/api/customers/'+encodeURIComponent(customerId)+'/loyalty-adjustment',{method:'POST',body:JSON.stringify({programId,progressDelta:Number(document.getElementById('la-progress')?.value),rewardDelta:Number(document.getElementById('la-rewards')?.value),reason:document.getElementById('la-reason')?.value,adminEmployeeId:credentials.employeeId,adminEmployeeName:credentials.employeeName,adminPassword:credentials.password})});flash('Корректировка сохранена');openCustomerAdminCard(customerId)}catch(e){flash(e.message||'Не удалось сохранить корректировку')}}
 async function openLoyaltyAdmin(){return openLoyaltyAdminScreen()}
 function loyaltyProgramForm(p=null){
+ if(!requireAdministration())return false;
   const earning=new Set((p?.loyalty_earning_products||[]).map(x=>String(x.product_id)));
   const rewards=new Set((p?.loyalty_reward_products||[]).map(x=>String(x.product_id)));
   const products=(state.products||[]).map(x=>({...x,id:String(x.id)}));
