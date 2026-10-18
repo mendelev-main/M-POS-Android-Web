@@ -30,6 +30,7 @@ function openCategoriesModal(){
 }
 
 function openCategoryModal(oldName){
+ if(!requireAdministration())return false;
   const returnToCategoryList = true;
   const editing = oldName !== null && oldName !== undefined;
   const colors = [
@@ -93,6 +94,7 @@ function limitTileSymbol(value, maxSymbols=3){
 }
 
 function saveCategory(oldName){
+ if(!requireAdministration())return false;
   const input=document.getElementById('cf-name');
   const name=(input?.value||'').trim();
   if(!name){ flash('Введите название категории'); return; }
@@ -129,6 +131,7 @@ function saveCategory(oldName){
   closeModal(); render(); flash(oldName===null||oldName===undefined?'Категория добавлена':'Категория изменена');
 }
 function toggleCategoryChannel(name,channel){
+ if(!requireAdministration())return false;
   const map=channel==='menu'?state.categoryOnlineMenu:state.categoryOnlineOrder;
   map[name]=map[name]===false;
   state.categoryOnline=state.categoryOnlineOrder;
@@ -137,6 +140,7 @@ function toggleCategoryChannel(name,channel){
   flash(map[name]?(channel==='menu'?'Категория добавлена в онлайн-меню':'Категория доступна для онлайн-заказа'):(channel==='menu'?'Категория скрыта из онлайн-меню':'Категория недоступна для онлайн-заказа'));
 }
 function toggleCategoryModalChannel(channel){
+ if(!requireAdministration())return false;
   const key=channel==='menu'?'_cmOnlineMenu':'_cmOnlineOrder';
   window[key]=!window[key];
   const b=document.getElementById(channel==='menu'?'cf-menu-toggle':'cf-order-toggle');

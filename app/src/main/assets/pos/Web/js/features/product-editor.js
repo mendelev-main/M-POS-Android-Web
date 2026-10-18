@@ -1,4 +1,5 @@
 function openProductModal(id){
+ if(!requireAdministration())return false;
   const editing=id?getProduct(id):null;
   if(id && !editing){flash('Товар не найден');return;}
   window._pmReturnScroll=document.querySelector('.screen.active')?.scrollTop||0;

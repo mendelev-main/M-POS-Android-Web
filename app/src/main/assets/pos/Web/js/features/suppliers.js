@@ -1,4 +1,5 @@
 function openSupplierModal(id=''){
+ if(!requireAdministration())return false;
   const supplier = state.suppliers.find(s=>s.id===id);
   const editing = !!supplier;
   const selected = new Set(Array.isArray(supplier?.productIds) ? supplier.productIds : []);
@@ -79,6 +80,7 @@ async function confirmDeleteSupplier(id){
 }
 
 async function saveSupplier(id=''){
+ if(!requireAdministration())return false;
   if(window._supplierSaveBusy)return false;
   const name=(document.getElementById('sf-name')?.value||'').trim();
   if(!name){flash('Введите название поставщика');return false;}

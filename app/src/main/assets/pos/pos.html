@@ -1097,6 +1097,8 @@
   .inventory-screen-heading{display:flex;align-items:center;gap:12px;min-width:0;}
   .inventory-back-button{width:auto;padding:10px 16px;flex:none;}
   .inventory-scroll{overflow:auto;min-height:0;flex:1;padding-right:4px;}
+  .administration-session-button{border-radius:999px;min-height:44px;}
+  .administration-active{background:var(--accent-soft);color:var(--accent);font-weight:800;}
   .inventory-card-spaced{margin-bottom:16px;}
   .inventory-card-title{font-size:17px;font-weight:800;line-height:1.35;}
   .inventory-schedule-description{margin:4px 0 8px;line-height:1.5;}
@@ -1824,6 +1826,7 @@ function renderTopbar(shift){
   const tabs = [['purchaseOrders','Заказы'],['receiving','Приёмка'],['receipts','Чеки'],['analytics','Аналитика'],['bookings','Бронирования']];
   return `
   <div class="topbar">
+    ${adminSessionIsActive()?'<button class="tab administration-active" onclick="openAdministrationSettings()" aria-label="Администрирование активно, открыть настройки">Администрирование активно</button>':''}
     <button class="brand ${state.tab==='pos'?'active':''}" onclick="setTab('pos')">M POS</button>
     <div class="tabs">
       ${tabs.map(([k,label])=>`<button class="tab ${state.tab===k?'active':''}" onclick="setTab('${k}')">${label}</button>`).join('')}
@@ -2030,6 +2033,7 @@ function renderAdminPanel(){
         <div class="content-title">Панель администратора</div>
       </div>
     </div>
+    <div class="settings-version">Версия __MPOS_VERSION__</div>
     <div class="settings-grid">
       <button class="settings-card settings-nav-card" onclick="openLoyaltyAdminScreen()">
         <div class="settings-card-title">Программа лояльности</div>
@@ -2067,7 +2071,7 @@ function renderSettingsScreen(){
   <div class="screen content-screen ${state.tab==='settings'?'active':''}">
     <div class="content-head">
       <div class="content-title">Настройки</div>
-      <div class="settings-version">Версия __MPOS_VERSION__</div>
+      ${renderAdministrationControl()}
       <div class="settings-theme-toggle" title="Светлая / тёмная тема">
         <span class="theme-icon sun" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg></span>
         <label class="theme-switch" aria-label="Переключить тему">
@@ -2083,7 +2087,7 @@ function renderSettingsScreen(){
     <div class="settings-grid">
       <div class="settings-card">
         <div class="settings-section-head"><div class="settings-section-title">Сотрудники</div><button class="settings-plus-btn" title="Добавить сотрудника" aria-label="Добавить сотрудника" onclick="openEmployeeModal()"><span class="ui-icon ui-icon-add" aria-hidden="true"></span></button></div>
-        <div class="setting-sub">Сотрудники выбираются при открытии кассовой смены. Введите ФИО и номер телефона.</div>
+        <div class="setting-sub">Кассиры выбираются при открытии смены. Администратор работает через отдельную сессию в настройках.</div>
         <div class="settings-list">${state.employees.length ? state.employees.slice().sort((a,b)=>a.name.localeCompare(b.name,'ru')).map(e=>`<div class="employee-settings-row"><div class="employee-settings-person"><div class="list-row-name employee-settings-name" title="${escapeAttr(e.name)}">${escapeHtml(employeeDisplayName(e.name))}</div><div class="list-row-sub">${escapeHtml(e.phone||'Телефон не указан')}</div></div><div class="employee-settings-role">${e.role==='admin'?'<span class="admin-badge">Админ</span>':employeeSalesCrown(e,employeeSalesRankMap.get(String(e.id)))}</div><button class="btn btn-secondary employee-settings-edit" onclick="openEmployeeModal(${escapeAttr(JSON.stringify(e.id))})">Изменить</button>${e.role==='admin'?`<button class="icon-btn employee-settings-action" aria-label="Информация об администраторе" onclick="showEmployeeAdminInfo(${escapeAttr(JSON.stringify(e.id))})"><span class="ui-icon ui-icon-info" aria-hidden="true"></span></button>`:`<button class="icon-btn danger employee-settings-action" aria-label="Удалить сотрудника" onclick="deleteEmployee(${escapeAttr(JSON.stringify(e.id))})"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button>`}</div>`).join('') : '<div class="center-note">Сотрудников пока нет.</div>'}</div>
       </div>
       <div class="settings-card">
@@ -2106,10 +2110,11 @@ function renderSettingsScreen(){
 }
 function showAdminOnlyInfo(sectionName){
   showModal(`<div class="modal-title">${escapeHtml(sectionName)}</div>
-    <div class="settings-note settings-admin-note">Настраивать этот раздел могут только сотрудники с правами администратора.</div>
+    <div class="settings-note settings-admin-note">Откройте Настройки → Администрирование и введите пароль администратора.</div>
     <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal()">Понятно</button></div>`);
 }
 function openDeliveryRateModal(id){
+ if(!requireAdministration())return false;
   const editing=(state.deliveryRates||[]).find(r=>r.id===id);
   showModal(`<div class="modal-title">${editing?'Изменить стоимость доставки':'Новая стоимость доставки'}</div>
     <div class="field"><label>Название</label><input id="delivery-rate-name" value="${escapeAttr(editing?.name||'')}" placeholder="Например: По городу"></div>
@@ -2117,6 +2122,7 @@ function openDeliveryRateModal(id){
     <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="saveDeliveryRate('${escapeAttr(id||'')}')">Сохранить</button></div>`);
 }
 async function saveDeliveryRate(id){
+ if(!requireAdministration())return false;
   if(!canEditCompanySettings()){flash('Только администратор может менять тарифы');return;}
   const name=(document.getElementById('delivery-rate-name')?.value||'').trim(),amount=parseFloat(document.getElementById('delivery-rate-amount')?.value);
   if(!name||name.length>100){flash('Введите название до 100 символов');return;}
@@ -2127,12 +2133,14 @@ async function saveDeliveryRate(id){
   }catch(error){flash('Не удалось сохранить тариф: '+error.message)}
 }
 async function deleteDeliveryRate(id){
+ if(!requireAdministration())return false;
   if(!canEditCompanySettings()){flash('Только администратор может менять тарифы');return;}
   try{await saveDeliveryTariffList(rates=>rates.filter(r=>r.id!==id));render();}
   catch(error){flash('Не удалось удалить тариф: '+error.message)}
 }
 
 function openDiscountModal(){
+ if(!requireAdministration())return false;
   showModal(`<div class="modal-title">Новая скидка</div>
     <div class="field"><label>Название</label><input id="df-name" placeholder="Например: Скидка сотрудника"></div>
     <div class="field"><label>Тип скидки</label><select id="df-type"><option value="percent">Процент</option><option value="fixed">Фиксированная сумма</option></select></div>
@@ -2140,6 +2148,7 @@ function openDiscountModal(){
     <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="saveDiscount()">Добавить</button></div>`, true);
 }
 function saveDiscount(){
+ if(!requireAdministration())return false;
   const name=(document.getElementById('df-name')?.value||'').trim();
   const type=document.getElementById('df-type')?.value==='fixed'?'fixed':'percent';
   const value=parseFloat(document.getElementById('df-value')?.value);
@@ -2149,6 +2158,7 @@ function saveDiscount(){
   state.discounts.push({id:uid(),name,type,value}); saveKey('discounts',state.discounts); closeModal(); render(); flash('Скидка добавлена');
 }
 function deleteDiscount(id){
+ if(!requireAdministration())return false;
   state.discounts=state.discounts.filter(d=>d.id!==id);
   state.cart.forEach(i=>{if(i.discountId===id)i.discountId='';});
   saveKey('discounts',state.discounts); render();
@@ -2373,15 +2383,10 @@ function openAppearanceModal(){
 
 /* Inventory runtime: Web/js/features/inventory.js */
 
-function canEditCompanySettings(){
-  const shift=currentShift();
-  if(!shift) return false;
-  const employee=state.employees.find(e=>e.id===shift.employeeId);
-  return employee?.role==='admin';
-}
+function canEditCompanySettings(){return currentShiftEmployeeIsAdmin();}
 function openCompanyEditModal(){
   if(!canEditCompanySettings()){
-    flash('Изменять реквизиты может только администратор при открытой им смене');
+    flash('Изменять реквизиты может только администратор в активной сессии администрирования');
     return;
   }
   showModal(`
@@ -2396,7 +2401,7 @@ function openCompanyEditModal(){
 function saveCompanySettings(){
   if(!canEditCompanySettings()){
     closeModal();
-    flash('Изменять реквизиты может только администратор при открытой им смене');
+    flash('Изменять реквизиты может только администратор в активной сессии администрирования');
     return;
   }
   state.company={
@@ -2411,6 +2416,7 @@ function saveCompanySettings(){
   flash('Реквизиты сохранены');
 }
 function savePrinterSettings(){
+ if(!requireAdministration())return false;
   const ip=(document.getElementById('printer-ip')?.value||'').trim();
   const port=parseInt(document.getElementById('printer-port')?.value,10)||9100;
   state.printer={...state.printer,ip,port,enabled:!!document.getElementById('printer-enabled')?.checked,autoPrint:!!document.getElementById('printer-auto')?.checked};
@@ -2425,7 +2431,7 @@ function testPrinterConnection(){
   flash('Отправляем пробную печать…');
   handler.postMessage({action:'print',order:{__networkPrinterIp:ip,__networkPrinterPort:port,__networkTest:true}});
 }
-function setTab(t){ state.tab = t; render(); }
+function setTab(t){ if(['network','inventory'].includes(t)&&!requireAdministration())return;state.tab = t; render(); }
 
 /* ============================= POS SCREEN ============================= */
 function productCategoryKey(p){ return (p.category||'').trim() || 'Без категории'; }
@@ -2457,12 +2463,13 @@ function flash(msg){
 
 function requestDelete(type, id){
   if(!['product','category'].includes(type))return;
-  const passwordRequired=type!=='product'||!currentShiftEmployeeIsAdmin();
+  if(!requireAdministration())return;
+  const passwordRequired=false;
   const title = type==='category' ? 'Удаление категории' : 'Удаление товара';
   const label = type==='category' ? id : (getProduct(id)?.name || 'товар');
   showModal(`
     <div class="modal-title">${title}</div>
-    <div class="center-note delete-confirm-note">${passwordRequired?'Для удаления «'+escapeHtml(label)+'» введите пароль.':'Удалить товар «'+escapeHtml(label)+'»?'}</div>
+    <div class="center-note delete-confirm-note">${passwordRequired?'Для удаления «'+escapeHtml(label)+'» введите пароль.':'Удалить «'+escapeHtml(label)+'»?'}</div>
     ${passwordRequired?'<div class="field"><label>Пароль</label><input type="password" id="delete-password" autocomplete="off" placeholder="Введите пароль"></div>':''}
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
@@ -2472,8 +2479,7 @@ function requestDelete(type, id){
 }
 function confirmDelete(type,id){
   if(!['product','category'].includes(type))return;
-  const pass=document.getElementById('delete-password')?.value||'';
-  if(!(type==='product'&&currentShiftEmployeeIsAdmin()) && pass!=='Rom23061998'){ flash('Неверный пароль'); return; }
+  if(!requireAdministration())return;
   if(type==='category'){
     if(state.products.some(p=>productCategoryKey(p)===id)){ flash('Нельзя удалить категорию: в ней есть товары'); return; }
     state.posNavigation.categories=state.posNavigation.categories.filter(e=>e.category!==id);saveKey('posNavigation',state.posNavigation);

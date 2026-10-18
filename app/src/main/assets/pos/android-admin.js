@@ -1,4 +1,4 @@
-/* Android settings presentation; upstream actions and role checks remain authoritative. */
+/* Android settings presentation; upstream actions and session checks remain authoritative. */
 (function(global){
   'use strict';
   const icons={
@@ -27,7 +27,7 @@
       ['inventory','Инвентаризация','График пересчёта, список товаров, проведение и история.',"setTab('inventory')"],
       ['warehouse','Складской учёт','Остатки, движение товаров, поставщики и складские отчёты.','openWarehousePage()']
     ];
-    return `<div class="android-admin-panel"><div class="content-head settings-content-head"><div class="settings-head-main"><button class="btn btn-secondary settings-back-button android-admin-back" onclick="closeAdminPanel()">${icon('back')}<span>Назад</span></button><div class="content-title">Панель администратора</div></div></div><div class="android-admin-actions">${actions.map(([name,title,description,action])=>`<button class="android-admin-action" onclick="${action}"><span class="android-admin-icon">${icon(name)}</span><span class="android-admin-copy"><span class="android-admin-title">${title}</span><span class="android-admin-description">${description}</span></span><span class="android-admin-next">${icon('next')}</span></button>`).join('')}</div></div>`;
+    return `<div class="android-admin-panel"><div class="content-head settings-content-head"><div class="settings-head-main"><button class="btn btn-secondary settings-back-button android-admin-back" onclick="closeAdminPanel()">${icon('back')}<span>Назад</span></button><div class="content-title">Панель администратора</div></div></div><div class="settings-version">Версия __MPOS_VERSION__</div><div class="android-admin-actions">${actions.map(([name,title,description,action])=>`<button class="android-admin-action" onclick="${action}"><span class="android-admin-icon">${icon(name)}</span><span class="android-admin-copy"><span class="android-admin-title">${title}</span><span class="android-admin-description">${description}</span></span><span class="android-admin-next">${icon('next')}</span></button>`).join('')}</div></div>`;
   };
   if(document.head){
     const style=document.createElement('style');style.id='android-admin-style';

@@ -30,7 +30,8 @@ function inventoryNextDate(){
 function inventoryDaysUntil(){const w=inventoryWindow();if(w?.active)return 0;const n=inventoryNextDate();return n?Math.ceil((n-inventoryDateOnly(new Date()))/86400000):null;}
 function renderInventoryTopbarReminder(){const w=inventoryWindow();if(!state.inventoryDraft&&!w?.active)return '';return '<button class="tab inventory-reminder '+(state.tab==='inventoryWork'?'active':'')+'" onclick="openInventoryWork()">Инвентаризация</button>';}
 function inventoryTrackedProducts(){const ids=new Set(state.inventoryConfig?.productIds||[]);return state.products.filter(p=>ids.has(p.id)&&productTracksStock(p));}
-function setInventoryFrequency(v){state.inventoryConfig.frequency=['weekly','monthly','quarterly'].includes(v)?v:'monthly';render();}
+function setInventoryFrequency(v){
+ if(!requireAdministration())return false;state.inventoryConfig.frequency=['weekly','monthly','quarterly'].includes(v)?v:'monthly';render();}
 function setInventoryCategoryFilter(category){
  window._inventoryCategory=String(category||'');
  document.querySelectorAll('[data-inventory-category]').forEach(button=>{
@@ -55,6 +56,7 @@ function renderInventoryHistoryRecord(r){
  return `<div class="list-row"><div class="inventory-row-main"><div class="list-row-name">${escapeHtml(fmtDate(r.cancelledAt||r.completedAt))}${r.type==='adhoc'?' · Внеплановая':''}${cancelled?' · <span class="inventory-history-cancelled">Отменена</span>':''}</div><div class="setting-sub">${details}</div>${cancelled?items.map(x=>`<div class="setting-sub">${escapeHtml(x.name)}: ${escapeHtml(stockQtyText(x.expected))} → ${escapeHtml(stockQtyText(x.actual))} ${escapeHtml(unitLabel(x.unit))}</div>`).join(''):''}</div></div>`;
 }
 function saveInventorySettings(){
+ if(!requireAdministration())return false;
  const productIds=[...document.querySelectorAll('[data-inventory-product]:checked')].map(x=>x.value);
  if(!productIds.length){flash('Выберите хотя бы один товар');return;}
  const frequency=['weekly','monthly','quarterly'].includes(state.inventoryConfig.frequency)?state.inventoryConfig.frequency:'monthly';
@@ -69,6 +71,7 @@ function startInventory(type='scheduled'){
 }
 function openInventoryWork(){if(!state.inventoryDraft&&!startInventory('scheduled'))return;state.tab='inventoryWork';render();}
 function startAdhocInventory(){
+ if(!requireAdministration())return false;
  if(state.inventoryDraft){state.tab='inventoryWork';render();flash('Сначала завершите текущую инвентаризацию');return;}
  if(!startInventory('adhoc'))return;state.tab='inventoryWork';render();
 }

@@ -2,10 +2,41 @@ let cashDrawerCloseEvent=null;
 function currentShift(){
   return state.shifts.find(s=>s.status==='open') || null;
 }
-function currentShiftEmployeeIsAdmin(){
-  const shift=currentShift();
-  if(!shift) return false;
-  return state.employees.find(e=>e.id===shift.employeeId)?.role==='admin';
+// Runtime-only administration. Never serialize the session or its credentials.
+const administrationSession=(()=>{
+ let password=null;
+ return {
+   active:()=>password!==null,
+   start(value){if(value!=='Rom23061998')return false;password=value;return true;},
+   close(){password=null;},
+   credentials(){const employee=state.employees.find(e=>e.role==='admin');return password===null?null:{password,employeeId:employee?.id||'',employeeName:employee?.name||'Администратор'};}
+ };
+})();
+function adminSessionIsActive(){return administrationSession.active();}
+// Compatibility entry point for shared features and platform adapters.
+function currentShiftEmployeeIsAdmin(){return adminSessionIsActive();}
+function requireAdministration(){
+ if(currentShiftEmployeeIsAdmin())return true;
+ flash('Откройте сессию администрирования в Настройках');return false;
+}
+function openAdministrationSession(){
+ if(adminSessionIsActive())return;
+ showModal(`<div class="modal-title">Администрирование</div><div class="field"><label for="administration-password">Пароль администратора</label><input id="administration-password" type="password" autocomplete="off" onkeydown="if(event.key==='Enter')confirmAdministrationSession()"></div><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="confirmAdministrationSession()">Войти</button></div>`);
+ setTimeout(()=>document.getElementById('administration-password')?.focus(),50);
+}
+function confirmAdministrationSession(){
+ const field=document.getElementById('administration-password');
+ if(!administrationSession.start(field?.value||'')){if(field)field.value='';flash('Неверный пароль');return false;}
+ if(field)field.value='';closeModal();state.settingsAdminPanel=false;state.tab='settings';render();flash('Администрирование активно');return true;
+}
+function closeAdministrationSession(){
+ administrationSession.close();state.settingsAdminPanel=false;state.loyaltyAdminScreen=false;state.editMode=false;
+ window._pmStockUnlocked=false;window._pmNoStockUnlocked=false;
+ closeModal();state.tab='settings';render();flash('Сессия администрирования закрыта');
+}
+function openAdministrationSettings(){state.settingsAdminPanel=false;state.loyaltyAdminScreen=false;state.tab='settings';render();}
+function renderAdministrationControl(){
+ return `<button class="btn btn-secondary administration-session-button" onclick="${adminSessionIsActive()?'closeAdministrationSession()':'openAdministrationSession()'}">${adminSessionIsActive()?'Закрыть сессию администрирования':'Администрирование'}</button>`;
 }
 function shiftOrders(shiftId){
   return state.orders.filter(o=>o.shiftId===shiftId);
@@ -162,18 +193,13 @@ function renderShiftScreen(shift){
   </div>`;
 }
 function openShiftModal(){
-  const employees = state.employees.slice().sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  const employees = state.employees.filter(e=>e.role!=='admin').slice().sort((a,b)=>a.name.localeCompare(b.name,'ru'));
   const previousClosed = state.shifts.filter(s=>s.status==='closed').slice().sort((a,b)=>(b.closedAt||0)-(a.closedAt||0))[0] || null;
   const previousCash = previousClosed ? Number(previousClosed.countedCash||0) : 0;
   showModal(`
     <div class="modal-title">Открыть смену</div>
     <div class="field"><label>Сотрудник</label>
-      ${employees.length ? `<select id="sf-employee" onchange="toggleShiftAdminPassword()"><option value="">Выберите сотрудника</option>${employees.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(employeeShortName(e.name))}${e.role==='admin'?' · АДМИНИСТРАТОР':''}</option>`).join('')}</select>` : `<div class="settings-note">Сначала добавьте сотрудников в Настройки → Сотрудники.</div>`}
-    </div>
-    <div id="sf-admin-password-wrap" class="field shift-admin-password" hidden>
-      <label>Пароль администратора</label>
-      <input id="sf-admin-password" type="password" autocomplete="off" placeholder="Введите пароль">
-      <div class="settings-note shift-admin-note">Для открытия смены администратором требуется пароль.</div>
+      ${employees.length ? `<select id="sf-employee"><option value="">Выберите сотрудника</option>${employees.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(employeeShortName(e.name))}${e.role==='admin'?' · АДМИНИСТРАТОР':''}</option>`).join('')}</select>` : `<div class="settings-note">Сначала добавьте сотрудников в Настройки → Сотрудники.</div>`}
     </div>
     <div class="field">
       <label>Наличные при открытии смены</label>
@@ -186,27 +212,13 @@ function openShiftModal(){
     </div>
   `);
 }
-function toggleShiftAdminPassword(){
-  const select=document.getElementById('sf-employee');
-  const wrap=document.getElementById('sf-admin-password-wrap');
-  const password=document.getElementById('sf-admin-password');
-  if(!select || !wrap) return;
-  const employee=state.employees.find(e=>e.id===select.value);
-  const isAdmin=employee?.role==='admin';
-  wrap.hidden=!isAdmin;
-  if(!isAdmin && password) password.value='';
-  if(isAdmin) setTimeout(()=>password?.focus(),50);
-}
 async function submitOpenShift(){
   if(criticalOperationBusy){flash('Сохранение операции ещё не завершено');return false;}
   if(currentShift()){flash('Смена уже открыта');return false;}
   const employeeId=document.getElementById('sf-employee')?.value||'';
   const employee=state.employees.find(e=>e.id===employeeId);
   if(!employee){flash('Выберите сотрудника');return false;}
-  if(employee.role==='admin'){
-    const password=document.getElementById('sf-admin-password')?.value||'';
-    if(password!=='Rom23061998'){flash('Для открытия смены администратором введите верный пароль');return false;}
-  }
+  if(employee.role==='admin'){flash('Администратор не открывает кассовую смену. Используйте Настройки → Администрирование');return false;}
   const previousClosed = state.shifts.filter(s=>s.status==='closed').slice().sort((a,b)=>(b.closedAt||0)-(a.closedAt||0))[0] || null;
   const openingCash = previousClosed ? Number(previousClosed.countedCash||0) : 0;
   if(!Number.isFinite(openingCash)||openingCash<0){flash('Некорректный остаток предыдущей смены');return false;}

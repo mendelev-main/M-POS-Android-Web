@@ -325,50 +325,15 @@ function toggleNoStockFields(){
   if(stock) stock.disabled=noStock || (window._pmEditingId && !window._pmStockUnlocked);
 }
 
-function requestNoStockUnlock(){
-  showModal(`
-    <div class="modal-title">Доступ администратора</div>
-    <div class="modal-sub">Только администратор может включить или отключить учет остатков для товара.</div>
-    <div class="field"><label>Пароль администратора</label>
-      <input type="password" id="no-stock-password" inputmode="text" autocomplete="off" placeholder="Введите пароль">
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal();renderProductModal(getProduct(window._pmEditingId),window._pmType,window._pmSimpleProducts,state.categoryOrder.slice())">Отмена</button>
-      <button class="btn btn-primary" onclick="confirmNoStockUnlock()">Разрешить</button>
-    </div>
-  `);
-  setTimeout(()=>document.getElementById('no-stock-password')?.focus(),50);
-}
+function requestNoStockUnlock(){if(requireAdministration())confirmNoStockUnlock();}
 function confirmNoStockUnlock(){
-  const value=document.getElementById('no-stock-password')?.value||'';
-  if(value!=='Rom23061998'){ flash('Неверный пароль'); return; }
-  window._pmNoStockUnlocked=true;
-  closeModal();
-  const editing=getProduct(window._pmEditingId);
-  renderProductModal(editing,window._pmType,window._pmSimpleProducts,state.categoryOrder.slice());
-  flash('Доступ администратора разрешен');
+ if(!requireAdministration())return;
+ window._pmNoStockUnlocked=true;closeModal();
+ renderProductModal(getProduct(window._pmEditingId),window._pmType,window._pmSimpleProducts,state.categoryOrder.slice());
 }
-
-function requestStockUnlock(){
-  if(!window._pmEditingId) return;
-  showModal(`
-    <div class="modal-title">Изменение остатка</div>
-    <div class="field"><label>Пароль</label>
-      <input type="password" id="stock-password" inputmode="text" autocomplete="off" placeholder="Введите пароль">
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal(); renderProductModal(getProduct(window._pmEditingId),window._pmType,window._pmSimpleProducts,state.categoryOrder.slice())">Отмена</button>
-      <button class="btn btn-primary" onclick="confirmStockUnlock()">Разрешить</button>
-    </div>
-  `);
-  setTimeout(()=>document.getElementById('stock-password')?.focus(),50);
-}
+function requestStockUnlock(){if(window._pmEditingId&&requireAdministration())confirmStockUnlock();}
 function confirmStockUnlock(){
-  const value=document.getElementById('stock-password')?.value||'';
-  if(value!=='Rom23061998'){ flash('Неверный пароль'); return; }
-  window._pmStockUnlocked=true;
-  closeModal();
-  const editing=getProduct(window._pmEditingId);
-  renderProductModal(editing,window._pmType,window._pmSimpleProducts,state.categoryOrder.slice());
-  flash('Изменение остатка разрешено');
+ if(!requireAdministration())return;
+ window._pmStockUnlocked=true;closeModal();
+ renderProductModal(getProduct(window._pmEditingId),window._pmType,window._pmSimpleProducts,state.categoryOrder.slice());
 }

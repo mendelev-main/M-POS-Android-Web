@@ -60,11 +60,13 @@ function renderPosFolderModal(){
   if(editing)setupLayoutGridDrag(grid);
 }
 function openPosFolderEditor(id=''){
+ if(!requireAdministration())return false;
   if(!state.editMode||!state.posPath)return;
   const folder=posCategoryItems(state.posPath).find(i=>i.type==='folder'&&i.id===id);
   showModal(`<div class="modal-title">${folder?'Изменить папку':'Новая папка'}</div><div class="field"><label>Название</label><input id="pos-folder-name" maxlength="80" value="${escapeAttr(folder?.name||'')}"></div><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="savePosFolder(${escapeAttr(JSON.stringify(id))})">Сохранить</button></div>${folder?`<button class="btn btn-danger-outline pos-folder-delete" onclick="requestRemovePosFolder(${escapeAttr(JSON.stringify(id))})">Удалить папку</button>`:''}`);
 }
 async function savePosFolder(id=''){
+ if(!requireAdministration())return false;
   if(!state.editMode||!state.posPath)return;
   const name=(document.getElementById('pos-folder-name')?.value||'').trim();
   if(!name||name.length>80){flash('Укажите название до 80 символов');return;}
@@ -79,16 +81,19 @@ function requestRemovePosFolder(id){
   showModal(`<div class="modal-title">Удалить папку?</div><p>Товары вернутся в корень категории.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-danger" onclick="removePosFolder(${escapeAttr(JSON.stringify(id))})">Удалить папку</button></div>`);
 }
 async function removePosFolder(id){
+ if(!requireAdministration())return false;
   if(!state.editMode||!state.posPath)return;
   const ok=await updatePosNavigation(state.posPath,items=>{const index=items.findIndex(i=>i.type==='folder'&&i.id===id);if(index<0)throw Error('Папка не найдена');items.splice(index,1);for(const i of items)if(i.parentId===id)i.parentId='';});
   if(ok&&state.posFolder===id){state.posFolder='';render();}
 }
 function openPosTileMove(id){
+ if(!requireAdministration())return false;
   if(!state.editMode||!state.posPath)return;
   const items=posCategoryItems(state.posPath),item=items.find(i=>i.type==='product'&&i.id===id);if(!item)return;
   showModal(`<div class="modal-title">Переместить товар</div><p>${escapeHtml(getProduct(id)?.name||'')}</p><div class="field"><label>Папка</label><select id="pos-move-folder"><option value="">Корень категории</option>${items.filter(i=>i.type==='folder').map(f=>`<option value="${escapeAttr(f.id)}" ${item.parentId===f.id?'selected':''}>${escapeHtml(f.name)}</option>`).join('')}</select></div><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="movePosProduct(${escapeAttr(JSON.stringify(id))},document.getElementById('pos-move-folder').value)">Переместить</button></div>`);
 }
 function movePosProduct(id,folderId){
+ if(!requireAdministration())return false;
   if(!state.editMode||!state.posPath)return;
   return updatePosNavigation(state.posPath,items=>{
     if(folderId&&!items.some(i=>i.type==='folder'&&i.id===folderId))throw Error('Папка не найдена');
@@ -97,6 +102,7 @@ function movePosProduct(id,folderId){
   });
 }
 function reorderPosCategoryTile(type,id,targetIndex){
+ if(!requireAdministration())return false;
   if(!state.editMode||!state.posPath||state.search)return;
   const parent=window._posFolderModal?.id||state.posFolder||'';
   return updatePosNavigation(state.posPath,items=>{
@@ -208,6 +214,7 @@ function renderPosScreen(shift){
 }
 
 function toggleEditMode(){
+ if(!requireAdministration())return false;
   state.editMode=!state.editMode;
   state.search='';
   render();
@@ -244,6 +251,7 @@ function handlePosGridClick(e){
   if(type==='product') addToCart(id);
 }
 function openLayoutEditor(){
+ if(!requireAdministration())return false;
   const products=state.products.slice().sort((a,b)=>a.name.localeCompare(b.name,'ru'));
   const cats=state.categoryOrder.slice();
   showModal(`<div class="modal-title">Настройка рабочей зоны</div>
@@ -259,6 +267,7 @@ function openLayoutEditor(){
   document.getElementById('layout-editor-done')?.addEventListener('click',()=>{ closeModal(); render(); setTimeout(setupLayoutGridDrag,50); });
 }
 function addLayoutTile(type,id){
+ if(!requireAdministration())return false;
   if(!type || !id) return;
   if(state.layoutTiles.length>=20){ flash('В рабочей зоне можно разместить максимум 20 плиток'); return; }
   state.layoutTiles.push({type,id});
@@ -268,6 +277,7 @@ function addLayoutTile(type,id){
   openLayoutEditor();
 }
 function removeLayoutTile(index){
+ if(!requireAdministration())return false;
   state.layoutTiles.splice(Number(index),1);
   saveKey('layout',categoryLayoutSnapshot());
   render();

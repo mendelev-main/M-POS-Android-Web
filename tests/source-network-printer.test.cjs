@@ -10,7 +10,7 @@ const plain=value=>JSON.parse(JSON.stringify(value));
 
 function fixture(printers){
   const data=new Map([['printers',JSON.stringify(printers||[])]]),posts=[],messages=[];
-  const c={console:{error:()=>{}},state:{},document:{documentElement:{},getElementById:()=>null},MutationObserver:class{observe(){}},queueMicrotask:()=>{},localStorage:{getItem:key=>data.has(key)?data.get(key):null,setItem:(key,value)=>data.set(key,String(value)),removeItem:key=>data.delete(key)},webkit:{messageHandlers:{printer:{postMessage:value=>posts.push(plain(value))}}},flash:value=>messages.push(value)};
+  const c={currentShiftEmployeeIsAdmin:()=>true,console:{error:()=>{}},state:{},document:{documentElement:{},getElementById:()=>null},MutationObserver:class{observe(){}},queueMicrotask:()=>{},localStorage:{getItem:key=>data.has(key)?data.get(key):null,setItem:(key,value)=>data.set(key,String(value)),removeItem:key=>data.delete(key)},webkit:{messageHandlers:{printer:{postMessage:value=>posts.push(plain(value))}}},flash:value=>messages.push(value)};
   c.window=c;vm.createContext(c);vm.runInContext(script,c);return{c,data,posts,messages};
 }
 

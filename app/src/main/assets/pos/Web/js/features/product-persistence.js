@@ -8,6 +8,7 @@ function productDependsOn(productId, targetId, seen=new Set()){
 }
 
 async function saveProduct(editingId){
+ if(!requireAdministration())return false;
   const name = document.getElementById('pf-name').value.trim();
   const category = document.getElementById('pf-category').value.trim();
   const price = parseFloat(document.getElementById('pf-price').value) || 0;
@@ -105,7 +106,7 @@ function canEditProductWebSetting(){
 }
 function toggleProductOnline(id){
   if(!canEditProductWebSetting()){
-    flash('Настройку WEB может изменять только администратор при открытой им смене');
+    flash('Настройку WEB может изменять только администратор в активной сессии администрирования');
     return;
   }
   const p=getProduct(id); if(!p) return;
@@ -115,7 +116,7 @@ function toggleProductOnline(id){
 }
 function toggleProductModalOnline(){
   if(!canEditProductWebSetting()){
-    flash('Настройку WEB может изменять только администратор при открытой им смене');
+    flash('Настройку WEB может изменять только администратор в активной сессии администрирования');
     return;
   }
   window._pmOnline = !window._pmOnline;
@@ -124,7 +125,7 @@ function toggleProductModalOnline(){
 }
 function toggleProductModalMenu(){
   if(!canEditProductWebSetting()){
-    flash('Настройку WEB может изменять только администратор при открытой им смене');
+    flash('Настройку WEB может изменять только администратор в активной сессии администрирования');
     return;
   }
   window._pmOnlineMenu = !window._pmOnlineMenu;

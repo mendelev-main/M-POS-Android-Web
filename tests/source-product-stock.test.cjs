@@ -45,13 +45,14 @@ const androidBackup=fs.readFileSync(path.join(root,'app/src/main/java/com/mendel
 const androidRouter=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/bridge/NativeBridgeRouter.kt'),'utf8');
 const plain=x=>JSON.parse(JSON.stringify(x));
 const near=(actual,expected)=>assert.ok(Math.abs(actual-expected)<1e-10,`${actual} != ${expected}`);
-function fixture(){
+function fixture(privileged=true){
  const data=new Map(),messages=[],writes=[],fields={'pf-prep-station':{value:'kitchen'},'pf-prep-difficulty':{value:'1'},'pf-base-prep-minutes':{value:'5'}},events=[];
  const document={getElementById:id=>fields[id]||null,querySelector:()=>null,addEventListener:()=>{}};
  // Isolate automatic startup recovery; tests call recovery entry points explicitly.
  const c={queueMicrotask:()=>{},console:{error:()=>{}},document,crypto:{randomUUID:()=> 'device-test'},setTimeout:()=>0,clearTimeout:()=>{},addEventListener:()=>{},removeEventListener:()=>{},AbortController,localStorage:{getItem:k=>data.has(k)?data.get(k):null,setItem:(k,v)=>{data.set(k,String(v));writes.push(k);},removeItem:k=>data.delete(k)},fetch:()=>{throw Error('Network is prohibited in this test');},setInterval:()=>{throw Error('Timer is prohibited in this test');}};
- c.window=c;vm.createContext(c);vm.runInContext(adapter,c);vm.runInContext(inline.replace(/loadAll\(\);\s*$/,''),c);vm.runInContext(shiftsScript,c);vm.runInContext(employeesScript,c);vm.runInContext(loyaltyScript,c);vm.runInContext(productConfigurationScript,c);vm.runInContext(productPhotoScript,c);vm.runInContext(productPersistenceScript,c);vm.runInContext(productEditorScript,c);vm.runInContext(availabilityScript,c);vm.runInContext(deliveryTariffsScript,c);vm.runInContext(suppliersScript,c);vm.runInContext(purchaseOrdersScript,c);vm.runInContext(receivingUiScript,c);vm.runInContext(receivingDraftsScript,c);vm.runInContext(receivingScript,c);vm.runInContext(webOrdersScript,c);vm.runInContext(inventoryScript,c);vm.runInContext(warehouseReportingScript,c);vm.runInContext(analyticsScript,c);vm.runInContext(productCatalogScript,c);vm.runInContext(productCategoriesScript,c);vm.runInContext(posNavigationScript,c);vm.runInContext(cartPresentationScript,c);vm.runInContext(cartCompositionScript,c);vm.runInContext(parkedOrdersScript,c);vm.runInContext(paymentScript,c);vm.runInContext(receiptsScript,c);vm.runInContext(hallBookingsScript,c);vm.runInContext(backupScript,c);
+ c.window=c;vm.createContext(c);vm.runInContext(adapter,c);vm.runInContext(inline.replace(/loadAll\(\);\s*$/,''),c);vm.runInContext(shiftsScript.replace(/value!==('[^']+')/,"value!=='test-administration'"),c);vm.runInContext(employeesScript,c);vm.runInContext(loyaltyScript,c);vm.runInContext(productConfigurationScript,c);vm.runInContext(productPhotoScript,c);vm.runInContext(productPersistenceScript,c);vm.runInContext(productEditorScript,c);vm.runInContext(availabilityScript,c);vm.runInContext(deliveryTariffsScript,c);vm.runInContext(suppliersScript,c);vm.runInContext(purchaseOrdersScript,c);vm.runInContext(receivingUiScript,c);vm.runInContext(receivingDraftsScript,c);vm.runInContext(receivingScript,c);vm.runInContext(webOrdersScript,c);vm.runInContext(inventoryScript,c);vm.runInContext(warehouseReportingScript,c);vm.runInContext(analyticsScript,c);vm.runInContext(productCatalogScript,c);vm.runInContext(productCategoriesScript,c);vm.runInContext(posNavigationScript,c);vm.runInContext(cartPresentationScript,c);vm.runInContext(cartCompositionScript,c);vm.runInContext(parkedOrdersScript,c);vm.runInContext(paymentScript,c);vm.runInContext(receiptsScript,c);vm.runInContext(hallBookingsScript,c);vm.runInContext(backupScript,c);
  c.flash=m=>messages.push(m);c.render=()=>{};c.showReceipt=()=>{};c.showPaymentReceipt=()=>{};c.closeModal=()=>{};c.applyTheme=()=>{};
+ if(privileged)c.currentShiftEmployeeIsAdmin=()=>true;
  const state=vm.runInContext('state',c);
  c.__printerSettingsSnapshot=()=>({printers:[],posNotifications:{soundEnabled:true,sound:'default'}});c.__restorePrinterSettings=()=>true;
  state.products=[{id:'flour',name:'Мука',type:'simple',stock:10,cost:2,price:2,category:'Сырьё',sortOrder:0,availableOnline:false,imageUrl:''},{id:'water',name:'Вода',type:'simple',stock:10,cost:1,price:1},{id:'dough',name:'Тесто',type:'composite',components:[{productId:'flour',qty:0.2},{productId:'water',qty:0.1}]},{id:'pizza',name:'Пицца',type:'composite',price:10,components:[{productId:'dough',qty:1}]}];
@@ -69,7 +70,7 @@ test('shifts module loads before dependent features and preserves its public API
 test('employees module loads after shifts and before startup with its public API',()=>{
  const shiftsTag='<script src="Web/js/features/shifts.js"></script>',moduleTag='<script src="Web/js/features/employees.js"></script>',startupTag='<script>loadAll();</script>';
  assert.ok(html.indexOf(moduleTag)>html.indexOf(shiftsTag));assert.ok(html.indexOf(startupTag)>html.indexOf(moduleTag));assert.doesNotMatch(inline,/function saveEmployee\s*\(/);
- const f=fixture();for(const name of ['employeeShortName','employeeDisplayName','employeeSalesLeaderboard','employeeSalesRanks','employeeSalesCrown','openEmployeeModal','toggleEmployeeAdminPassword','saveEmployee','showEmployeeAdminInfo','employeeDeletionAllowed','deleteEmployee','confirmDeleteEmployee'])assert.equal(typeof f.c[name],'function',name);
+ const f=fixture();for(const name of ['employeeShortName','employeeDisplayName','employeeSalesLeaderboard','employeeSalesRanks','employeeSalesCrown','openEmployeeModal','saveEmployee','showEmployeeAdminInfo','employeeDeletionAllowed','deleteEmployee','confirmDeleteEmployee'])assert.equal(typeof f.c[name],'function',name);
 });
 test('loyalty module loads after employees and before suppliers with its public API',()=>{
  const employeesTag='<script src="Web/js/features/employees.js"></script>',moduleTag='<script src="Web/js/features/loyalty.js"></script>',suppliersTag='<script src="Web/js/features/suppliers.js"></script>',startupTag='<script>loadAll();</script>';
@@ -834,7 +835,7 @@ test('cannot delete or change type of a tracked product needed by an unreturned 
  const f=fixture();await f.sale();Object.assign(f.fields,{'pf-name':{value:'Мука'},'pf-category':{value:'Сырьё'},'pf-price':{value:'2'}});
  f.c._pmType='composite';f.c._pmComponents=[{productId:'water',qty:1}];const before=JSON.stringify(f.state.products);await f.c.saveProduct('flour');assert.equal(JSON.stringify(f.state.products),before);assert.match(f.messages.at(-1),/Нельзя изменить тип/);
  f.state.products=f.state.products.filter(p=>p.type==='simple');
- f.fields['delete-password']={value:html.match(/function confirmDelete[\s\S]*?pass!=='([^']+)'/)[1]};
+ f.fields['delete-password']={value:'test-administration'};
  f.c.confirmDelete('product','flour');assert.ok(f.c.getProduct('flour'));assert.match(f.messages.at(-1),/Товар нужен для возврата/);
  assert.equal(f.c.hasUnreturnedStockConsumption('flour'),true);f.state.orders[0].returnedAt=1;assert.equal(f.c.hasUnreturnedStockConsumption('flour'),false);
 });
@@ -1421,24 +1422,22 @@ test('product sorting helpers remain compatible while table headers are static l
 });
 
 function adminDeletionFixture(){const f=fixture();f.state.employees=[{id:'admin',name:'Админ',role:'admin'},{id:'other',name:'Другой',role:'employee'}];f.state.shifts[0].employeeId='admin';return f;}
-test('administrator product delete omits password but preserves recipe protection',()=>{
- const f=adminDeletionFixture();let modal='';f.c.showModal=h=>modal=h;f.c.requestDelete('product','flour');assert.ok(!modal.includes('id="delete-password"'));f.c.confirmDelete('product','flour');assert.ok(f.c.getProduct('flour'));assert.match(f.messages.at(-1),/составном/);
- f.state.products.push({id:'unused',name:'Не используется',type:'simple'});f.c.confirmDelete('product','unused');assert.equal(f.c.getProduct('unused'),undefined);
- f.c.requestDelete('category','Категория');assert.ok(modal.includes('id="delete-password"'));
+test('administrator deletes products and categories without another password, preserving recipe protection',()=>{
+ const f=adminDeletionFixture();let modal='';f.c.showModal=h=>modal=h;f.c.requestDelete('product','flour');assert.doesNotMatch(modal,/delete-password/);f.c.confirmDelete('product','flour');assert.ok(f.c.getProduct('flour'));assert.match(f.messages.at(-1),/составном/);
+ f.c.requestDelete('category','Пустая');assert.doesNotMatch(modal,/delete-password/);
 });
-test('non-administrator cannot bypass product password and rights are rechecked',()=>{
- const f=adminDeletionFixture();f.state.products.push({id:'unused',name:'Товар',type:'simple'});f.c.showModal=()=>{};f.c.requestDelete('product','unused');f.state.employees[0].role='employee';f.c.confirmDelete('product','unused');assert.ok(f.c.getProduct('unused'));assert.match(f.messages.at(-1),/пароль/);
+test('closing administration blocks stale deletion confirmations',()=>{
+ const f=adminDeletionFixture();f.state.products.push({id:'unused',name:'Товар',type:'simple'});f.c.showModal=()=>{};f.c.requestDelete('product','unused');f.c.currentShiftEmployeeIsAdmin=()=>false;f.c.confirmDelete('product','unused');assert.ok(f.c.getProduct('unused'));assert.match(f.messages.at(-1),/администрирования/);
 });
-test('employees including administrators cannot delete themselves, including direct confirmation',async()=>{
- const f=adminDeletionFixture(),before=JSON.stringify(f.state.employees);await f.c.confirmDeleteEmployee('admin');assert.equal(JSON.stringify(f.state.employees),before);assert.equal(f.writes.length,0);
- f.state.employees[0].role='employee';await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,2);assert.equal(f.writes.length,0);
+test('current cashier and administrator records remain protected from deletion',async()=>{
+ const f=adminDeletionFixture();await f.c.confirmDeleteEmployee('admin');assert.equal(f.state.employees.length,2);f.c.currentShiftEmployeeIsAdmin=()=>false;await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,2);assert.equal(f.writes.length,0);
 });
 test('employee deletion uses POS confirmation and preserves shifts and receipts',async()=>{
  const f=adminDeletionFixture();let modal='';f.c.showModal=h=>modal=h;f.c.deleteEmployee('other');assert.match(modal,/confirmDeleteEmployee/);assert.equal(f.state.employees.length,2);
- f.fields['employee-delete-password']={value:html.match(/function confirmDelete[\s\S]*?pass!=='([^']+)'/)[1]};const shifts=JSON.stringify(f.state.shifts),orders=JSON.stringify(f.state.orders);await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,1);assert.deepEqual(f.writes,['prilavok_employees']);assert.equal(JSON.stringify(f.state.shifts),shifts);assert.equal(JSON.stringify(f.state.orders),orders);
+ f.fields['employee-delete-password']={value:'test-administration'};const shifts=JSON.stringify(f.state.shifts),orders=JSON.stringify(f.state.orders);await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,1);assert.deepEqual(f.writes,['prilavok_employees']);assert.equal(JSON.stringify(f.state.shifts),shifts);assert.equal(JSON.stringify(f.state.orders),orders);
 });
 test('employee deletion failure leaves local state intact',async()=>{
- const f=adminDeletionFixture();f.fields['employee-delete-password']={value:html.match(/function confirmDelete[\s\S]*?pass!=='([^']+)'/)[1]};f.c.localStorage.setItem=()=>{throw Error('quota');};await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,2);assert.match(f.messages.at(-1),/Не удалось/);
+ const f=adminDeletionFixture();f.fields['employee-delete-password']={value:'test-administration'};f.c.localStorage.setItem=()=>{throw Error('quota');};await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,2);assert.match(f.messages.at(-1),/Не удалось/);
 });
 
 
@@ -1457,10 +1456,10 @@ test('employee storage failure preserves prior state and does not report success
   assert.equal(await f.c.saveEmployee(mode==='edit'?'one':''),false);assert.equal(JSON.stringify(f.state.employees),before);assert.equal(closed,0);assert.equal(rendered,0);assert.equal(f.fields['employee-save-confirm'].disabled,false);assert.match(f.messages.at(-1),/Не удалось сохранить сотрудника/);
  }
 });
-test('administrator role changes still require the existing password',async()=>{
- const f=fixture();f.state.employees=[{id:'one',name:'Сотрудник',phone:'',role:'employee'}];Object.assign(f.fields,{'ef-name':{value:'Сотрудник'},'ef-phone':{value:''},'ef-admin':{checked:true},'ef-admin-password':{value:'wrong'},'employee-save-confirm':{disabled:false}});
- assert.equal(await f.c.saveEmployee('one'),false);assert.equal(f.state.employees[0].role,'employee');assert.equal(f.writes.length,0);assert.match(f.messages.at(-1),/верный пароль/);
- f.fields['ef-admin-password'].value='Rom23061998';assert.equal(await f.c.saveEmployee('one'),true);assert.equal(f.state.employees[0].role,'admin');assert.deepEqual(f.writes,['prilavok_employees']);
+test('administrator role changes require an active session and no second password',async()=>{
+ const f=fixture();f.state.employees=[{id:'one',name:'Сотрудник',role:'employee'}];Object.assign(f.fields,{'ef-name':{value:'Сотрудник'},'ef-phone':{value:''},'ef-admin':{checked:true}});
+ f.c.currentShiftEmployeeIsAdmin=()=>false;assert.equal(await f.c.saveEmployee('one'),false);assert.equal(f.state.employees[0].role,'employee');
+ f.c.currentShiftEmployeeIsAdmin=()=>true;assert.equal(await f.c.saveEmployee('one'),true);assert.equal(f.state.employees[0].role,'admin');
 });
 test('repeated employee save while storage is pending cannot create duplicates',async()=>{
  const f=fixture();f.state.employees=[];Object.assign(f.fields,{'ef-name':{value:'Новый сотрудник'},'ef-phone':{value:''},'ef-admin':{checked:false},'ef-admin-password':{value:''},'employee-save-confirm':{disabled:false}});
@@ -1519,11 +1518,11 @@ test('folder modal leaves category visible and renders six products without fold
  f.c.openPosFolder(id);assert.equal(f.state.posPath,'Пицца');assert.equal(f.state.posFolder,'');const html=f.fields['modal-root'].innerHTML;assert.match(html,/pos-folder-modal/);assert.equal((html.match(/data-tile-type="product"/g)||[]).length,6);assert.match(html,/Закрыть/);f.c.closeModal();assert.equal(f.c._posFolderModal,null);assert.equal(f.state.posPath,'Пицца');
 });
 
-test('employee deletion requires password for both administrator and ordinary operator',async()=>{
- for(const role of ['admin','employee']){const f=adminDeletionFixture();f.state.employees[0].role=role;await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,2);f.fields['employee-delete-password']={value:'wrong'};await f.c.confirmDeleteEmployee('other');assert.equal(f.writes.length,0);f.fields['employee-delete-password'].value=html.match(/function confirmDelete[\s\S]*?pass!=='([^']+)'/)[1];await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,1);}
+test('employee deletion requires administration, without a shift or repeat password',async()=>{
+ const f=adminDeletionFixture();f.state.shifts=[];f.c.currentShiftEmployeeIsAdmin=()=>false;await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,2);f.c.currentShiftEmployeeIsAdmin=()=>true;await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,1);
 });
 test('administrator target is protected even with valid password; settings show aligned controls',async()=>{
- const f=adminDeletionFixture();f.state.employees[1].role='admin';f.fields['employee-delete-password']={value:html.match(/function confirmDelete[\s\S]*?pass!=='([^']+)'/)[1]};await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,2);assert.equal(f.writes.length,0);const view=f.c.renderSettingsScreen();assert.match(view,/employee-settings-row/);assert.equal((view.match(/employee-settings-edit/g)||[]).length,2);assert.equal((view.match(/Информация об администраторе/g)||[]).length,2);
+ const f=adminDeletionFixture();f.state.employees[1].role='admin';f.fields['employee-delete-password']={value:'test-administration'};await f.c.confirmDeleteEmployee('other');assert.equal(f.state.employees.length,2);assert.equal(f.writes.length,0);const view=f.c.renderSettingsScreen();assert.match(view,/employee-settings-row/);assert.equal((view.match(/employee-settings-edit/g)||[]).length,2);assert.equal((view.match(/Информация об администраторе/g)||[]).length,2);
  assert.match(view,/<span class="admin-badge">Админ<\/span>/);assert.doesNotMatch(view,/>АДМИНИСТРАТОР</);
 });
 
@@ -2363,4 +2362,28 @@ test('inventory work groups mixed categories without losing rows or fixation con
  assert.ok(screen.indexOf('Сахар')<screen.indexOf('<h3>Напитки'));
  assert.match(screen,/for="inventory-actual-a"/);assert.match(screen,/id="inventory-actual-a"/);assert.match(screen,/Зафиксированный остаток/);assert.match(screen,/Разница: -1/);assert.equal(JSON.stringify(f.state.inventoryDraft),before);
  f.state.products[0].category='';f.c.currentShiftEmployeeIsAdmin=()=>false;const staff=f.c.renderInventoryWorkScreen();assert.match(staff,/<h3>Без категории<\/h3>/);assert.doesNotMatch(staff,/Учётный остаток|Отменить инвентаризацию/);
+});
+
+test('administration authenticates independently of shifts and is never serialized',()=>{
+ const f=fixture(false);f.state.shifts=[];f.state.employees=[{id:'admin',name:'Админ',role:'admin'}];let modal='';f.c.showModal=h=>modal=h;
+ assert.equal(f.c.adminSessionIsActive(),false);assert.equal(f.c.currentShiftEmployeeIsAdmin(),false);
+ f.c.openAdministrationSession();assert.match(modal,/administration-password/);f.fields['administration-password']={value:'wrong'};assert.equal(f.c.confirmAdministrationSession(),false);assert.equal(f.c.adminSessionIsActive(),false);
+ f.fields['administration-password'].value='test-administration';assert.equal(f.c.confirmAdministrationSession(),true);assert.equal(f.fields['administration-password'].value,'');assert.equal(f.c.currentShiftEmployeeIsAdmin(),true);assert.equal(f.c.canEditCompanySettings(),true);assert.equal(f.c.currentShift(),null);assert.equal(f.writes.length,0);
+ assert.match(f.c.renderAdministrationControl(),/Закрыть сессию администрирования/);assert.match(f.c.renderTopbar(null),/Администрирование активно/);
+ const fresh=fixture(false);for(const [key,value] of f.data)fresh.data.set(key,value);assert.equal(fresh.c.adminSessionIsActive(),false);
+ f.c.closeAdministrationSession();assert.equal(f.c.adminSessionIsActive(),false);assert.equal(f.c.canEditCompanySettings(),false);assert.equal(f.state.settingsAdminPanel,false);assert.equal(f.writes.length,0);
+});
+test('administrator cannot open a cashier shift and an old administrator shift grants no rights',async()=>{
+ const f=fixture(false);f.state.employees=[{id:'admin',name:'Админ',role:'admin'},{id:'cashier',name:'Кассир',role:'employee'}];f.state.shifts=[];let modal='';f.c.showModal=h=>modal=h;f.c.openShiftModal();assert.doesNotMatch(modal,/<option value="admin"/);assert.match(modal,/<option value="cashier"/);assert.doesNotMatch(modal,/sf-admin-password/);
+ f.fields['sf-employee']={value:'admin'};assert.equal(await f.c.submitOpenShift(),false);assert.equal(f.state.shifts.length,0);
+ f.state.shifts=[{id:'legacy',status:'open',employeeId:'admin'}];assert.equal(f.c.currentShiftEmployeeIsAdmin(),false);
+});
+test('administration leaves cashier identity intact and never substitutes for a sales shift',async()=>{
+ const f=fixture(false);f.state.employees=[{id:'admin',name:'Админ',role:'admin'},{id:'cashier',role:'employee'}];f.state.shifts[0].employeeId='cashier';const shifts=JSON.stringify(f.state.shifts);f.fields['administration-password']={value:'test-administration'};f.c.confirmAdministrationSession();assert.equal(JSON.stringify(f.state.shifts),shifts);
+ f.c.closeAdministrationSession();assert.equal(JSON.stringify(f.state.shifts),shifts);
+ f.fields['administration-password'].value='test-administration';f.c.confirmAdministrationSession();f.state.shifts=[];f.cart();await f.c.finalizePayment([{method:'cash',amount:10}]);assert.equal(f.state.orders.length,0);
+});
+test('session exit rechecks product deletion, product saves, employee changes and configuration',async()=>{
+ const f=fixture(false);f.state.shifts=[];f.fields['administration-password']={value:'test-administration'};f.c.confirmAdministrationSession();f.state.products.push({id:'unused',type:'simple',name:'Товар'});f.c.showModal=()=>{};f.c.requestDelete('product','unused');f.c.closeAdministrationSession();
+ f.c.confirmDelete('product','unused');assert.ok(f.c.getProduct('unused'));assert.equal(await f.c.saveProduct('unused'),false);assert.equal(await f.c.saveEmployee(),false);assert.equal(f.c.saveNetworkSettings(),false);assert.equal(f.c.saveInventorySettings(),false);assert.equal(f.writes.length,0);
 });

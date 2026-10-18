@@ -50,19 +50,23 @@ function planProductImport(entries){
   return {add,skipped};
 }
 function openProductImport(){
+ if(!requireAdministration())return false;
   showModal(`<h2>Импорт товаров</h2><p>Добавить товары, цены и совпадающие категории из CSV.</p><p class="pe-note">Остатки и состав заполните вручную. Пустые и изменяемые цены нужно назначить после импорта. Существующие товары сохранятся.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="chooseProductCSV()">Выбрать CSV</button></div><button class="btn btn-outline product-import-backup" onclick="closeModal();importBackup()">Восстановить резервную копию JSON</button>`);
 }
 function chooseProductCSV(){
+ if(!requireAdministration())return false;
   const input=document.createElement('input');input.type='file';input.accept='.csv,text/csv';
   input.onchange=()=>{const file=input.files?.[0];if(!file)return;if(file.size>5*1024*1024){flash('Файл больше 5 МБ');return;}
     const reader=new FileReader();reader.onerror=()=>flash('Не удалось прочитать файл');reader.onload=()=>{try{window._productImportEntries=parseProductCSV(reader.result);previewProductImport();}catch(e){flash(e.message);}};reader.readAsText(file,'UTF-8');};input.click();
 }
 function previewProductImport(){
+ if(!requireAdministration())return false;
   const plan=planProductImport(window._productImportEntries||[]);
   window._productImportPreview=JSON.stringify(plan.add);
   showModal(`<h2>Проверка импорта</h2><p>Добавить: <b>${plan.add.length}</b> · Уже есть или повторяются: <b>${plan.skipped.length}</b></p><p class="pe-note">Цены берутся из файла. Пустая или изменяемая цена — 0 до ручного заполнения. Себестоимость и остаток — 0; публикация в WEB выключена. Единицы и состав не назначены.</p><div class="product-import-preview">${plan.add.map(p=>`<div class="product-import-row"><b>${escapeHtml(p.name)}</b><div class="pe-note">${escapeHtml(p.category||'Без категории')} · ${p.price===null?'Цена не задана — заполните вручную':money(p.price)}</div></div>`).join('')}${plan.skipped.length?`<details><summary>Пропущенные товары</summary>${plan.skipped.map(n=>`<p>${escapeHtml(n)}</p>`).join('')}</details>`:''}</div><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button id="product-import-confirm" class="btn btn-primary" ${plan.add.length?'':'disabled'} onclick="confirmProductImport()">Добавить товары</button></div>`,true);
 }
 async function confirmProductImport(){
+ if(!requireAdministration())return false;
   if(window._productImportBusy)return;
   const plan=planProductImport(window._productImportEntries||[]);
   if(JSON.stringify(plan.add)!==window._productImportPreview){previewProductImport();flash('Список обновился — проверьте импорт ещё раз');return;}
