@@ -12,6 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Harness preflight and self checks
+        run: |
+          python3 scripts/harness.py preflight
+          python3 -m unittest discover -s scripts/harness -p 'test_*.py'
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -22,26 +26,17 @@ jobs:
           cache: gradle
       - run: bash scripts/ci/setup-sdk.sh
       - name: JS source parity and transport tests
-        run: |
-          mkdir -p build/ci
-          set +e
-          node --test tests/*.test.cjs 2>&1 | tee build/ci/js-tests.log
-          js_status=${PIPESTATUS[0]}
-          set -e
-          if [ "$js_status" -ne 0 ]; then
-            js_summary=$(tail -n 80 build/ci/js-tests.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g' | cut -c1-4000)
-            echo "::error title=JavaScript regression failure::$js_summary"
-            exit "$js_status"
-          fi
+        run: python3 scripts/harness.py js
       - name: Android compilation, tests and lint
         if: ${{ !cancelled() }}
-        run: ./gradlew --no-daemon --max-workers=4 testDebugUnitTest lintDebug
+        run: python3 scripts/harness.py android
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Android-Web-test-reports
           path: |
             build/ci/
+            build/harness/
             app/build/reports/
             app/build/test-results/
             app/build/visual-parity/

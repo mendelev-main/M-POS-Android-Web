@@ -15,6 +15,8 @@ Actions сначала выполняет тесты/проверку неизм
 
 ## Источник и проверка
 
+Рабочий контур Codex: [harness/README.md](harness/README.md). Он содержит карту архитектуры, рабочий цикл, команды проверок и журнал результатов. Начальная статическая проверка: `python3 scripts/harness.py preflight`; существующие тесты запускаются через тот же harness в Actions.
+
 `web-source-manifest.json` содержит commit и SHA-256 всех 33 исходных файлов. `python3 scripts/sync-pos-assets.py /path/to/prilavok-pos-ipad` обновляет исходник; только вставки Android bridge/network/notification scripts разрешены в HTML. Перенесены JS-тесты iPad, кроме проверок Swift-принтера; Android bridge/transport проверяются отдельно.
 
 Статус переноса и ожидаемые проверки: [docs/ANDROID_WEB_PORT_RU.md](docs/ANDROID_WEB_PORT_RU.md). Локальные tests/lint/APK не запускались по указанию пользователя. Готовность к эксплуатации подтверждается Actions и физическими проверками, а не одним наличием кода.

@@ -9,3 +9,9 @@
 7. The user authorizes committing/pushing main. Preserve the native project and unrelated user changes. Never force push.
 8. Write tests but do not run local JS/JVM tests, lint or APK assembly unless explicitly requested. Actions has separate tests and signed-build jobs. Report CI and physical checks as pending until actually verified.
 9. Document source revision, platform changes, limitations and physical acceptance after each stage. Do not claim an APK or tablet acceptance without evidence.
+
+## Repository harness
+
+10. Start each task with `harness/README.md`, `harness/architecture.md`, `harness/workflow.md` and the latest entry in `harness/build-log.md`. Run `python3 scripts/harness.py preflight` before implementation and after source synchronization. This is static inspection, not a local application test.
+11. Use `python3 scripts/harness.py js` and `python3 scripts/harness.py android` in GitHub Actions. Do not pass `--allow-local-tests` without the user's explicit authorization for local tests. The harness does not override rule 8.
+12. Record material decisions, observed verification evidence and remaining physical checks in `harness/build-log.md`; for a complex task keep its scoped plan in `harness/tasks/`. Preserve existing authorizations; do not introduce extra approval gates for routine authorized work.
