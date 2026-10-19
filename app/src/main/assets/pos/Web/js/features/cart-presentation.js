@@ -21,7 +21,7 @@ function renderCartPanel(shift){
   const hasItems = state.cart.length>0;
   return `
   <div class="cart-panel">
-    <div class="cart-head"><span class="cart-order-title">Текущий заказ <span class="cart-position-count">— ${state.cart.reduce((s,i)=>s+i.qty,0)} поз.</span></span><div class="cart-head-actions"><span id="cart-add-feedback" class="cart-add-feedback">Добавлено</span><button class="cart-customer-button ${state.customer?.id?'selected':''}" onclick="openOrderCustomer()" aria-label="${state.customer?.id?'Изменить клиента заказа':'Выбрать клиента'}" title="${escapeAttr(state.customer?.name||'Выбрать клиента')}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></button></div></div>
+    <div class="cart-head"><span class="cart-order-title">Текущий заказ <span class="cart-position-count">— ${state.cart.reduce((s,i)=>s+i.qty,0)} поз.</span></span><div class="cart-head-actions"><span id="cart-add-feedback" class="cart-add-feedback">Добавлено</span><button class="cart-customer-button ${state.customer?.id?'selected':''}" onclick="openOrderCustomer()" aria-label="${state.customer?.id?'Изменить клиента заказа':'Выбрать клиента'}" title="${escapeAttr(state.customer?.name||'Выбрать клиента')}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></button><details class="cart-more" id="cart-more"><summary class="cart-customer-button" aria-label="Действия с чеком" title="Действия с чеком"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></summary><div class="cart-more-menu"><button type="button" ${hasItems?'':'disabled'} onclick="closeCartActions();requestClearCurrentReceipt()">Очистить чек</button><button type="button" ${hasItems?'':'disabled'} onclick="closeCartActions();printCurrentReceipt('bill')">Печатать счёт</button><button type="button" ${hasItems?'':'disabled'} onclick="closeCartActions();printCurrentReceipt('kitchen')">Печатать заказ</button></div></details></div></div>
     <div class="order-meta">
       <button class="order-type-btn" onclick="openOrderSettings()">${state.orderLabel?'<b>'+escapeHtml(state.orderLabel)+'</b> · ':''}${escapeHtml(state.orderType)}${state.customer.name||state.customer.phone?' · '+escapeHtml(state.customer.name||state.customer.phone):''}</button>
       ${state.orderComment?`<div class="cart-row-sub cart-order-comment"><strong>Комментарий:</strong> ${escapeHtml(state.orderComment)}</div>`:''}
@@ -31,12 +31,10 @@ function renderCartPanel(shift){
       ${state.orderType==='Доставка' ? `<div class="total-row cart-total-meta"><span class="label">Доставка</span><span class="value">${hasDeliveryTariff()?fullMoney(deliveryFee):'Выберите тариф'}</span></div>` : ''}
       ${loyaltyRewardDiscount()>0?`<div class="total-row cart-total-meta"><span class="label">Программа лояльности</span><span class="value">−${fullMoney(loyaltyRewardDiscount())}</span></div>`:''}
       <div class="total-row"><span class="label">Итого</span><span class="value">${fullMoney(total)}</span></div>
-      <div class="cart-actions">
-        <button class="btn btn-secondary" ${hasItems?'':'disabled'} onclick="parkOrder()">Отложить</button>
-        ${hasItems&&state.currentOrderSource==='web'&&state.currentWebOrderId&&state.currentWebOrderStatus!=='ready'?'<button class="btn btn-primary" onclick="markCurrentWebOrderReady()">Заказ готов</button>':''}
-      </div>
-      <div class="cart-actions cart-actions-primary">
-        <button class="btn btn-primary" ${hasItems&&shift?'':'disabled'} onclick="openPaymentModal()">Оплатить</button>
+      ${hasItems&&state.currentOrderSource==='web'&&state.currentWebOrderId&&state.currentWebOrderStatus!=='ready'?'<div class="cart-actions cart-ready-actions"><button class="btn btn-primary" onclick="markCurrentWebOrderReady()">Заказ готов</button></div>':''}
+      <div class="cart-actions cart-checkout-actions">
+        <button class="btn btn-secondary cart-park-button" ${hasItems?'':'disabled'} onclick="parkOrder()">Отложить</button>
+        <button class="btn btn-primary cart-pay-button" ${hasItems&&shift?'':'disabled'} onclick="openPaymentModal()">Оплатить</button>
       </div>
     </div>
   </div>`;
@@ -123,4 +121,37 @@ function saveOrderSettings(){
   state.customer.address=(document.getElementById('customer-address')?.value||'').trim();
   saveCurrentOrderSession();
   closeModal(); render();
+}
+
+function closeCartActions(){const menu=document.getElementById('cart-more');if(menu)menu.open=false;}
+document.addEventListener?.('click',event=>{const menu=document.getElementById('cart-more');if(menu?.open&&!menu.contains(event.target))menu.open=false;});
+document.addEventListener?.('keydown',event=>{if(event.key==='Escape')closeCartActions();});
+function requestClearCurrentReceipt(){
+  if(!state.cart.length||criticalOperationBusy)return;
+  showModal(`<div class="modal-title">Очистить чек?</div><div class="settings-note">Все позиции и данные текущего заказа будут удалены из чека.</div><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-danger" onclick="confirmClearCurrentReceipt()">Очистить чек</button></div>`,true);
+}
+async function confirmClearCurrentReceipt(){
+  if(criticalOperationBusy)return false;
+  criticalOperationBusy=true;
+  try{await commitCriticalStorage('clear-current-receipt',{currentOrderSession:emptyCurrentOrderSession()});}
+  catch(e){flash('Чек не очищен: '+(e?.message||e));return false;}
+  finally{criticalOperationBusy=false;}
+  resetCurrentOrderState();closeModal();render();return true;
+}
+async function printCurrentReceipt(kind){
+  if(!state.cart.length||criticalOperationBusy||!['bill','kitchen'].includes(kind))return false;
+  const printers=typeof window.loadPrinters==='function'?window.loadPrinters():[];
+  const eligible=printers.some(p=>p.enabled!==false&&p.ip&&(kind==='kitchen'?p.printOrders===true:p.printReceipts!==false)&&
+    (kind!=='kitchen'||!p.orderCategories?.length||state.cart.some(i=>p.orderCategories.includes(getProduct(i.productId)?.category||i.category||''))));
+  if(!eligible){flash(kind==='bill'?'Принтер для счетов не настроен':'Нет принтера заказов для этих категорий');return false;}
+  const shift=currentShift(),employee=state.employees.find(e=>e.id===shift?.employeeId);
+  const items=state.cart.map(i=>{const discount=state.discounts.find(d=>d.id===i.discountId);return {...storageSnapshot(i),category:getProduct(i.productId)?.category||i.category||'',discountType:discount?.type||'',discountValue:Number(discount?.value||0),discountName:discount?.name||''};});
+  const order={items,total:cartTotal(),subtotal:cartSubtotal(),deliveryFee:state.orderType==='Доставка'?Number(state.deliveryFee||0):0,orderType:state.orderType,orderLabel:state.orderLabel,receiptDisplayNumber:state.orderLabel||'Текущий заказ',customer:storageSnapshot(state.customer),comment:state.orderComment||'',timestamp:Date.now(),employeeName:employee?.name||employee?.fullName||'Сотрудник',loyaltyDiscount:loyaltyRewardDiscount(),productDiscountTotal:state.cart.reduce((sum,i)=>sum+discountValue(i),0),subtotalBeforeDiscounts:state.cart.reduce((sum,i)=>sum+i.price*i.qty,0)};
+  criticalOperationBusy=true;
+  try{
+    await commitCriticalStorage('print-current-receipt',{currentOrderSession:currentOrderSessionSnapshot()});
+    if(kind==='bill')await window.sendBillToPrint(order);else await window.sendKitchenOrderToPrint(order);
+    return true;
+  }catch(e){flash('Не удалось отправить на печать: '+(e?.message||e));return false;}
+  finally{criticalOperationBusy=false;}
 }

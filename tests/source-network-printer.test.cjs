@@ -45,3 +45,8 @@ test('printer module does not rewrite the network settings DOM',()=>{
   assert.match(script,/window\.openPrintersManager/);
   assert.match(script,/window\.openNotificationSettings/);
 });
+
+test('manual unpaid bill uses receipt printers without cash drawer events',()=>{
+ const f=fixture([receipt('r',{autoPrintReceipt:false,cashDrawerEnabled:true}),kitchen('k')]);
+ f.c.sendBillToPrint(order);assert.equal(f.posts.length,1);assert.equal(f.posts[0].order.__printDocumentType,'bill');assert.equal(f.posts[0].action,'print');
+});

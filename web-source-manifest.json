@@ -1,9 +1,9 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "4152604bce38dfa6a632affdd62cd027db952f94",
+  "sourceCommit": "97d2b8925c8eaebc5eabcff8ff7d1a4b13edbbe2",
   "files": {
-    "pos.html": "49e9a5c3f264d8783a99e21ea89b1a5112547e7c3fe8b01fb548d36c20bfdf42",
-    "network-printer.js": "5a34855b1f3b62f8110c25bb64f573ebe69325167e8ce8b57ab1ec54bb78e9f2",
+    "pos.html": "e6b23b1dcc837a37be8c5532836e8cb46b597065d3eee9b02ad6e1318ef9ef27",
+    "network-printer.js": "24bcff55aaa2f0a198039e476a70a22054cd212024544e7af4020912d13488cd",
     "notification-native.js": "d14a707f108f4ffd192a660a3a0f2dd87f2d9484c8309e6105a76e8935a40ca1",
     "Web/fonts/Manrope-Variable.ttf": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
     "Web/fonts/OFL.txt": "58172e0c0fac2cda8a37b348164bb55e44b0e69051e557e92b1d3f6910141f7b",
@@ -12,7 +12,7 @@
     "Web/js/features/availability.js": "2a46389555a12b7b66d602a6311444b5d0bf751e12e20198043b2c44c7cc4967",
     "Web/js/features/backup.js": "5416e37882d7f1afbd3a405fbd14a56bbb218bf3e6660a0ad9d9ed0f8bcd720a",
     "Web/js/features/cart-composition.js": "5c6fe4c7cae9c9cd2d6baeb5ce5c1f5c5fbbaf995c76d59a27e835e9089dd0f3",
-    "Web/js/features/cart-presentation.js": "6d333b7808db2682248d225aadcab161b5f1f7e33276f48c976508682037d3fc",
+    "Web/js/features/cart-presentation.js": "7a77a3ad76814d1d377a93446319851aabab8775866c12d629b071599ae832c0",
     "Web/js/features/delivery-tariffs.js": "3fccee015f94aff434550593796278c50a0efe9270169d7fbc878e91f02def6f",
     "Web/js/features/employees.js": "dfd0757756138d3f5ebfeb7bf152d48334abac046ca299d0d1a5868891e92ceb",
     "Web/js/features/hall-bookings.js": "44d342fdd3e0c81011b23f02fefb9e3221dcf08872eacbbb5938e0e4e52a53e8",
