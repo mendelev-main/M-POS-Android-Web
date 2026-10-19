@@ -1,8 +1,8 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "3229bcbc357d3de0f2f9864713bcb1bf9fc321fa",
+  "sourceCommit": "2939e632fa2b8843526d3b97c3f0083a1152277f",
   "files": {
-    "pos.html": "ad371b779aab12ea3366b8bdb0a7552aa00da26ee69df2c75476d83f0d4f47e3",
+    "pos.html": "f069fea14879dad8e18f9a8f6c47cfccea54209777847568dd64329e45463002",
     "network-printer.js": "24bcff55aaa2f0a198039e476a70a22054cd212024544e7af4020912d13488cd",
     "notification-native.js": "01df1dcaf6f7dc5c28372a842a4b123552547a7988d5a14776504453a7dc3069",
     "Web/fonts/Manrope-Variable.ttf": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",

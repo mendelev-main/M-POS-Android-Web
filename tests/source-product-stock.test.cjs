@@ -2509,3 +2509,9 @@ test('blank and zero supplier quantities are excluded while another supplier pro
 });
 
 test('an older supplier line keeps its recorded stock unit instead of current purchase preferences',()=>{const f=purchaseOrderFixture(),p=f.c.getProduct('flour');p.purchaseUnit='pack';p.purchasePackSize=2;const html=f.c.purchaseRequestRowHtml(p,{productId:'flour',qty:8,stockUnit:'kg'},'edit');assert.match(html,/<option value="kg" selected>/);assert.match(html,/value="8"/)});
+
+ test('administration perimeter indicator follows runtime session without a topbar sticker',()=>{
+ const f=fixture(false);f.c.adminSessionIsActive=()=>false;assert.equal(f.c.renderAdministrationIndicator(),'');
+ f.c.adminSessionIsActive=()=>true;assert.match(f.c.renderAdministrationIndicator(),/administration-session-glow/);assert.match(f.c.renderAdministrationIndicator(),/role="status"/);assert.doesNotMatch(f.c.renderTopbar(null),/class="tab administration-active"/);
+ f.c.adminSessionIsActive=()=>false;assert.equal(f.c.renderAdministrationIndicator(),'');
+ });

@@ -1103,7 +1103,8 @@
   .inventory-back-button{width:auto;padding:10px 16px;flex:none;}
   .inventory-scroll{overflow:auto;min-height:0;flex:1;padding-right:4px;}
   .administration-session-button{border-radius:999px;min-height:44px;}
-  .administration-active{background:var(--accent-soft);color:var(--accent);font-weight:800;}
+  .administration-session-glow{position:fixed;inset:0;z-index:2147483647;pointer-events:none;border:3px solid #bd7aff;border-radius:10px;box-shadow:inset 0 0 7px 2px #a855f7,inset 0 0 23px 4px rgba(147,51,234,.46);}
+  .administration-session-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
   .inventory-card-spaced{margin-bottom:16px;}
   .inventory-card-title{font-size:17px;font-weight:800;line-height:1.35;}
   .inventory-schedule-description{margin:4px 0 8px;line-height:1.5;}
@@ -1874,11 +1875,14 @@ function renderStorageWarning(){
   </div>`;
 }
 
+function renderAdministrationIndicator(){
+  return adminSessionIsActive()?'<div class="administration-session-glow" role="status"><span class="administration-session-status">Администрирование активно</span></div>':'';
+}
 function renderTopbar(shift){
   const tabs = [['purchaseOrders','Заказы'],['receiving','Приёмка'],['receipts','Чеки'],['analytics','Аналитика'],['bookings','Бронирования']];
   return `
+  ${renderAdministrationIndicator()}
   <div class="topbar">
-    ${adminSessionIsActive()?'<button class="tab administration-active" onclick="openAdministrationSettings()" aria-label="Администрирование активно, открыть настройки">Администрирование активно</button>':''}
     <button class="brand ${state.tab==='pos'?'active':''}" onclick="setTab('pos')">M POS</button>
     <div class="tabs">
       ${tabs.map(([k,label])=>`<button class="tab ${state.tab===k?'active':''}" onclick="setTab('${k}')">${label}</button>`).join('')}
