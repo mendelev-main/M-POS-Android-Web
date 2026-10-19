@@ -1,6 +1,6 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "cb22b6cbe91bde9fae3f1fe7ec7b7f6227b4cdae",
+  "sourceCommit": "ad076b7399a56afc837bb13d97aeffbac31cd4ed",
   "files": {
     "pos.html": "d3d648561f803162f9f6ee948e3203115ffbde7fb5f09be298777d5a27f82f39",
     "network-printer.js": "24bcff55aaa2f0a198039e476a70a22054cd212024544e7af4020912d13488cd",
@@ -28,7 +28,7 @@
     "Web/js/features/product-editor.js": "27785ca6ea155786bb2297131b14df70168f866d7d029771b843a7783ab2df99",
     "Web/js/features/product-persistence.js": "0dfaf7e7f4cc312c1230afbc02c4e99ad68bb3e585e74485336f71fa921f42ea",
     "Web/js/features/product-photo.js": "a3eacce4e8c560e4e8b98e8c68726eee05220aa3e763a6d9cd9f8fced95f2294",
-    "Web/js/features/purchase-orders.js": "a9dd961381b4fc1e97e4decf9177e71a53aae66358db395245c75e5f07958007",
+    "Web/js/features/purchase-orders.js": "04c7dc1bbbc1a077359df289cf631880e3214ef26cbc737a7625bf2f46ec8004",
     "Web/js/features/receipts.js": "b019a3a0936c5b344ffcff6f833490b733c2c2cb121bbe3773357e855d0e9768",
     "Web/js/features/receiving-drafts.js": "83a590b9875b582c17b25e9a60977354b8f2bc6d3a11757615175bcb953ee9e6",
     "Web/js/features/receiving-ui.js": "7491c32aa99080a247fc263bf2ad8e160c7d92724d516998c431ce037875a393",

@@ -2507,3 +2507,5 @@ test('supplier edit keypad returns to its editor and leaves the new-order draft 
 test('blank and zero supplier quantities are excluded while another supplier product can be selected',async()=>{
  const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();f.state.suppliers[0].productIds.push('water');f.c.renderPurchaseOrderEditor=()=>{};f.c.openEditPurchaseOrder(f.state.purchaseOrders[0].id);f.c.setPurchaseEditProductValue('flour','requestedQty','0');f.c.setPurchaseEditProductValue('water','requestedQty','3');assert.equal(await f.c.savePurchaseOrderEdit(),true);assert.equal(f.state.purchaseOrders[0].items.length,1);assert.equal(f.state.purchaseOrders[0].items[0].productId,'water');assert.equal(f.state.purchaseOrders[0].items[0].requestedQty,3);
 });
+
+test('an older supplier line keeps its recorded stock unit instead of current purchase preferences',()=>{const f=purchaseOrderFixture(),p=f.c.getProduct('flour');p.purchaseUnit='pack';p.purchasePackSize=2;const html=f.c.purchaseRequestRowHtml(p,{productId:'flour',qty:8,stockUnit:'kg'},'edit');assert.match(html,/<option value="kg" selected>/);assert.match(html,/value="8"/)});
