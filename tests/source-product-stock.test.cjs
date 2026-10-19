@@ -2465,3 +2465,28 @@ test('inline correction at the threshold grants one gift and a failed response r
  const bodies=[];f.c.loyaltyApi=async(path,options)=>{bodies.push(JSON.parse(options.body));throw Error('offline')};await f.c.saveInlineLoyaltyAdjustment();await f.c.saveInlineLoyaltyAdjustment();assert.equal(bodies[0].requestId,bodies[1].requestId);assert.equal(bodies[0].targetBalance.progress,0);assert.equal(bodies[0].targetBalance.rewards,1);
 });
 test('inactive membership does not open an inline progress correction',()=>{const f=fixture();let refreshed=0;f.c.refreshLoyaltyCustomerCard=()=>refreshed++;f.c.setLoyaltyCustomerCard('c',{membership:{active:false,version:2},programs:[{id:'p'}]});f.c.openInlineLoyaltyAdjustment('c','p');assert.equal(refreshed,0);assert.match(f.messages.at(-1),/статус участия/)});
+
+test('only pending supplier orders expose pencil actions and can open editing',()=>{
+ const f=purchaseOrderFixture();f.c.renderPurchaseOrderEditor=()=>{};
+ f.state.purchaseOrders=['pending','received','deleted','cancelled','unknown'].map((status,i)=>({id:'po-'+i,status,supplierName:'Поставщик',timestamp:i,items:[]}));
+ assert.equal((f.c.purchaseHistoryMarkup().match(/purchase-history-edit/g)||[]).length,1);
+ assert.equal(f.c.openEditPurchaseOrder('po-0'),true);for(const o of f.state.purchaseOrders.slice(1))assert.equal(f.c.openEditPurchaseOrder(o.id),false);
+ assert.equal(f.c.canEditPurchaseOrder({status:'pending',deletedAt:1}),false);
+});
+test('editing updates supplier request in place and preserves creation date, stock and unrelated creation draft',async()=>{
+ const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();const o=f.state.purchaseOrders[0],id=o.id,time=o.timestamp;f.c.renderPurchaseOrderEditor=()=>{};
+ const products=JSON.stringify(f.state.products);f.state.purchaseOrderCart=[{productId:'water',requestedQty:7}];f.c.openEditPurchaseOrder(id);f.c.updatePurchaseEditItem(0,'requestedQty','6');
+ assert.equal(await f.c.savePurchaseOrderEdit(),true);const updated=f.state.purchaseOrders[0];assert.equal(f.state.purchaseOrders.length,1);assert.equal(updated.id,id);assert.equal(updated.timestamp,time);assert.equal(updated.requestVersion,2);assert.equal(updated.items[0].requestedQty,6);assert.equal(updated.items[0].expectedQty,12);assert.equal(JSON.stringify(f.state.products),products);assert.equal(f.state.purchaseOrderCart[0].requestedQty,7);assert.equal(JSON.parse(f.data.get('prilavok_purchaseOrders'))[0].items[0].requestedQty,6);
+});
+test('saving an open supplier editor after receipt or deletion never changes the order',async()=>{
+ for(const status of ['received','deleted','cancelled']){const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();const order=f.state.purchaseOrders[0];f.c.renderPurchaseOrderEditor=()=>{};f.c.openEditPurchaseOrder(order.id);f.c.updatePurchaseEditItem(0,'requestedQty',9);order.status=status;const before=JSON.stringify(f.state.purchaseOrders);assert.equal(await f.c.savePurchaseOrderEdit(),false);assert.equal(JSON.stringify(f.state.purchaseOrders),before);}
+});
+test('supplier editor preserves original order and entered values on storage failure',async()=>{
+ const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();const id=f.state.purchaseOrders[0].id;f.c.renderPurchaseOrderEditor=()=>{};f.c.openEditPurchaseOrder(id);f.c.updatePurchaseEditItem(0,'requestedQty','8');const before=JSON.stringify(f.state.purchaseOrders);f.c.commitCriticalStorage=async()=>{throw Error('fixture storage failure')};assert.equal(await f.c.savePurchaseOrderEdit(),false);assert.equal(JSON.stringify(f.state.purchaseOrders),before);assert.equal(vm.runInContext('purchaseOrderEditor.items[0].requestedQty',f.c),'8');
+});
+test('supplier request changes keep factual invoice lines and append newly requested products',async()=>{
+ const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();const o=f.state.purchaseOrders[0];o.receivingDraftV2={version:1,orderId:o.id,lines:[{productId:'flour',qtyInput:'3',unit:'kg',priceInput:'4',totalInput:'12',priceMode:'total'}]};o.receivingIncomplete=true;f.state.suppliers[0].productIds.push('water');f.c.getProduct('water').stockUnit='l';f.fields['purchase-edit-add-product']={value:'water'};f.c.renderPurchaseOrderEditor=()=>{};f.c.openEditPurchaseOrder(o.id);f.c.addPurchaseEditItem();f.c.updatePurchaseEditItem(0,'requestedQty',10);assert.equal(await f.c.savePurchaseOrderEdit(),true);const d=f.state.purchaseOrders[0].receivingDraftV2;assert.equal(d.lines[0].qtyInput,'3');assert.equal(d.lines[0].totalInput,'12');assert.equal(d.lines[1].productId,'water');
+});
+test('supplier editing rejects a changed baseline, empty orders and invalid amounts',async()=>{
+ const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();const o=f.state.purchaseOrders[0];f.c.renderPurchaseOrderEditor=()=>{};f.c.openEditPurchaseOrder(o.id);o.updatedAt=123;assert.equal(await f.c.savePurchaseOrderEdit(),false);f.c.openEditPurchaseOrder(o.id);f.c.updatePurchaseEditItem(0,'requestedQty',0);assert.equal(await f.c.savePurchaseOrderEdit(),false);f.c.removePurchaseEditItem(0);assert.equal(await f.c.savePurchaseOrderEdit(),false);assert.equal(o.items[0].requestedQty,4);
+});

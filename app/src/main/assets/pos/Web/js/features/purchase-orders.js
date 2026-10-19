@@ -1,3 +1,47 @@
+let purchaseOrderEditor=null;
+function canEditPurchaseOrder(order){return !!order&&order.status==='pending'&&!order.deletedAt&&!order.receivedAt;}
+function openEditPurchaseOrder(orderId){
+ if(criticalOperationBusy){flash('Сохранение операции ещё не завершено');return false;}
+ const order=state.purchaseOrders.find(o=>o.id===orderId);
+ if(!canEditPurchaseOrder(order)){flash('Изменять можно только заказ, ожидающий приёмку');return false;}
+ purchaseOrderEditor={orderId,baseline:JSON.stringify(order),items:storageSnapshot(order.items||[])};renderPurchaseOrderEditor();return true;
+}
+function renderPurchaseOrderEditor(){
+ const draft=purchaseOrderEditor,order=state.purchaseOrders.find(o=>o.id===draft?.orderId);if(!draft||!order)return;
+ const supplier=state.suppliers.find(s=>s.id===order.supplierId),ids=new Set(draft.items.map(i=>String(i.productId)));
+ const available=state.products.filter(p=>p.type==='simple'&&(supplier?.productIds||[]).map(String).includes(String(p.id))&&!ids.has(String(p.id)));
+ showModal(`<div class="modal-title">Изменить заказ поставщику</div><div class="supply-modal-meta"><strong>${escapeHtml(order.supplierName||'Поставщик')}</strong><br>${fmtDate(order.timestamp)}</div><div class="purchase-edit-items">${draft.items.map((i,index)=>{const p=getProduct(i.productId),unit=i.requestedUnit??i.stockUnit??stockUnit(p),pack=['bottle','pack','box'].includes(unit);return `<section class="purchase-edit-item"><div class="purchase-edit-heading"><strong>${escapeHtml(i.productName||p?.name||'Товар')}</strong><button class="icon-btn" aria-label="Убрать товар из заказа: ${escapeAttr(i.productName||p?.name||'Товар')}" onclick="removePurchaseEditItem(${index})"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button></div><div class="purchase-edit-fields"><label>Количество<input type="number" min="0" step="any" inputmode="decimal" value="${escapeAttr(i.requestedQty??i.qty??'')}" oninput="updatePurchaseEditItem(${index},'requestedQty',this.value)"></label><label>Единица заказа<select onchange="updatePurchaseEditItem(${index},'requestedUnit',this.value);renderPurchaseOrderEditor()">${p?purchaseUnitOptions(p,unit):`<option>${escapeHtml(unit)}</option>`}</select></label>${pack?`<label>В единице<input type="number" min="0" step="any" inputmode="decimal" value="${escapeAttr(i.packSize??'')}" oninput="updatePurchaseEditItem(${index},'packSize',this.value)"></label><label>Единица внутри<select onchange="updatePurchaseEditItem(${index},'contentUnit',this.value)">${productUnitOptions(stockUnit(p),i.contentUnit??stockUnit(p))}</select></label>`:''}</div></section>`}).join('')||'<div class="center-note">Добавьте хотя бы один товар</div>'}</div>${available.length?`<div class="purchase-edit-add"><select id="purchase-edit-add-product" aria-label="Товар для добавления"><option value="">Выберите товар</option>${available.map(p=>`<option value="${escapeAttr(p.id)}">${escapeHtml(p.name)}</option>`).join('')}</select><button class="btn btn-secondary" onclick="addPurchaseEditItem()">Добавить товар</button></div>`:''}${order.receivingDraftV2?'<p class="setting-sub">Черновик приёмки сохранится. Фактические количества и суммы в нём не изменятся.</p>':''}<div class="modal-actions"><button class="btn btn-secondary" onclick="cancelPurchaseOrderEdit()">Отмена</button><button class="btn btn-primary" onclick="savePurchaseOrderEdit()">Сохранить изменения</button></div>`,true);
+ document.querySelector('#modal-root .modal')?.classList.add('purchase-edit-modal');
+}
+function updatePurchaseEditItem(index,field,value){if(purchaseOrderEditor&&!criticalOperationBusy&&['requestedQty','requestedUnit','packSize','contentUnit'].includes(field)&&purchaseOrderEditor.items[index])purchaseOrderEditor.items[index][field]=value;}
+function removePurchaseEditItem(index){if(!purchaseOrderEditor||criticalOperationBusy)return;purchaseOrderEditor.items.splice(index,1);renderPurchaseOrderEditor();}
+function addPurchaseEditItem(){
+ if(!purchaseOrderEditor||criticalOperationBusy)return;
+ const id=document.getElementById('purchase-edit-add-product')?.value,p=getProduct(id),order=state.purchaseOrders.find(o=>o.id===purchaseOrderEditor.orderId),supplier=state.suppliers.find(s=>s.id===order?.supplierId);
+ if(!p||p.type!=='simple'||!(supplier?.productIds||[]).map(String).includes(String(id)))return flash('Выберите товар поставщика');
+ if(purchaseOrderEditor.items.some(i=>i.productId===id))return;
+ purchaseOrderEditor.items.push({productId:p.id,productName:p.name,requestedQty:1,requestedUnit:p.purchaseUnit??stockUnit(p),packSize:p.purchasePackSize??'',contentUnit:p.purchaseContentUnit??stockUnit(p)});renderPurchaseOrderEditor();
+}
+function cancelPurchaseOrderEdit(){if(criticalOperationBusy)return;const id=purchaseOrderEditor?.orderId;purchaseOrderEditor=null;if(id)viewPurchaseOrder(id);else closeModal();}
+async function savePurchaseOrderEdit(){
+ const draft=purchaseOrderEditor;if(!draft||criticalOperationBusy)return false;
+ const order=state.purchaseOrders.find(o=>o.id===draft.orderId);
+ if(!canEditPurchaseOrder(order)){flash('Заказ уже не ожидает приёмку. Изменения не сохранены');return false;}
+ if(JSON.stringify(order)!==draft.baseline){flash('Заказ изменился. Откройте редактирование заново');return false;}
+ let next;
+ try{
+  if(!draft.items.length)throw new Error('Добавьте хотя бы один товар');
+  const supplier=state.suppliers.find(s=>s.id===order.supplierId);if(!supplier)throw new Error('Поставщик недоступен');
+  const seen=new Set();const items=draft.items.map(i=>{const p=getProduct(i.productId);if(!p||p.type!=='simple')throw new Error('Товар недоступен: '+i.productName);if(seen.has(String(p.id)))throw new Error('Товар повторяется: '+p.name);seen.add(String(p.id));if(!(supplier.productIds||[]).map(String).includes(String(p.id)))throw new Error('Товар больше не закреплён за поставщиком: '+p.name);return makePurchaseLine(p,i.requestedQty??i.qty,i.requestedUnit??i.stockUnit??stockUnit(p),i.packSize??'',i.contentUnit??i.stockUnit??stockUnit(p));});
+  next=storageSnapshot(state.purchaseOrders);const updated=next.find(o=>o.id===order.id);updated.items=items;updated.updatedAt=Date.now();updated.requestVersion=(Number(order.requestVersion)||1)+1;
+  // Invoice quantities and costs are facts entered independently from requested amounts.
+  // Keep them intact; append blank invoice rows only for newly requested products.
+  if(updated.receivingDraftV2){const fresh=receivingDraftForOrder({...updated,receivingDraftV2:null},updated.id),present=new Set(updated.receivingDraftV2.lines.map(i=>String(i.productId)));for(const line of fresh.lines)if(!present.has(String(line.productId)))updated.receivingDraftV2.lines.push(line);}
+  criticalOperationBusy=true;try{await commitCriticalStorage('edit-purchase-order',{purchaseOrders:next});}finally{criticalOperationBusy=false;}
+ }catch(e){flash('Заказ не изменён: '+(e?.message||e));return false;}
+ state.purchaseOrders=next;purchaseOrderEditor=null;try{render();viewPurchaseOrder(order.id);flash('Заказ поставщику изменён')}catch(e){console.error('Заказ изменён, но не удалось обновить экран:',e)}return true;
+}
+
 function canAdminDeletePurchaseOrder(){return currentShiftEmployeeIsAdmin();}
 
 function openDeletePurchaseOrderModal(orderId){
@@ -136,7 +180,7 @@ function purchaseHistoryStatus(order){
 }
 function purchaseHistoryMarkup(){
   const history=state.purchaseOrders.slice().sort((a,b)=>b.timestamp-a.timestamp);
-  return history.map(o=>{const status=purchaseHistoryStatus(o);return `<button class="purchase-history-row" onclick="viewPurchaseOrder(${escapeAttr(JSON.stringify(o.id))})"><span class="purchase-history-title"><strong>${escapeHtml(o.supplierName||'Поставщик')}</strong><small>${fmtDate(o.timestamp)} · ${(o.items||[]).length} позиций</small></span><span class="purchase-status ${status.style}">${status.label}</span></button>`;}).join('')||'<p class="pe-note supply-history-empty">Заказов пока нет.</p>';
+  return history.map(o=>{const status=purchaseHistoryStatus(o);return `<div class="purchase-history-entry"><button class="purchase-history-row" onclick="viewPurchaseOrder(${escapeAttr(JSON.stringify(o.id))})"><span class="purchase-history-title"><strong>${escapeHtml(o.supplierName||'Поставщик')}</strong><small>${fmtDate(o.timestamp)} · ${(o.items||[]).length} позиций</small></span><span class="purchase-status ${status.style}">${status.label}</span></button>${canEditPurchaseOrder(o)?`<button class="icon-btn purchase-history-edit" aria-label="Изменить заказ поставщику: ${escapeAttr(o.supplierName||'Поставщик')}" onclick="openEditPurchaseOrder(${escapeAttr(JSON.stringify(o.id))})"><span class="ui-icon ui-icon-edit" aria-hidden="true"></span></button>`:''}</div>`;}).join('')||'<p class="pe-note supply-history-empty">Заказов пока нет.</p>';
 }
 function togglePurchaseHistory(){
   window._purchaseHistoryExpanded=!window._purchaseHistoryExpanded;
@@ -207,7 +251,7 @@ function viewPurchaseOrder(id){
   const deletedLabel=order.status==='deleted'?`<div class="badge deleted-admin supply-deleted-label">Удалено администратором</div>`:'';
   const text=purchaseOrderText(order),safeId=escapeAttr(JSON.stringify(order.id));
   showModal(`
-    <div class="modal-title">Заказ поставщику</div>${deletedLabel}
+    <div class="purchase-view-heading"><div class="modal-title">Заказ поставщику</div>${canEditPurchaseOrder(order)?`<button class="icon-btn" aria-label="Изменить заказ поставщику" onclick="openEditPurchaseOrder(${safeId})"><span class="ui-icon ui-icon-edit" aria-hidden="true"></span></button>`:''}</div>${deletedLabel}
     <div class="supply-modal-meta"><strong>${escapeHtml(order.supplierName)}</strong><br>${fmtDate(order.timestamp)}</div>
     <pre id="purchase-order-text" class="purchase-order-copy">${escapeHtml(text)}</pre>
     <div class="modal-actions">
