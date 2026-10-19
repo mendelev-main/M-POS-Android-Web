@@ -28,3 +28,5 @@ test('Android uses overlay keyboard hosting and presentation changes do not writ
  const activity=fs.readFileSync(path.join(root,'app/src/main/java/com/mendelev/mpos/MainActivity.kt'),'utf8');assert.match(activity,/window\.__mposKeyboardInsets/);assert.doesNotMatch(activity,/view.setPadding\(view.paddingLeft, view.paddingTop, view.paddingRight, keyboardBottom\)/);
  assert.doesNotMatch(code,/saveKey\(|localStorage\.|Storage\.set\(/);
 });
+
+test('Android keeps cashier loyalty enrollment choice after creating the customer',async()=>{const f=fixture();f.c.openCreateCustomer();f.elements['new-customer-name'].value='Fixture';f.elements['new-customer-phone'].value='290000000';f.elements['new-customer-loyalty']={checked:true};let enrollment=0;f.c.openPosLoyaltyConsent=async()=>enrollment++;await f.c.createCustomerFromPos();assert.equal(f.selected.length,1);assert.equal(enrollment,1)});
