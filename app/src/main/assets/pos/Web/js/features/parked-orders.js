@@ -86,9 +86,9 @@ function openParkedModal(){
     <div class="parked-orders-list">${list.length?list.map(o=>`
     <article class="parked-order-card ${o.webOrderId?'parked-web-order':''}">
       <button class="parked-order-tile" onclick="resumeParked('${escapeAttr(o.id)}')" aria-label="Открыть чек ${escapeAttr(o.orderLabel||'Без подписи')}">
-        <div class="parked-order-heading"><span class="parked-order-name">${escapeHtml(o.orderLabel||'Без подписи')}</span>${parkedOrderTypeBadge(o.orderType)}</div>
+        <div class="parked-order-heading"><span class="parked-order-name">${escapeHtml(o.orderLabel||'Без подписи')}</span><span class="parked-order-date">${fmtDate(o.createdAt||o.timestamp)}</span></div>
+        ${parkedOrderTypeBadge(o.orderType)}
         <div class="parked-order-total">${fullMoney(o.total)}</div>
-        <div class="parked-order-date">${fmtDate(o.createdAt||o.timestamp)}</div>
       </button>
       ${typeof window.parkedWebReadyMarkup==='function'?window.parkedWebReadyMarkup(o):''}
       <button class="parked-order-delete" aria-label="Удалить отложенный заказ" title="Удалить отложенный заказ" onclick="requestDeleteParkedOrder('${escapeAttr(o.id)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></svg></button>
