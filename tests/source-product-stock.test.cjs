@@ -2495,7 +2495,7 @@ test('supplier editor renders numeric quantities and pack sizes without string c
 
 test('editing uses the same supplier rows and keypad as new orders without an add-product button',async()=>{
  const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();f.state.suppliers[0].productIds.push('water');let html;f.c.showModal=value=>html=value;
- f.c.openEditPurchaseOrder(f.state.purchaseOrders[0].id);assert.match(html,/data-purchase-edit-row="flour"/);assert.match(html,/data-purchase-edit-row="water"/);assert.doesNotMatch(html,/Добавить товар|purchase-edit-add-product|type="number"/);assert.match(html,/readonly inputmode="none"/);assert.match(html,/supply-request-fields/);assert.match(html,/value="4"/);
+ f.c.openEditPurchaseOrder(f.state.purchaseOrders[0].id);assert.match(html,/data-purchase-edit-row="flour"/);assert.match(html,/data-purchase-edit-row="water"/);assert.doesNotMatch(html,/Добавить товар|purchase-edit-add-product|type="number"/);assert.match(html,/readonly inputmode="none"/);assert.match(html,/supply-request-fields/);assert.match(html,/class="purchase-edit-items supply-focused"/);assert.match(html,/value="4"/);
  const original=f.c.purchaseRequestRowHtml(f.c.getProduct('flour'),{requestedQty:4},'new'),edited=f.c.purchaseRequestRowHtml(f.c.getProduct('flour'),{requestedQty:4},'edit');assert.match(original,/supply-request-fields/);assert.match(edited,/supply-request-fields/);
 });
 test('supplier edit keypad returns to its editor and leaves the new-order draft untouched',async()=>{
