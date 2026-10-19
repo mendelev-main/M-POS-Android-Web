@@ -73,18 +73,31 @@ async function parkOrderNow(){
   render();flash(printWarning||'Чек отложен');
   return true;
 }
+function parkedOrderTypeBadge(orderType){
+  const type=orderType||'На месте';
+  const variant=type==='С собой'?'takeaway':type==='Доставка'?'delivery':'dinein';
+  const paths=variant==='takeaway'?'<path d="M6 7h12l2 14H4L6 7Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>':variant==='delivery'?'<path d="M3 6h11v12H3zM14 10h4l3 4v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/>':'<path d="M5 3v6a3 3 0 0 0 6 0V3M8 3v18M19 21V3c-4 2-5 7-1 9h1"/>';
+  return `<span class="parked-type-badge parked-type-${variant}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>${escapeHtml(type)}</span>`;
+}
 function openParkedModal(){
   const list=state.parked.slice().sort((a,b)=>b.createdAt-a.createdAt);
-  showModal(`<div class="modal-title">Отложенные чеки</div>${list.length?list.map(o=>`
-    <div class="list-row">
-      <div class="parked-order-main"><div class="list-row-name">${escapeHtml(o.orderLabel||'Без подписи')}</div>
-      <div class="list-row-sub">${o.items.reduce((sum,i)=>sum+i.qty,0)} поз. · ${fullMoney(o.total)} · ${escapeHtml(o.orderType||'На месте')} · ${fmtDate(o.createdAt)}</div>
-      ${o.comment?`<div class="list-row-sub parked-order-comment"><strong>Комментарий:</strong> ${escapeHtml(o.comment)}</div>`:''}</div>
-      <button class="btn btn-outline parked-order-open" onclick="resumeParked('${o.id}')">Открыть</button>
-      <button class="icon-btn danger" aria-label="Удалить отложенный заказ" onclick="deleteParked('${o.id}')"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button>
-    </div>`).join(''):`<div class="center-note">Нет отложенных чеков</div>`}
-    <div class="modal-actions"><button class="btn btn-secondary modal-full-width-action" onclick="closeModal()">Закрыть</button></div>`);
+  showModal(`<div class="parked-modal-header"><div class="modal-title">Отложенные чеки</div><div class="parked-modal-subtitle">${list.length?'Чеков: '+list.length:'Сохранённые заказы появятся здесь'}</div></div>
+    ${state.cart.length?'<div class="settings-note parked-current-note">Чтобы открыть отложенный чек, сначала завершите или отложите текущий заказ.</div>':''}
+    <div class="parked-orders-list">${list.length?list.map(o=>`
+    <article class="parked-order-card">
+      <div class="parked-order-main"><div class="parked-order-heading"><div class="parked-order-name">${escapeHtml(o.orderLabel||'Без подписи')}</div>${parkedOrderTypeBadge(o.orderType)}</div>
+        <div class="parked-order-meta"><span>${(o.items||[]).reduce((sum,i)=>sum+Number(i.qty||0),0)} поз.</span><span>${fmtDate(o.createdAt)}</span></div>
+        ${o.comment?`<div class="parked-order-comment"><strong>Комментарий:</strong> ${escapeHtml(o.comment)}</div>`:''}
+      </div>
+      <div class="parked-order-summary"><div class="parked-order-total">${fullMoney(o.total)}</div><div class="parked-order-actions">
+        <button class="btn btn-primary parked-order-open" onclick="resumeParked('${escapeAttr(o.id)}')">Открыть</button>
+        <button class="parked-order-delete" aria-label="Удалить отложенный заказ" title="Удалить отложенный заказ" onclick="deleteParked('${escapeAttr(o.id)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></svg></button>
+      </div></div>
+    </article>`).join(''):'<div class="parked-empty"><div class="parked-empty-title">Нет отложенных чеков</div><div>Нажмите «Отложить» в текущем заказе, чтобы сохранить чек и вернуться к нему позже.</div></div>'}</div>
+    <div class="modal-actions"><button class="btn btn-secondary modal-full-width-action" onclick="closeModal()">Закрыть</button></div>`,true);
+  document.querySelector?.('#modal-root .modal')?.classList?.add('parked-orders-modal');
 }
+
 async function resumeParked(id){
   if(state.cart.length){flash('Сначала завершите текущий заказ');return false;}
   if(criticalOperationBusy){flash('Сохранение операции ещё не завершено');return false;}
