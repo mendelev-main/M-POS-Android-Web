@@ -656,7 +656,9 @@
   .payment-change-field{margin-top:14px;}
   .payment-change{font-size:21px;font-weight:800;color:var(--accent);overflow-wrap:anywhere;}
   .payment-change-large{font-size:24px;}
-  .payment-actions{margin-top:auto;padding-top:14px;display:flex;flex-direction:column;gap:8px;}
+  .payment-actions{margin-top:auto;padding-top:14px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .payment-actions .btn{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:52px;}
+  .pos-action-icon{width:20px;height:20px;flex-shrink:0;}
   .payment-split-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
   .payment-split-title-row{display:flex;align-items:center;gap:10px;min-width:0;}
   .payment-split-back{flex:none;}
@@ -1195,7 +1197,7 @@
   .cart-more summary{list-style:none;}
   .cart-more summary::-webkit-details-marker{display:none;}
   .cart-more-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:50;min-width:210px;padding:6px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 30px #0003;}
-  .cart-more-menu button{display:block;width:100%;min-height:46px;padding:12px;text-align:left;border:0;border-radius:10px;background:transparent;color:var(--ink);font:inherit;cursor:pointer;}
+  .cart-more-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:12px;text-align:left;border:0;border-radius:10px;background:transparent;color:var(--ink);font-family:inherit;font-size:14.5px;font-weight:600;line-height:1.4;cursor:pointer;}
   .cart-more-menu button:disabled{opacity:.4;}
   .cart-more-menu button:active{background:var(--bg);}
   .cart-customer-button{width:44px;height:44px;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--ink);cursor:pointer}.cart-customer-button.selected{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}

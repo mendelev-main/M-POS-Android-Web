@@ -68,8 +68,8 @@ function renderPaymentScreen(){
         <div class="payment-quick" id="paymentQuick">${cashQuickValues(total).map(v=>`<button type="button" onclick="setPaymentCash(${v},${total})">${fullMoney(v)}</button>`).join('')}</div>
         <div class="field payment-change-field"><label>Сдача</label><div id="paymentChange" class="payment-change">0 ${state.currency}</div></div>
         <div class="payment-actions">
-          <button class="btn btn-cash" onclick="confirmPaymentScreen('cash')">Оплатить</button>
-          <button class="btn btn-card" onclick="confirmPaymentScreen('card')">Оплата картой</button>
+          <button class="btn btn-card" onclick="confirmPaymentScreen('card')"><svg class="pos-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h3"/></svg><span>Оплата картой</span></button>
+          <button class="btn btn-cash" onclick="confirmPaymentScreen('cash')"><svg class="pos-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9h.01M18 15h.01"/></svg><span>Оплатить</span></button>
         </div>
       </div>
     </div></div>`;
