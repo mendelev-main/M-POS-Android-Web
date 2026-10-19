@@ -48,7 +48,7 @@ async function parkOrderNow(){
     total:cartTotal(), subtotal:cartSubtotal(), deliveryTariffSelected:!!state.deliveryTariffSelected,deliveryTariff:storageSnapshot(state.deliveryTariff||null), deliveryFee:state.orderType==='Доставка'?Number(state.deliveryFee||0):0,
     orderLabel:state.orderLabel, orderType:state.orderType, customer:JSON.parse(JSON.stringify(state.customer)),
     comment:state.orderComment||'', source:state.currentOrderSource||'', webOrderId:state.currentWebOrderId||'', webOrderStatus:state.currentWebOrderStatus||'',
-    employeeName:employee?.name||employee?.fullName||'Сотрудник',registerName:'POS 1',timestamp:Date.now(),createdAt:Date.now(),kitchenPrinted:!!window.__currentOrderKitchenPrinted,
+    employeeName:employee?.name||employee?.fullName||'Сотрудник',registerName:'POS 1',timestamp:Date.now(),createdAt:Number(state.currentOrderCreatedAt)||Date.now(),kitchenPrinted:!!window.__currentOrderKitchenPrinted,
     printedItems:JSON.parse(JSON.stringify(window.__currentOrderPrintedItems||[]))
   };
   const deltaItems=kitchenPrintDelta(parked.items,parked.printedItems);
@@ -81,20 +81,16 @@ function parkedOrderTypeBadge(orderType){
 }
 function openParkedModal(){
   const list=state.parked.slice().sort((a,b)=>b.createdAt-a.createdAt);
-  showModal(`<div class="parked-modal-header"><div class="modal-title">Отложенные чеки</div><div class="parked-modal-subtitle">${list.length?'Чеков: '+list.length:'Сохранённые заказы появятся здесь'}</div></div>
-    ${state.cart.length?'<div class="settings-note parked-current-note">Чтобы открыть отложенный чек, сначала завершите или отложите текущий заказ.</div>':''}
+  showModal(`<div class="parked-modal-header"><div class="modal-title">Отложенные чеки</div><button class="parked-modal-close" aria-label="Закрыть отложенные чеки" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
     <div class="parked-orders-list">${list.length?list.map(o=>`
     <article class="parked-order-card">
-      <div class="parked-order-main"><div class="parked-order-heading"><div class="parked-order-name">${escapeHtml(o.orderLabel||'Без подписи')}</div>${parkedOrderTypeBadge(o.orderType)}</div>
-        <div class="parked-order-meta"><span>${(o.items||[]).reduce((sum,i)=>sum+Number(i.qty||0),0)} поз.</span><span>${fmtDate(o.createdAt)}</span></div>
-        ${o.comment?`<div class="parked-order-comment"><strong>Комментарий:</strong> ${escapeHtml(o.comment)}</div>`:''}
-      </div>
-      <div class="parked-order-summary"><div class="parked-order-total">${fullMoney(o.total)}</div><div class="parked-order-actions">
-        <button class="btn btn-primary parked-order-open" onclick="resumeParked('${escapeAttr(o.id)}')">Открыть</button>
-        <button class="parked-order-delete" aria-label="Удалить отложенный заказ" title="Удалить отложенный заказ" onclick="deleteParked('${escapeAttr(o.id)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></svg></button>
-      </div></div>
-    </article>`).join(''):'<div class="parked-empty"><div class="parked-empty-title">Нет отложенных чеков</div><div>Нажмите «Отложить» в текущем заказе, чтобы сохранить чек и вернуться к нему позже.</div></div>'}</div>
-    <div class="modal-actions"><button class="btn btn-secondary modal-full-width-action" onclick="closeModal()">Закрыть</button></div>`,true);
+      <button class="parked-order-tile" onclick="resumeParked('${escapeAttr(o.id)}')" aria-label="Открыть чек ${escapeAttr(o.orderLabel||'Без подписи')}">
+        <div class="parked-order-heading"><span class="parked-order-name">${escapeHtml(o.orderLabel||'Без подписи')}</span>${parkedOrderTypeBadge(o.orderType)}</div>
+        <div class="parked-order-total">${fullMoney(o.total)}</div>
+        <div class="parked-order-date">${fmtDate(o.createdAt||o.timestamp)}</div>
+      </button>
+      <button class="parked-order-delete" aria-label="Удалить отложенный заказ" title="Удалить отложенный заказ" onclick="deleteParked('${escapeAttr(o.id)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></svg></button>
+    </article>`).join(''):'<div class="parked-empty"><div class="parked-empty-title">Нет отложенных чеков</div><div>Нажмите «Отложить» в текущем заказе, чтобы сохранить чек и вернуться к нему позже.</div></div>'}</div>`,true);
   document.querySelector?.('#modal-root .modal')?.classList?.add('parked-orders-modal');
 }
 
@@ -104,13 +100,13 @@ async function resumeParked(id){
   const o=state.parked.find(x=>x.id===id);if(!o)return false;
   const items=storageSnapshot(o.items||[]),customer=Object.assign({name:'',phone:'',address:''},storageSnapshot(o.customer||{}));
   const printedItems=Array.isArray(o.printedItems)?storageSnapshot(o.printedItems):(o.kitchenPrinted?kitchenPrintedSnapshot(o.items):[]);
-  const session={items,orderLabel:o.orderLabel||'',orderType:o.orderType||'На месте',customer,deliveryFee:Number(o.deliveryFee||0),deliveryTariffSelected:o.deliveryTariffSelected===true,deliveryTariff:storageSnapshot(o.deliveryTariff||null),orderComment:o.comment||'',source:o.source||'',webOrderId:o.webOrderId||'',webOrderStatus:o.webOrderStatus||'',kitchenPrinted:!!o.kitchenPrinted,printedItems,updatedAt:Date.now()};
+  const session={items,createdAt:Number(o.createdAt||o.timestamp)||Date.now(),orderLabel:o.orderLabel||'',orderType:o.orderType||'На месте',customer,deliveryFee:Number(o.deliveryFee||0),deliveryTariffSelected:o.deliveryTariffSelected===true,deliveryTariff:storageSnapshot(o.deliveryTariff||null),orderComment:o.comment||'',source:o.source||'',webOrderId:o.webOrderId||'',webOrderStatus:o.webOrderStatus||'',kitchenPrinted:!!o.kitchenPrinted,printedItems,updatedAt:Date.now()};
   const nextParked=state.parked.filter(x=>x.id!==id).map(storageSnapshot);
   criticalOperationBusy=true;
   try{await commitCriticalStorage('resume-parked',{currentOrderSession:session,parked:nextParked})}
   catch(e){flash('Чек не открыт: '+(e?.message||e));return false}
   finally{criticalOperationBusy=false}
-  state.cart=items;state.orderLabel=session.orderLabel;state.orderType=session.orderType;
+  state.cart=items;state.currentOrderCreatedAt=session.createdAt;state.orderLabel=session.orderLabel;state.orderType=session.orderType;
   state.loyaltyPrograms=[];state.loyaltyRedemptions={};state.customer=customer;
   state.deliveryFee=session.deliveryFee;state.deliveryTariffSelected=session.deliveryTariffSelected;state.deliveryTariff=session.deliveryTariff||null;
   state.orderComment=session.orderComment;state.currentOrderSource=session.source;state.currentWebOrderId=session.webOrderId;state.currentWebOrderStatus=session.webOrderStatus;

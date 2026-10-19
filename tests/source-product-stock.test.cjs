@@ -2402,3 +2402,13 @@ test('queued sale sends its captured consent instead of a later customer enrollm
 });
 
 test('refund reconciles a sale whose acknowledgement was lost before consent withdrawal',async()=>{const f=fixture();const order={id:'paid',customer:{id:'customer'},items:[],returnedAt:Date.now(),loyaltySync:{status:'consent_required'},loyaltyReversal:{status:'pending'}};f.state.orders=[order];let route;f.c.loyaltyApi=async p=>{route=p;return {}};await f.c.settleReturnedOrderLoyalty(order);assert.equal(route,'/api/loyalty/reversal');assert.equal(order.loyaltyReversal.status,'synced')});
+
+test('first creation date survives resume, restart and re-parking',async()=>{
+ const f=fixture();f.cart();f.state.orderLabel='Чек даты';f.state.currentOrderCreatedAt=1700000000000;
+ assert.equal(await f.c.parkOrderNow(),true);const first=f.state.parked[0];assert.equal(first.createdAt,1700000000000);
+ assert.equal(await f.c.resumeParked(first.id),true);assert.equal(f.state.currentOrderCreatedAt,1700000000000);
+ assert.equal(JSON.parse(f.data.get('prilavok_currentOrderSession')).createdAt,1700000000000);
+ const restarted=fixture();for(const [key,value] of f.data)restarted.data.set(key,value);await restarted.c.loadAll();
+ assert.equal(restarted.state.currentOrderCreatedAt,1700000000000);assert.equal(await restarted.c.parkOrderNow(),true);
+ assert.equal(restarted.state.parked[0].createdAt,1700000000000);assert.equal(restarted.state.currentOrderCreatedAt,0);
+});

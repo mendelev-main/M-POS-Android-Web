@@ -150,8 +150,8 @@ test('WEB events and parked orders use shared presentation classes',()=>{
   assert.doesNotMatch(parkedOrders,/style="/);
   assert.match(html,/\.web-event-row\{/);
   assert.match(html,/\.web-recovery-note\{/);
-  assert.match(html,/\.parked-order-main\{/);
-  assert.match(html,/\.parked-order-comment\{/);
+  assert.match(html,/\.parked-order-tile\{/);
+  assert.match(html,/\.parked-order-date\{/);
 });
 
 test('system and network settings contain no inline presentation',()=>{
