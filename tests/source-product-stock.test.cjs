@@ -2490,3 +2490,5 @@ test('supplier request changes keep factual invoice lines and append newly reque
 test('supplier editing rejects a changed baseline, empty orders and invalid amounts',async()=>{
  const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();const o=f.state.purchaseOrders[0];f.c.renderPurchaseOrderEditor=()=>{};f.c.openEditPurchaseOrder(o.id);o.updatedAt=123;assert.equal(await f.c.savePurchaseOrderEdit(),false);f.c.openEditPurchaseOrder(o.id);f.c.updatePurchaseEditItem(0,'requestedQty',0);assert.equal(await f.c.savePurchaseOrderEdit(),false);f.c.removePurchaseEditItem(0);assert.equal(await f.c.savePurchaseOrderEdit(),false);assert.equal(o.items[0].requestedQty,4);
 });
+
+test('supplier editor renders numeric quantities and pack sizes without string coercion errors',async()=>{const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();let html;f.c.showModal=value=>{html=value};assert.equal(f.c.openEditPurchaseOrder(f.state.purchaseOrders[0].id),true);assert.match(html,/value="4"/);assert.match(html,/value="2"/);assert.match(html,/Сохранить изменения/)});
