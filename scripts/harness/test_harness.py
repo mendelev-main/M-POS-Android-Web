@@ -71,7 +71,7 @@ class HarnessTests(unittest.TestCase):
         process = Mock(stdout=io.StringIO('fixture failure\n'))
         process.wait.return_value = 7
         with patch.object(harness, 'ROOT', self.root), patch('sys.argv', ['harness.py', 'js']), \
-             patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+             patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}, clear=True), \
              patch.object(harness.subprocess, 'Popen', return_value=process), \
              patch.object(harness.subprocess, 'check_output', return_value='a' * 40), \
              contextlib.redirect_stdout(io.StringIO()):
