@@ -2492,3 +2492,18 @@ test('supplier editing rejects a changed baseline, empty orders and invalid amou
 });
 
 test('supplier editor renders numeric quantities and pack sizes without string coercion errors',async()=>{const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();let html;f.c.showModal=value=>{html=value};assert.equal(f.c.openEditPurchaseOrder(f.state.purchaseOrders[0].id),true);assert.match(html,/value="4"/);assert.match(html,/value="2"/);assert.match(html,/Сохранить изменения/)});
+
+test('editing uses the same supplier rows and keypad as new orders without an add-product button',async()=>{
+ const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();f.state.suppliers[0].productIds.push('water');let html;f.c.showModal=value=>html=value;
+ f.c.openEditPurchaseOrder(f.state.purchaseOrders[0].id);assert.match(html,/data-purchase-edit-row="flour"/);assert.match(html,/data-purchase-edit-row="water"/);assert.doesNotMatch(html,/Добавить товар|purchase-edit-add-product|type="number"/);assert.match(html,/readonly inputmode="none"/);assert.match(html,/supply-request-fields/);assert.match(html,/value="4"/);
+ const original=f.c.purchaseRequestRowHtml(f.c.getProduct('flour'),{requestedQty:4},'new'),edited=f.c.purchaseRequestRowHtml(f.c.getProduct('flour'),{requestedQty:4},'edit');assert.match(original,/supply-request-fields/);assert.match(edited,/supply-request-fields/);
+});
+test('supplier edit keypad returns to its editor and leaves the new-order draft untouched',async()=>{
+ const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();f.state.purchaseOrderCart=[{productId:'water',requestedQty:7}];let renders=0;f.c.renderPurchaseOrderEditor=()=>renders++;
+ f.c.openEditPurchaseOrder(f.state.purchaseOrders[0].id);const row={dataset:{purchaseEditRow:'flour'},querySelector:()=>({value:'4'})};f.c.document.querySelectorAll=()=>[row];f.c.showModal=()=>{};
+ f.c.openPurchaseQuantity('flour','qty','edit');f.c.purchaseQuantityKey('6');f.c.applyPurchaseQuantity();assert.equal(renders,2);assert.equal(vm.runInContext('purchaseOrderEditor.items[0].requestedQty',f.c),'6');assert.equal(f.state.purchaseOrderCart[0].requestedQty,7);
+ f.c.openPurchaseQuantity('flour','qty','edit');f.c.cancelPurchaseQuantity();assert.equal(renders,3);assert.equal(vm.runInContext('purchaseOrderEditor.items[0].requestedQty',f.c),'6');
+});
+test('blank and zero supplier quantities are excluded while another supplier product can be selected',async()=>{
+ const f=purchaseOrderFixture();await f.c.finalizePurchaseOrder();f.state.suppliers[0].productIds.push('water');f.c.renderPurchaseOrderEditor=()=>{};f.c.openEditPurchaseOrder(f.state.purchaseOrders[0].id);f.c.setPurchaseEditProductValue('flour','requestedQty','0');f.c.setPurchaseEditProductValue('water','requestedQty','3');assert.equal(await f.c.savePurchaseOrderEdit(),true);assert.equal(f.state.purchaseOrders[0].items.length,1);assert.equal(f.state.purchaseOrders[0].items[0].productId,'water');assert.equal(f.state.purchaseOrders[0].items[0].requestedQty,3);
+});
