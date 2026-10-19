@@ -59,11 +59,12 @@
   };
   global.createCustomerFromPos=async function(){
     if(creating)return;
+    const enroll=document.getElementById('new-customer-loyalty')?.checked===true;
     const name=String(document.getElementById('new-customer-name')?.value||'').trim(),digits=nationalDigits(document.getElementById('new-customer-phone')?.value);
     if(!name)return flash('Введите имя клиента');
     if(!/^\d{9}$/.test(digits))return flash('Введите 9 цифр телефона после +375');
     const button=document.getElementById('android-new-customer-save');creating=true;if(button)button.disabled=true;
-    try{const data=await loyaltyApi('/api/customers',{method:'POST',body:JSON.stringify({name,phone:'+375'+digits})});await selectCustomer(data.customer.id,data.customer.name,data.customer.normalized_phone);}
+    try{const data=await loyaltyApi('/api/customers',{method:'POST',body:JSON.stringify({name,phone:'+375'+digits})});await selectCustomer(data.customer.id,data.customer.name,data.customer.normalized_phone);if(enroll)await openPosLoyaltyConsent();}
     catch(error){flash(error.message||'Не удалось создать клиента');}
     finally{creating=false;if(button)button.disabled=false;}
   };

@@ -492,7 +492,20 @@ function confirmPaymentScreen(method,loyaltyValidated=false){
     openCardPartConfirmation(total, ()=>finalizePayment([{method:'card',amount:total,cashGiven:null,change:null,paid:true}]));
   }
 }
+let loyaltyFinalizeBusy=false;
 async function finalizePayment(payments){
+ if(loyaltyFinalizeBusy)return;
+ loyaltyFinalizeBusy=true;
+ const customerId=state.customer?.id,cartBefore=JSON.stringify(state.cart);
+ try{
+  if(customerId&&!hasSelectedLoyaltyReward()&&(state.loyaltyCustomerId!==String(customerId)||state.loyaltyLoadingCustomerId||state.loyaltyLoadError)){
+   try{await loadCustomerLoyalty(customerId)}catch(e){/* Offline sales remain available; the receipt records unknown membership. */}
+   if(String(state.customer?.id||'')!==String(customerId)||JSON.stringify(state.cart)!==cartBefore){flash('Заказ изменился. Повторите оплату');return}
+  }
+  return await finalizePaymentSaved(payments);
+ }finally{loyaltyFinalizeBusy=false}
+}
+async function finalizePaymentSaved(payments){
   if(criticalOperationBusy){flash('Сохранение операции ещё не завершено');return;}
   if(!requireDeliveryTariff())return;
   const shift=currentShift(); if(!shift){flash('Смена не открыта');return;}
@@ -521,7 +534,7 @@ async function finalizePayment(payments){
     const requested=Math.max(0,Math.trunc(Number(value)||0)),allocated=(rewardAllocation.allocations[programId]||[]).reduce((sum,item)=>sum+Number(item.quantity||0),0);
     if(requested!==allocated){flash('Недостаточно подходящих товаров для выбранного подарка');return}
   }
-  const order={id:uid(),loyaltyConsentVersion:state.customer?.membership?.active===true?state.customer.membership.version:null,loyaltyRedemptions:storageSnapshot(state.loyaltyRedemptions||{}),loyaltyRewardAllocations:rewardAllocation.allocations,loyaltyDiscount:loyaltyReceipt.discount,loyaltyProgramsApplied:storageSnapshot(loyaltyReceipt.programs),productDiscountTotal,subtotalBeforeDiscounts,shiftId:shift.id,receiptNumber:receiptSequence,receiptDisplayNumber:`#${receiptSequence}`,employeeId:shift.employeeId||'',employeeName:shiftEmployee?.name||shiftEmployee?.fullName||'Сотрудник',registerName:'POS 1',method,total,payments:clean,cashGiven:method==='cash'?clean[0].cashGiven:null,change:method==='cash'?clean[0].change:null,orderLabel:state.orderLabel||'',orderType:state.orderType,deliveryFee:deliveryFee,deliveryTariff:storageSnapshot(state.deliveryTariff||null),customer:storageSnapshot(state.customer),source:state.currentOrderSource||'',webOrderId:state.currentWebOrderId||'',webOrderStatus:state.currentWebOrderStatus||'',items:state.cart.map(i=>{const d=state.discounts.find(x=>x.id===i.discountId),product=getProduct(i.productId);return {...i,category:product?.category||i.category||'',discountName:d?.name||'',discountType:d?.type||'',discountValue:Number(d?.value)||0,cost:product?(product.type==='simple'?product.cost:compositeCost(product)):0};}),timestamp:Date.now(),kitchenPrinted,printedItems:storageSnapshot(window.__currentOrderPrintedItems||[])};
+  const order={id:uid(),loyaltyMembershipUnknown:!!state.customer?.id&&!state.customer?.membership,loyaltyConsentVersion:state.customer?.membership?.active===true?state.customer.membership.version:null,loyaltyRedemptions:storageSnapshot(state.loyaltyRedemptions||{}),loyaltyRewardAllocations:rewardAllocation.allocations,loyaltyDiscount:loyaltyReceipt.discount,loyaltyProgramsApplied:storageSnapshot(loyaltyReceipt.programs),productDiscountTotal,subtotalBeforeDiscounts,shiftId:shift.id,receiptNumber:receiptSequence,receiptDisplayNumber:`#${receiptSequence}`,employeeId:shift.employeeId||'',employeeName:shiftEmployee?.name||shiftEmployee?.fullName||'Сотрудник',registerName:'POS 1',method,total,payments:clean,cashGiven:method==='cash'?clean[0].cashGiven:null,change:method==='cash'?clean[0].change:null,orderLabel:state.orderLabel||'',orderType:state.orderType,deliveryFee:deliveryFee,deliveryTariff:storageSnapshot(state.deliveryTariff||null),customer:storageSnapshot(state.customer),source:state.currentOrderSource||'',webOrderId:state.currentWebOrderId||'',webOrderStatus:state.currentWebOrderStatus||'',items:state.cart.map(i=>{const d=state.discounts.find(x=>x.id===i.discountId),product=getProduct(i.productId);return {...i,category:product?.category||i.category||'',discountName:d?.name||'',discountType:d?.type||'',discountValue:Number(d?.value)||0,cost:product?(product.type==='simple'?product.cost:compositeCost(product)):0};}),timestamp:Date.now(),kitchenPrinted,printedItems:storageSnapshot(window.__currentOrderPrintedItems||[])};
   order.stockConsumption=stockConsumption;
   if(order.webOrderId)order.privacyCompletion={status:'pending'};
   if(order.customer?.id)order.loyaltySync={status:'pending',at:Date.now(),attempts:0};

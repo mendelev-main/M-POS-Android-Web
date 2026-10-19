@@ -2422,3 +2422,26 @@ test('actual Android addon order keeps compact parked tiles, confirmation and st
  assert.match(markup,/parked-order-tile/);assert.match(markup,/parked-modal-close/);assert.match(markup,/parked-web-ready-button/);assert.match(markup,/Некоторые заказы требуют исправления/);assert.match(markup,/<\/button><\/div>\s*<div class="settings-note parked-stock-warning">/);assert.doesNotMatch(markup,/class="list-row-sub"|>Закрыть<|>Открыть</);
  f.c.requestDeleteParkedOrder('broken');assert.match(markup,/Удаление заказа/);assert.equal(f.state.parked.length,1);
 });
+
+test('switching customer drops the previous membership even if loading fails',async()=>{
+ const f=fixture();f.state.customer={id:'old',membership:{active:true,version:9}};f.c.loyaltyApi=async()=>{throw Error('offline')};
+ await f.c.selectCustomer('new','Fixture','+375290000003');assert.equal(f.state.customer.id,'new');assert.equal(f.state.customer.membership,undefined);
+});
+test('cashier consent stays optional and preserves receipt if server skips accrual',async()=>{
+ const f=fixture();let markup;f.c.showModal=s=>{markup=s};f.c.openCreateCustomer();assert.match(markup,/id="new-customer-loyalty" type="checkbox"/);assert.doesNotMatch(markup,/id="new-customer-loyalty"[^>]*checked/);
+ const order={id:'skip',timestamp:Date.now(),customer:{id:'c'},loyaltyConsentVersion:null,items:[]};f.state.orders=[order];f.c.loyaltyApi=async()=>({skipped:'consent_required',events:[]});await f.c.publishPaidOrderLoyalty(order);assert.equal(order.loyaltySync.status,'consent_required');assert.match(f.messages.at(-1),/не начислена/);
+});
+test('fast payment awaits client membership before capturing the version',async()=>{
+ const f=fixture();f.cart('pizza',2);f.state.customer={id:'c'};f.state.loyaltyCustomerId='';let release;
+ f.c.loyaltyApi=async(path,options)=>path.endsWith('/loyalty')?await new Promise(resolve=>release=resolve):{events:[]};
+ const pending=f.c.finalizePayment([{method:'cash',amount:20}]);assert.equal(f.state.orders.length,0);
+ release({customer:{id:'c',name:'Fixture',normalized_phone:'+375290000003'},membership:{active:true,version:4},programs:[]});await pending;
+ assert.equal(f.state.orders.length,1);assert.equal(f.state.orders[0].loyaltyConsentVersion,4);assert.equal(f.state.orders[0].loyaltyMembershipUnknown,false);
+});
+test('offline payment records unknown membership and resolves it before sending only once',async()=>{
+ const f=fixture();f.cart();f.state.customer={id:'c'};f.state.loyaltyCustomerId='';f.c.loyaltyApi=async()=>{throw Error('offline')};
+ await f.c.finalizePayment([{method:'cash',amount:10}]);const order=f.state.orders[0];assert.ok(order);assert.equal(order.loyaltyMembershipUnknown,true);
+ order.loyaltySync={status:'pending'};let posted;
+ f.c.loyaltyApi=async(path,options)=>options?(posted=JSON.parse(options.body),{events:[]}):{membership:{active:true,version:5}};
+ await f.c.publishPaidOrderLoyalty(order);assert.equal(posted.consentVersion,5);assert.equal(order.loyaltyMembershipUnknown,false);
+});
