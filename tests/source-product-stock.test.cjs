@@ -2412,3 +2412,13 @@ test('first creation date survives resume, restart and re-parking',async()=>{
  assert.equal(restarted.state.currentOrderCreatedAt,1700000000000);assert.equal(await restarted.c.parkOrderNow(),true);
  assert.equal(restarted.state.parked[0].createdAt,1700000000000);assert.equal(restarted.state.currentOrderCreatedAt,0);
 });
+
+test('actual Android addon order keeps compact parked tiles, confirmation and stock diagnostics',()=>{
+ const f=fixture();f.c.document.readyState='loading';installLivePosStock(f);
+ const renderer=f.c.openParkedModal;vm.runInContext(androidWebReadyScript,f.c);vm.runInContext(notificationNativeScript,f.c);vm.runInContext(androidWebReadyScript,f.c);
+ assert.strictEqual(f.c.openParkedModal,renderer);
+ f.state.parked=[{id:'broken',orderLabel:'Старый чек',createdAt:1,orderType:'Доставка',total:10,webOrderId:'w',items:[{productId:'deleted',name:'Удалённый товар',qty:1}]}];
+ let markup='';f.c.showModal=s=>{markup=s};f.c.openParkedModal();
+ assert.match(markup,/parked-order-tile/);assert.match(markup,/parked-modal-close/);assert.match(markup,/parked-web-ready-button/);assert.match(markup,/Некоторые заказы требуют исправления/);assert.match(markup,/<\/button><\/div>\s*<div class="settings-note parked-stock-warning">/);assert.doesNotMatch(markup,/class="list-row-sub"|>Закрыть<|>Открыть</);
+ f.c.requestDeleteParkedOrder('broken');assert.match(markup,/Удаление заказа/);assert.equal(f.state.parked.length,1);
+});

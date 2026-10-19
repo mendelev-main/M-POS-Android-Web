@@ -28,11 +28,10 @@
   };
 
   let readyBusy = false;
-  const originalOpenParkedModal = typeof openParkedModal === 'function' ? openParkedModal : null;
   function readyButtonMarkup(order) {
     if (!order?.webOrderId) return '';
-    if (order?.webReadyAt) return '<span class="badge" style="flex:none;padding:7px 11px;font-size:14px;white-space:nowrap;background:var(--accent-soft);color:var(--accent);">✓ Готов</span>';
-    return `<button class="btn btn-primary web-ready-btn" style="flex:none;width:auto;min-width:0;min-height:40px;padding:8px 14px;font-size:14px;white-space:nowrap;" onclick="event.stopPropagation();confirmWebOrderReady('${escapeAttr(order.id)}')">Готов</button>`;
+    if (order?.webReadyAt) return '<span class="parked-web-ready-status">✓ Готов</span>';
+    return `<button class="parked-web-ready-button" onclick="event.stopPropagation();confirmWebOrderReady('${escapeAttr(order.id)}')">Готов</button>`;
   }
 
   function confirmationModal(title, text, confirmLabel, confirmAction, danger=false) {
@@ -51,28 +50,7 @@
     confirmationModal('Удаление заказа', 'Вы уверены, что хотите удалить весь заказ?', 'Удалить', `deleteParked('${escapeAttr(parkedId)}')`, true);
   };
 
-  if (originalOpenParkedModal) window.openParkedModal = function () {
-    const list = state.parked.slice().sort((a,b)=>b.createdAt-a.createdAt);
-    showModal(`
-      <div style="width:min(900px,86vw);max-width:100%;min-width:0;">
-        <div class="modal-title">Отложенные чеки</div>
-        <div style="width:100%;min-width:0;max-height:68vh;overflow-y:auto;overflow-x:hidden;padding-right:2px;">
-        ${list.length ? list.map(o=>`
-          <div role="button" tabindex="0" onclick="resumeParked('${escapeAttr(o.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();resumeParked('${escapeAttr(o.id)}')}" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;width:100%;min-width:0;padding:15px 14px;margin-bottom:8px;border:1px solid var(--border);border-radius:14px;background:var(--surface);cursor:pointer;">
-            <div style="min-width:0;overflow:hidden;">
-              <div class="list-row-name" style="font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(o.orderLabel||'Без подписи')}</div>
-              <div class="list-row-sub" style="margin-top:5px;white-space:normal;overflow-wrap:anywhere;">${o.items.reduce((s,i)=>s+i.qty,0)} поз. · ${fullMoney(o.total)} · ${escapeHtml(o.orderType||'На месте')} · ${fmtDate(o.createdAt)}</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex:none;">
-              ${readyButtonMarkup(o)}
-              <button class="icon-btn danger" style="flex:none;" aria-label="Удалить заказ" onclick="event.stopPropagation();confirmDeleteParkedOrder('${escapeAttr(o.id)}')">✕</button>
-            </div>
-          </div>`).join('') : `<div class="center-note">Нет отложенных чеков</div>`}
-        </div>
-        <div class="modal-actions"><button class="btn btn-secondary" style="width:100%;" onclick="closeModal()">Закрыть</button></div>
-      </div>
-    `);
-  };
+  window.parkedWebReadyMarkup = readyButtonMarkup;
   window.markWebOrderReady = async function (parkedId) {
     if (readyBusy) return;
     const parked = state.parked.find(x=>x.id===parkedId); if (!parked?.webOrderId || parked.webReadyAt) return;

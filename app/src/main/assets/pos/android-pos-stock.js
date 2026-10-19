@@ -86,8 +86,8 @@
   global.openParkedModal=function(){
     const issues=global.__androidParkedStockIssues();if(!issues.length)return parkedModal.apply(this,arguments);
     const show=global.showModal,title='<div class="modal-title">Отложенные чеки</div>';
-    const warning='<div class="settings-note"><strong>Некоторые заказы требуют исправления</strong><div>Откройте заказ и исправьте проблемную строку или удалите заказ. Определимые резервы продолжают учитываться.</div>'+issues.map(issue=>'<div>'+escapeHtml(issue.label)+' · '+escapeHtml(issue.line)+': '+escapeHtml(issue.message)+'</div>').join('')+'</div>';
-    global.showModal=function(html,...args){return show.call(this,String(html).replace(title,title+warning),...args)};
+    const warning='<div class="settings-note parked-stock-warning"><strong>Некоторые заказы требуют исправления</strong><div>Откройте заказ и исправьте проблемную строку или удалите заказ. Определимые резервы продолжают учитываться.</div>'+issues.map(issue=>'<div>'+escapeHtml(issue.label)+' · '+escapeHtml(issue.line)+': '+escapeHtml(issue.message)+'</div>').join('')+'</div>';
+    global.showModal=function(html,...args){return show.call(this,(String(html).includes('<!-- parked-order-warnings -->')?String(html).replace('<!-- parked-order-warnings -->',warning):String(html).replace(title,title+warning)),...args)};
     try{return parkedModal.apply(this,arguments)}finally{global.showModal=show}
   };
   const deleteParked=global.deleteParked;
