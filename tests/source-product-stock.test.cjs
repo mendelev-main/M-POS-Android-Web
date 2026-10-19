@@ -2445,3 +2445,23 @@ test('offline payment records unknown membership and resolves it before sending 
  f.c.loyaltyApi=async(path,options)=>options?(posted=JSON.parse(options.body),{events:[]}):{membership:{active:true,version:5}};
  await f.c.publishPaidOrderLoyalty(order);assert.equal(posted.consentVersion,5);assert.equal(order.loyaltyMembershipUnknown,false);
 });
+
+test('customer progress card shows paid units, remaining units and the available gift state',()=>{
+ const f=fixture();const p={id:'pizza-program',name:'Пицца',required_quantity:5,progress:2,rewards:0};
+ f.c.setLoyaltyCustomerCard('c',{membership:{active:true,version:1},programs:[p]});
+ let html=f.c.loyaltyProgressCardHtml('c',p);assert.match(html,/max="5" value="2"/);assert.match(html,/Ещё 3 товара/);assert.match(html,/openInlineLoyaltyAdjustment/);
+ html=f.c.loyaltyProgressCardHtml('c',{...p,progress:0,rewards:1});assert.match(html,/Доступен 1 подарок/);assert.match(html,/Накопление продолжится после использования/);
+});
+test('inline correction saves a target count with its original balance and administrator identity',async()=>{
+ const f=fixture();f.state.employees=[{id:'admin',name:'Fixture admin',role:'admin'}];f.fields['administration-password']={value:'test-administration'};f.c.confirmAdministrationSession();
+ f.c.setLoyaltyCustomerCard('c',{membership:{active:true,version:3},programs:[{id:'p',name:'Пицца',required_quantity:5,progress:2,rewards:0}]});f.c.refreshLoyaltyCustomerCard=()=>{};f.c.openInlineLoyaltyAdjustment('c','p');
+ vm.runInContext("loyaltyCustomerCard.editor.reason='Fixture correction'",f.c);f.c.changeInlineLoyaltyProgress(1);
+ let body;f.c.loyaltyApi=async(path,options)=>{body=JSON.parse(options.body);return {ok:true}};f.c.openCustomerAdminCard=async()=>{};
+ await f.c.saveInlineLoyaltyAdjustment();assert.equal(body.targetBalance.progress,3);assert.equal(body.expectedBalance.progress,2);assert.equal(body.consentVersion,3);assert.equal(body.adminEmployeeId,'admin');assert.equal(body.reason,'Fixture correction');assert.ok(body.requestId);
+});
+test('inline correction at the threshold grants one gift and a failed response retains its request identity',async()=>{
+ const f=fixture();f.state.employees=[{id:'admin',name:'Fixture admin',role:'admin'}];f.fields['administration-password']={value:'test-administration'};f.c.confirmAdministrationSession();f.c.refreshLoyaltyCustomerCard=()=>{};
+ f.c.setLoyaltyCustomerCard('c',{membership:{active:true,version:3},programs:[{id:'p',name:'Пицца',required_quantity:5,progress:2,rewards:0}]});f.c.openInlineLoyaltyAdjustment('c','p');f.c.setInlineLoyaltyProgress(5);vm.runInContext("loyaltyCustomerCard.editor.reason='Fixture correction'",f.c);
+ const bodies=[];f.c.loyaltyApi=async(path,options)=>{bodies.push(JSON.parse(options.body));throw Error('offline')};await f.c.saveInlineLoyaltyAdjustment();await f.c.saveInlineLoyaltyAdjustment();assert.equal(bodies[0].requestId,bodies[1].requestId);assert.equal(bodies[0].targetBalance.progress,0);assert.equal(bodies[0].targetBalance.rewards,1);
+});
+test('inactive membership does not open an inline progress correction',()=>{const f=fixture();let refreshed=0;f.c.refreshLoyaltyCustomerCard=()=>refreshed++;f.c.setLoyaltyCustomerCard('c',{membership:{active:false,version:2},programs:[{id:'p'}]});f.c.openInlineLoyaltyAdjustment('c','p');assert.equal(refreshed,0);assert.match(f.messages.at(-1),/статус участия/)});

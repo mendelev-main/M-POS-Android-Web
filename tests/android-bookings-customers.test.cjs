@@ -4,13 +4,14 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const assets=path.join(__dirname,'../app/src/main/assets/pos');
 const code=fs.readFileSync(path.join(assets,'android-bookings-customers.js'),'utf8');
+const loyalty=fs.readFileSync(path.join(assets,'Web/js/features/loyalty.js'),'utf8');
 const hall=fs.readFileSync(path.join(assets,'Web/js/features/hall-bookings.js'),'utf8');
 function fixture(){
  let mount=null;const shown=[],writes=[],messages=[],requests=[],classes=new Set(),listeners={};
  const el={dataset:{id:'table'},offsetWidth:128,offsetHeight:72,style:{left:'94%',top:'88%'},setPointerCapture:()=>{}};
  const map={clientWidth:500,clientHeight:360,querySelectorAll:()=>[el]};
- const c={addEventListener:(name,fn)=>listeners[name]=fn,state:{hallTables:[{id:'table',number:1,name:'Стол 1',shape:'rectangle',rotation:0,x:94,y:88}],bookings:[],tab:'bookings',hallEditMode:true,bookingDate:'2026-10-08'},document:{getElementById:id=>id==='bookingsMap'?map:id==='android-customer-workspace'?mount:null,querySelector:()=>({classList:{add:x=>classes.add(x)},parentElement:{classList:{add:x=>classes.add(x)}}})},render:()=>{},saveKey:(key,value)=>writes.push({key,value:JSON.parse(JSON.stringify(value))}),currentShiftEmployeeIsAdmin:()=>true,flash:message=>messages.push(message),escapeHtml:value=>String(value??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])),localDateString:()=> '2026-10-08',hallTableLabel:t=>t.name,openCustomersAdmin:()=>{},showModal:(html,wide)=>{shown.push({html,wide});mount={dataset:{}};},loyaltyApi:async url=>{requests.push(url);return url.endsWith('/loyalty')?{customer:{name:'Тестовый клиент',normalized_phone:'Телефон не указан'},programs:[{id:'program',name:'Кофе',progress:2,required_quantity:5,rewards:0}]}:url.endsWith('/orders')?{orders:[{id:'order',total:12,status:'paid',order_items:[{product_name:'Кофе',quantity:2}]}]}:{ledger:[{operation_type:'EARN',progress_delta:2,reward_delta:0}]};}};
- c.loyaltyInlineArg=value=>c.escapeHtml(JSON.stringify(String(value??'')));c.window=c;vm.createContext(c);vm.runInContext(hall,c);vm.runInContext(code,c);
+ const c={escapeAttr:value=>String(value??'').replace(/"/g,'&quot;'),addEventListener:(name,fn)=>listeners[name]=fn,state:{hallTables:[{id:'table',number:1,name:'Стол 1',shape:'rectangle',rotation:0,x:94,y:88}],bookings:[],tab:'bookings',hallEditMode:true,bookingDate:'2026-10-08'},document:{getElementById:id=>id==='bookingsMap'?map:id==='android-customer-workspace'?mount:null,querySelector:()=>({classList:{add:x=>classes.add(x)},parentElement:{classList:{add:x=>classes.add(x)}}})},render:()=>{},saveKey:(key,value)=>writes.push({key,value:JSON.parse(JSON.stringify(value))}),currentShiftEmployeeIsAdmin:()=>true,flash:message=>messages.push(message),escapeHtml:value=>String(value??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])),localDateString:()=> '2026-10-08',hallTableLabel:t=>t.name,openCustomersAdmin:()=>{},showModal:(html,wide)=>{shown.push({html,wide});mount={dataset:{}};},loyaltyApi:async url=>{requests.push(url);return url.endsWith('/loyalty')?{customer:{name:'Тестовый клиент',normalized_phone:'Телефон не указан'},membership:{active:true,version:1},programs:[{id:'program',name:'Кофе',progress:2,required_quantity:5,rewards:0}]}:url.endsWith('/orders')?{orders:[{id:'order',total:12,status:'paid',order_items:[{product_name:'Кофе',quantity:2}]}]}:{ledger:[{operation_type:'EARN',progress_delta:2,reward_delta:0}]};}};
+ c.loyaltyInlineArg=value=>c.escapeHtml(JSON.stringify(String(value??'')));c.window=c;vm.createContext(c);const api=c.loyaltyApi;vm.runInContext(loyalty,c);c.loyaltyApi=api;vm.runInContext(hall,c);vm.runInContext(code,c);
  return{c,el,map,shown,writes,messages,requests,classes,listeners,close:()=>{mount=null}};
 }
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
@@ -31,7 +32,7 @@ test('rotated bounds constrain dragging and saved positions, including narrow re
 });
 test('customer card fills the window and preserves sections, escaped server values and adjustment action',async()=>{
  const f=fixture();await f.c.openCustomerAdminCard('customer');const html=f.shown.at(-1).html;
- assert.equal(f.requests.length,3);for(const name of ['Данные клиента','Программы лояльности','Покупки','История начислений','Корректировка','Начисление за покупку'])assert.ok(html.includes(name),name);
+ assert.equal(f.requests.length,3);for(const name of ['Данные клиента','Программы лояльности','Покупки','История начислений','Изменить','Начисление за покупку'])assert.ok(html.includes(name),name);
  assert.ok(f.classes.has('android-customer-window'));assert.ok(f.classes.has('android-customer-overlay'));assert.match(html,/max="5" value="2"/);assert.match(html,/12\.00 BYN/);
  f.c.loyaltyApi=async url=>url.endsWith('/loyalty')?{customer:{name:'<script>bad()</script>'},programs:[]}:{};await f.c.openCustomerAdminCard('a/b');assert.match(f.shown.at(-1).html,/&lt;script&gt;/);assert.doesNotMatch(f.shown.at(-1).html,/<script>/);
 });
@@ -58,3 +59,5 @@ test('missing or unsafe customer username disables contact button without guessi
 });
 
 test('loyalty synchronization refreshes only the currently open customer card',async()=>{const f=fixture();await f.c.openCustomerAdminCard('customer');const before=f.requests.length;f.listeners['mpos-loyalty-synced']({detail:{customerId:'other'}});assert.equal(f.requests.length,before);f.listeners['mpos-loyalty-synced']({detail:{customerId:'customer'}});assert.equal(f.requests.length,before+3);await Promise.resolve();f.close();f.listeners['mpos-loyalty-synced']({detail:{customerId:'customer'}});assert.equal(f.requests.length,before+3)});
+
+test('overview keeps client data in a sidebar and history beneath program scales',async()=>{const f=fixture();await f.c.openCustomerAdminCard('customer');const html=f.shown.at(-1).html;assert.match(html,/android-customer-overview[\s\S]*<aside class="android-customer-sidebar"/);assert.ok(html.indexOf('android-customer-main')<html.indexOf('android-customer-history'));assert.match(html,/Участие активно/);assert.match(html,/loyalty-progress-segments/);assert.match(html,/Ещё 3 товара/);assert.match(html,/data-customer-tab="ledger"[^>]*aria-selected="true"/)});
