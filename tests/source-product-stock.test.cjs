@@ -2586,3 +2586,28 @@ test('Android precise negative deductions survive repeated payments and return w
  f.c.getProduct('pizza').components=[{productId:'flour',qty:.0004}];for(let i=0;i<3;i++)await f.sale();
  assert.equal(f.state.orders.length,3);near(f.c.getProduct('flour').stock,-.0012);for(const order of f.state.orders)f.c.restoreOrderStock(order);near(f.c.getProduct('flour').stock,0);
 });
+
+test('POS recipe display preserves negative quantities while warehouse/web availability stays capped',()=>{
+ const f=fixture(),flour=f.c.getProduct('flour'),pizza=f.c.getProduct('pizza');flour.stock=-.4;flour.allowNegativeStock=true;
+ assert.equal(f.c.posDisplayStock(pizza),-2);assert.equal(f.c.availableStock(pizza),0);assert.equal(f.c.buildAvailabilityItems(f.state.products).find(p=>p.externalId==='pizza').quantity,0);
+ flour.stock=-.1;assert.equal(f.c.posDisplayStock(pizza),-1);flour.stock=-Number.EPSILON/10;assert.equal(f.c.posDisplayStock(pizza),0);
+ flour.noStockTracking=true;assert.equal(f.c.posDisplayStock(pizza),100);f.c.getProduct('water').noStockTracking=true;assert.equal(f.c.posDisplayStock(pizza),Infinity);
+});
+test('POS recipe display reflects each paid sale and historical return from zero',async()=>{
+ const f=fixture(),flour=f.c.getProduct('flour');flour.stock=0;flour.allowNegativeStock=true;
+ await f.sale();assert.equal(f.c.posDisplayStock(f.c.getProduct('pizza')),-1);await f.sale();assert.equal(f.c.posDisplayStock(f.c.getProduct('pizza')),-2);
+ f.c.restoreOrderStock(f.state.orders[1]);assert.equal(f.c.posDisplayStock(f.c.getProduct('pizza')),-1);assert.equal(f.c.availableStock(f.c.getProduct('pizza')),0);
+});
+
+test('Android workspace recipe cards show deficits from warehouse and unpaid reservations',()=>{
+ const f=liveStockFixture();liveStockWorkspace(f,['pizza','flour']);installLivePosStock(f);f.c.getProduct('flour').stock=0;f.c.getProduct('flour').allowNegativeStock=true;
+ f.cart('pizza',1);f.state.parked=[{id:'pending',items:[{productId:'pizza',qty:2}]}];const before=JSON.stringify(f.state.products),warehouse=f.c.availableStock;
+ const html=f.c.renderPosScreen(null);assert.match(html,/Доступно: -3/);assert.match(html,/Остаток: -0\.6 шт/);assert.doesNotMatch(html,/pcard disabled/);assert.equal(JSON.stringify(f.state.products),before);assert.strictEqual(f.c.availableStock,warehouse);assert.equal(f.c.availableStock(f.c.getProduct('pizza')),0);
+ f.state.cart=[];f.state.parked=[];f.c.getProduct('flour').stock=-.4;assert.match(f.c.renderPosScreen(null),/Доступно: -2/);
+ f.c.getProduct('flour').allowNegativeStock=false;const blocked=f.c.renderPosScreen(null);assert.match(blocked,/Доступно: -2/);assert.match(blocked,/pcard disabled/);
+});
+test('Android folders show negative recipe counts using the same projection as the workspace',()=>{
+ const f=navigationFixture();f.state.editMode=false;f.state.products=[{id:'ingredient',name:'Сырьё',type:'simple',stock:0,stockUnit:'kg',allowNegativeStock:true},{id:'a',name:'Готовый товар',category:'Пицца',type:'composite',price:10,components:[{productId:'ingredient',qty:.2}]}];
+ f.state.posNavigation={version:1,categories:[{category:'Пицца',items:[{type:'folder',id:'folder',name:'Популярное',parentId:''},{type:'product',id:'a',parentId:'folder'}]}]};f.c._posFolderModal={category:'Пицца',id:'folder'};f.state.cart=[{productId:'a',qty:2}];installLivePosStock(f);
+ f.c.renderPosFolderModal();assert.match(f.fields['modal-root'].innerHTML,/Остаток: -2/);assert.doesNotMatch(f.fields['modal-root'].innerHTML,/pcard disabled/);assert.equal(f.c.getProduct('ingredient').stock,0);assert.equal(f.c.availableStock(f.c.getProduct('a')),0);
+});

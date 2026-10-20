@@ -1707,7 +1707,7 @@ function canFulfillCart(items=state.cart){
 function hasUnreturnedStockConsumption(productId){
   return state.orders.some(o=>!o.returnedAt && o.stockConsumption?.items?.some(i=>i.productId===productId));
 }
-function availableStock(p, resolve=getProduct){
+function availableStock(p, resolve=getProduct, showNegative=false){
   if(!p) return 0;
   if(p.type==='simple') return p.noStockTracking ? Infinity : (Number(p.stock)||0);
   try{
@@ -1719,11 +1719,14 @@ function availableStock(p, resolve=getProduct){
       const ratio=(Number(ingredient.stock)||0)/qty;
       if(!Number.isFinite(ratio)) return 0;
       const tolerance=Number.EPSILON*8*Math.max(1,Math.abs(ratio));
-      min=Math.min(min,Math.max(0,Math.floor(ratio+tolerance)));
+      const count=Math.floor(ratio+tolerance);
+      min=Math.min(min,showNegative?count:Math.max(0,count));
     }
     return min;
   }catch(e){ return 0; }
 }
+// POS may display a recipe deficit; published availability remains nonnegative.
+function posDisplayStock(p){return availableStock(p,undefined,true);}
 // Sale limits are separate from physical warehouse availability and web snapshots.
 function saleAvailableStock(p, resolve=getProduct){
   if(!p)return 0;

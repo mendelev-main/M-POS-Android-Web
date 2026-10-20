@@ -111,9 +111,9 @@
         products.set(id,projected);return projected;
       }
       const previous=global.availableStock,previousSale=global.saleAvailableStock;
-      global.availableStock=function(product,resolve){
-        if(resolve)return warehouseAvailability(product,resolve);
-        return warehouseAvailability(product&&projectedProduct(product.id),projectedProduct);
+      global.availableStock=function(product,resolve,showNegative=false){
+        if(resolve)return warehouseAvailability(product,resolve,showNegative);
+        return warehouseAvailability(product&&projectedProduct(product.id),projectedProduct,showNegative);
       };
       global.saleAvailableStock=function(product,resolve){
         if(resolve)return saleAvailability(product,resolve);
