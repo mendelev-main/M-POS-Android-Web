@@ -1772,10 +1772,10 @@ function liveStockWorkspace(f,ids){f.state.layoutTiles=ids.map((id,col)=>({type:
 test('POS cards immediately project current cart stock and restore it on quantity decrease or removal',()=>{
  const f=liveStockFixture();liveStockWorkspace(f,['flour']);installLivePosStock(f);
  const warehouse=f.c.availableStock,products=JSON.stringify(f.state.products);
- assert.match(f.c.renderPosScreen(null),/Остаток: 10 шт/);
- f.cart('flour',2);assert.match(f.c.renderPosScreen(null),/Остаток: 8 шт/);
- f.cart('flour',1);assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
- f.state.cart=[];assert.match(f.c.renderPosScreen(null),/Остаток: 10 шт/);
+ assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>10</);
+ f.cart('flour',2);assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>8</);
+ f.cart('flour',1);assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>9</);
+ f.state.cart=[];assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>10</);
  assert.strictEqual(f.c.availableStock,warehouse);assert.equal(f.c.availableStock(f.c.getProduct('flour')),10);
  assert.equal(JSON.stringify(f.state.products),products);assert.equal(f.writes.length,0);
 });
@@ -1784,30 +1784,30 @@ test('POS projection consumes shared nested recipes and modifiers without changi
  f.cart('pizza',2);f.state.cart[0].selectedModifiers=[{productId:'flour',qty:.5,name:'Дополнительная мука'}];
  const html=f.c.renderPosScreen(null);
  // 10 - (2 * .2 nested recipe + 2 * .5 modifier) = 8.6; floor(8.6/.2)=43 pizzas.
- assert.match(html,/Остаток: 8\.6 шт/);assert.match(html,/Доступно: 43/);
+ assert.match(html,/pcard-stock[^>]*>8\.6</);assert.match(html,/pcard-stock[^>]*>43</);
  near(f.c.getProduct('flour').stock,10);assert.equal(f.c.availableStock(f.c.getProduct('pizza')),50);
  assert.equal(f.c.canFulfillCart(),true);assert.equal(f.writes.length,0);
 });
 test('POS unlimited products and exhausted cards retain expected behavior',()=>{
  const f=liveStockFixture();f.state.products[0].noStockTracking=true;liveStockWorkspace(f,['flour','water']);installLivePosStock(f);
  f.cart('water',10);const html=f.c.renderPosScreen(null);
- assert.match(html,/Остаток: ∞/);assert.match(html,/pcard disabled/);assert.match(html,/Остаток: 0 шт/);
+ assert.match(html,/pcard-stock[^>]*>∞</);assert.match(html,/pcard disabled/);assert.match(html,/pcard-stock[^>]*>0</);
  assert.equal(f.c.getProduct('water').stock,10);
 });
 test('folder stock projection matches workspace and always restores warehouse availability',()=>{
  const f=navigationFixture();for(const p of f.state.products)p.stockUnit='piece';f.state.editMode=false;f.state.cart=[{productId:'a',qty:3}];
  f.state.posNavigation={version:1,categories:[{category:'Пицца',items:[{type:'folder',id:'folder',name:'Популярное',parentId:''},{type:'product',id:'a',parentId:'folder'}]}]};
  f.c._posFolderModal={category:'Пицца',id:'folder'};installLivePosStock(f);
- const warehouse=f.c.availableStock;f.c.renderPosFolderModal();assert.match(f.fields['modal-root'].innerHTML,/Остаток: 7 шт/);
+ const warehouse=f.c.availableStock;f.c.renderPosFolderModal();assert.match(f.fields['modal-root'].innerHTML,/pcard-stock[^>]*>7</);
  assert.strictEqual(f.c.availableStock,warehouse);assert.equal(f.c.availableStock(f.c.getProduct('a')),10);
  f.c.renderCartPanel=()=>{throw Error('render failed')};f.state.posPath='';assert.throws(()=>f.c.renderPosScreen(null),/render failed/);assert.strictEqual(f.c.availableStock,warehouse);
 });
 test('paid cart is deducted once and parked baskets retain reservations',async()=>{
  const f=liveStockFixture();liveStockWorkspace(f,['flour']);installLivePosStock(f);
- f.cart('flour',1);assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
+ f.cart('flour',1);assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>9</);
  await f.c.finalizePayment([{method:'cash',amount:10}]);assert.equal(f.state.cart.length,0);assert.equal(f.c.getProduct('flour').stock,9);
- assert.match(f.c.renderPosScreen(null),/Остаток: 9 шт/);
- f.state.parked=[{items:[{productId:'flour',qty:3}]}];assert.match(f.c.renderPosScreen(null),/Остаток: 6 шт/);
+ assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>9</);
+ f.state.parked=[{items:[{productId:'flour',qty:3}]}];assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>6</);
 });
 
 // Android integration regressions: actual upstream storage/outbox, synthetic network only.
@@ -1896,25 +1896,25 @@ test('park, restart, resume and delete preserve or release reservations without 
  const f=liveStockFixture();liveStockWorkspace(f,['flour']);installLivePosStock(f);
  await f.c.PrilavokCore.Storage.set('products',f.state.products);await f.c.PrilavokCore.Storage.set('shifts',f.state.shifts);
  f.cart('flour',3);f.state.orderLabel='Стол 1';assert.equal(await f.c.parkOrderNow(),true);
- assert.match(f.c.renderPosScreen(null),/Остаток: 7 шт/);near(f.c.getProduct('flour').stock,10);
+ assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>7</);near(f.c.getProduct('flour').stock,10);
  const next=liveStockFixture();for(const [key,value] of f.data)next.data.set(key,value);await next.c.loadAll();liveStockWorkspace(next,['flour']);installLivePosStock(next);
- assert.match(next.c.renderPosScreen(null),/Остаток: 7 шт/);
- assert.equal(await next.c.resumeParked(next.state.parked[0].id),true);assert.match(next.c.renderPosScreen(null),/Остаток: 7 шт/);
- next.state.cart[0].qty=2;assert.match(next.c.renderPosScreen(null),/Остаток: 8 шт/);
+ assert.match(next.c.renderPosScreen(null),/pcard-stock[^>]*>7</);
+ assert.equal(await next.c.resumeParked(next.state.parked[0].id),true);assert.match(next.c.renderPosScreen(null),/pcard-stock[^>]*>7</);
+ next.state.cart[0].qty=2;assert.match(next.c.renderPosScreen(null),/pcard-stock[^>]*>8</);
  assert.equal(await next.c.parkOrderNow(),true);next.c.openParkedModal=()=>{};
- assert.equal(await next.c.deleteParked(next.state.parked[0].id),true);assert.match(next.c.renderPosScreen(null),/Остаток: 10 шт/);
+ assert.equal(await next.c.deleteParked(next.state.parked[0].id),true);assert.match(next.c.renderPosScreen(null),/pcard-stock[^>]*>10</);
  near(next.c.getProduct('flour').stock,10);
 });
 test('other parked orders block overselling and payment consumes only the current cart',async()=>{
  const f=liveStockFixture();installLivePosStock(f);f.state.parked=[{id:'parked',items:[{productId:'flour',qty:8}]}];
  f.cart('flour',3);assert.equal(f.c.canFulfillCart(),false);await f.c.finalizePayment([{method:'cash',amount:30}]);assert.equal(f.state.orders.length,0);near(f.c.getProduct('flour').stock,10);
  f.cart('flour',2);assert.equal(f.c.canFulfillCart(),true);await f.c.finalizePayment([{method:'cash',amount:20}]);assert.equal(f.state.orders.length,1);near(f.c.getProduct('flour').stock,8);assert.equal(f.state.parked.length,1);
- liveStockWorkspace(f,['flour']);assert.match(f.c.renderPosScreen(null),/Остаток: 0 шт/);
+ liveStockWorkspace(f,['flour']);assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>0</);
 });
 test('parked recipes and modifiers share ingredient reservations with the current cart',()=>{
  const f=liveStockFixture();installLivePosStock(f);liveStockWorkspace(f,['flour']);
  f.state.parked=[{items:[{productId:'pizza',qty:2,selectedModifiers:[{productId:'flour',qty:.5}]}]}];f.cart('flour',1);
- assert.match(f.c.renderPosScreen(null),/Остаток: 7\.6 шт/);near(f.c.getProduct('flour').stock,10);
+ assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>7\.6</);near(f.c.getProduct('flour').stock,10);
 });
 
 function installRuntimeSafety(f){f.c.requestAnimationFrame=()=>0;vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-safety.js'),'utf8'),f.c);}
@@ -2080,7 +2080,7 @@ test('inventory draft retains entered fractional quantity instead of rounding to
 test('fractional card availability includes both current and parked reservations',()=>{
  const f=preciseStockFixture();f.c.getProduct('flour').stock=1;f.c.getProduct('flour').stockUnit='kg';liveStockWorkspace(f,['flour']);
  f.cart('flour',.0004);f.state.parked=[{id:'reserved',items:[{productId:'flour',qty:.0004}]}];
- assert.match(f.c.renderPosScreen(null),/Остаток: 0\.9992 кг/);assert.equal(f.c.getProduct('flour').stock,1);
+ assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>0\.9992</);assert.equal(f.c.getProduct('flour').stock,1);
 });
 test('fractional payment still refuses real stock shortage',async()=>{
  const f=preciseStockFixture();f.c.getProduct('flour').stock=.0003;f.c.getProduct('pizza').components=[{productId:'flour',qty:.0004}];
@@ -2259,7 +2259,7 @@ test('cyclic reservation blocks reachable ingredients without poisoning unrelate
 });
 test('POS keeps partial reservations and does not release all stock after a bad line',()=>{
  const f=isolatedParkedFixture();for(const p of f.state.products)if(p.type==='simple')p.stockUnit='piece';liveStockWorkspace(f,['flour']);f.state.parked=[{id:'broken',items:[{productId:'deleted',qty:1},{productId:'flour',qty:3}]}];f.cart('flour',1);const before=JSON.stringify(f.state.products);
- assert.match(f.c.renderPosScreen(null),/Остаток: 6 шт/);assert.equal(JSON.stringify(f.state.products),before);assert.equal(f.writes.length,0);
+ assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>6</);assert.equal(JSON.stringify(f.state.products),before);assert.equal(f.writes.length,0);
 });
 test('unfulfillable parked stock only blocks payments using the same resource',()=>{
  const f=isolatedParkedFixture();f.state.parked=[{id:'shortage',items:[{productId:'flour',qty:12}]}];assert.doesNotThrow(()=>f.c.checkedStockConsumption([{productId:'water',qty:1}]));assert.throws(()=>f.c.checkedStockConsumption([{productId:'flour',qty:1}]),/отложенных/);
@@ -2578,8 +2578,8 @@ test('Android negative sales bypass shortages and reservations only for permitte
 });
 test('Android POS keeps negative counts visible and permitted cards enabled without leaking projected helpers',()=>{
  const f=liveStockFixture();liveStockWorkspace(f,['flour']);installLivePosStock(f);const p=f.c.getProduct('flour');p.stock=-2;p.allowNegativeStock=true;
- const availability=f.c.saleAvailableStock;assert.match(f.c.renderPosScreen(null),/Остаток: -2 шт/);assert.doesNotMatch(f.c.renderPosScreen(null),/pcard disabled/);assert.strictEqual(f.c.saleAvailableStock,availability);
- p.allowNegativeStock=false;assert.match(f.c.renderPosScreen(null),/pcard disabled/);assert.match(f.c.renderPosScreen(null),/Остаток: -2 шт/);
+ const availability=f.c.saleAvailableStock;assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>-2</);assert.doesNotMatch(f.c.renderPosScreen(null),/pcard disabled/);assert.strictEqual(f.c.saleAvailableStock,availability);
+ p.allowNegativeStock=false;assert.match(f.c.renderPosScreen(null),/pcard disabled/);assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>-2</);
 });
 test('Android precise negative deductions survive repeated payments and return without per-movement rounding',async()=>{
  const f=preciseStockFixture();f.c.getProduct('flour').stock=0;f.c.getProduct('flour').allowNegativeStock=true;
@@ -2602,12 +2602,12 @@ test('POS recipe display reflects each paid sale and historical return from zero
 test('Android workspace recipe cards show deficits from warehouse and unpaid reservations',()=>{
  const f=liveStockFixture();liveStockWorkspace(f,['pizza','flour']);installLivePosStock(f);f.c.getProduct('flour').stock=0;f.c.getProduct('flour').allowNegativeStock=true;
  f.cart('pizza',1);f.state.parked=[{id:'pending',items:[{productId:'pizza',qty:2}]}];const before=JSON.stringify(f.state.products),warehouse=f.c.availableStock;
- const html=f.c.renderPosScreen(null);assert.match(html,/Доступно: -3/);assert.match(html,/Остаток: -0\.6 шт/);assert.doesNotMatch(html,/pcard disabled/);assert.equal(JSON.stringify(f.state.products),before);assert.strictEqual(f.c.availableStock,warehouse);assert.equal(f.c.availableStock(f.c.getProduct('pizza')),0);
- f.state.cart=[];f.state.parked=[];f.c.getProduct('flour').stock=-.4;assert.match(f.c.renderPosScreen(null),/Доступно: -2/);
- f.c.getProduct('flour').allowNegativeStock=false;const blocked=f.c.renderPosScreen(null);assert.match(blocked,/Доступно: -2/);assert.match(blocked,/pcard disabled/);
+ const html=f.c.renderPosScreen(null);assert.match(html,/pcard-stock[^>]*>-3</);assert.match(html,/pcard-stock[^>]*>-0\.6</);assert.doesNotMatch(html,/pcard disabled/);assert.equal(JSON.stringify(f.state.products),before);assert.strictEqual(f.c.availableStock,warehouse);assert.equal(f.c.availableStock(f.c.getProduct('pizza')),0);
+ f.state.cart=[];f.state.parked=[];f.c.getProduct('flour').stock=-.4;assert.match(f.c.renderPosScreen(null),/pcard-stock[^>]*>-2</);
+ f.c.getProduct('flour').allowNegativeStock=false;const blocked=f.c.renderPosScreen(null);assert.match(blocked,/pcard-stock[^>]*>-2</);assert.match(blocked,/pcard disabled/);
 });
 test('Android folders show negative recipe counts using the same projection as the workspace',()=>{
  const f=navigationFixture();f.state.editMode=false;f.state.products=[{id:'ingredient',name:'Сырьё',type:'simple',stock:0,stockUnit:'kg',allowNegativeStock:true},{id:'a',name:'Готовый товар',category:'Пицца',type:'composite',price:10,components:[{productId:'ingredient',qty:.2}]}];
  f.state.posNavigation={version:1,categories:[{category:'Пицца',items:[{type:'folder',id:'folder',name:'Популярное',parentId:''},{type:'product',id:'a',parentId:'folder'}]}]};f.c._posFolderModal={category:'Пицца',id:'folder'};f.state.cart=[{productId:'a',qty:2}];installLivePosStock(f);
- f.c.renderPosFolderModal();assert.match(f.fields['modal-root'].innerHTML,/Остаток: -2/);assert.doesNotMatch(f.fields['modal-root'].innerHTML,/pcard disabled/);assert.equal(f.c.getProduct('ingredient').stock,0);assert.equal(f.c.availableStock(f.c.getProduct('a')),0);
+ f.c.renderPosFolderModal();assert.match(f.fields['modal-root'].innerHTML,/pcard-stock[^>]*>-2</);assert.doesNotMatch(f.fields['modal-root'].innerHTML,/pcard disabled/);assert.equal(f.c.getProduct('ingredient').stock,0);assert.equal(f.c.availableStock(f.c.getProduct('a')),0);
 });

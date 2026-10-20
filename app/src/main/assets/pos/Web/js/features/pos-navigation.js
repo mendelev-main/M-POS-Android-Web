@@ -47,13 +47,17 @@ function openPosFolder(id){
   window._posFolderModal={category:state.posPath,id};renderPosFolderModal();
 }
 function renderProductTileSymbol(product){return product.tileSymbol?`<div class="tile-symbol">${escapeHtml(product.tileSymbol)}</div>`:'';}
+function renderProductTileFooter(product,available){
+  const quantity=available===Infinity?'∞':stockQtyText(available);
+  return `<div class="pcard-bottom product-tile-footer"><div class="pcard-price">${money(product.price)}</div><div class="pcard-stock ${available<=3?'low':''}" aria-label="Количество: ${escapeAttr(quantity)}">${quantity}</div></div>`;
+}
 function renderPosFolderModal(){
   const context=window._posFolderModal;if(!context)return;
   const items=posCategoryItems(context.category),folder=items.find(i=>i.type==='folder'&&i.id===context.id);
   if(!folder||state.posPath!==context.category){closeModal();return;}
   const editing=state.editMode,products=items.filter(i=>i.type==='product'&&i.parentId===folder.id).map(i=>getProduct(i.id)).filter(Boolean);
   const columns=Math.max(1,Math.min(4,products.length));
-  document.getElementById('modal-root').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><section class="modal pos-folder-modal" data-columns="${columns}" role="dialog" aria-modal="true" aria-label="${escapeAttr(folder.name)}"><header><h2>${escapeHtml(folder.name)}</h2><button class="btn btn-outline" onclick="closeModal()">Закрыть</button></header><div class="pos-folder-grid ${editing?'category-edit-grid':''}" id="pos-folder-grid">${products.map((p,index)=>{const avail=posDisplayStock(p);return `<div class="layout-tile" data-tile-type="product" data-id="${escapeAttr(p.id)}" data-index="${index}"><div class="pcard folder-product-card ${editing?'edit-tile':''} ${!editing&&saleAvailableStock(p)<=0?'disabled':''}" role="button" tabindex="0" aria-label="${escapeAttr(p.name)}">${editing?`<button class="navigation-action" onclick="event.stopPropagation();openPosTileMove(${escapeAttr(JSON.stringify(p.id))})">Переместить</button>`:''}${renderProductTileSymbol(p)}<div class="pcard-name">${escapeHtml(p.name)}</div><div class="pcard-bottom"><div><div class="pcard-price">${money(p.price)}</div><div class="pcard-stock">${avail===Infinity?'Остаток: ∞':'Остаток: '+stockQtyText(avail)+' '+unitLabel(stockUnit(p))}</div></div></div></div></div>`;}).join('')||'<p class="pe-note pos-folder-empty">В папке пока нет товаров.</p>'}</div></section></div>`;
+  document.getElementById('modal-root').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><section class="modal pos-folder-modal" data-columns="${columns}" role="dialog" aria-modal="true" aria-label="${escapeAttr(folder.name)}"><header><h2>${escapeHtml(folder.name)}</h2><button class="btn btn-outline" onclick="closeModal()">Закрыть</button></header><div class="pos-folder-grid ${editing?'category-edit-grid':''}" id="pos-folder-grid">${products.map((p,index)=>{const avail=posDisplayStock(p);return `<div class="layout-tile" data-tile-type="product" data-id="${escapeAttr(p.id)}" data-index="${index}"><div class="pcard folder-product-card ${editing?'edit-tile':''} ${!editing&&saleAvailableStock(p)<=0?'disabled':''}" role="button" tabindex="0" aria-label="${escapeAttr(p.name)}">${editing?`<button class="navigation-action" onclick="event.stopPropagation();openPosTileMove(${escapeAttr(JSON.stringify(p.id))})">Переместить</button>`:''}${renderProductTileSymbol(p)}<div class="pcard-name">${escapeHtml(p.name)}</div>${renderProductTileFooter(p,avail)}</div></div>`;}).join('')||'<p class="pe-note pos-folder-empty">В папке пока нет товаров.</p>'}</div></section></div>`;
   const grid=document.getElementById('pos-folder-grid');
   grid.addEventListener('click',handlePosGridClick);
   grid.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button')){e.preventDefault();handlePosGridClick(e);}});
@@ -181,7 +185,7 @@ function renderPosScreen(shift){
         ${editing&&currentCategory?`<button class="navigation-action" onclick="event.stopPropagation();openPosTileMove(${escapeAttr(JSON.stringify(p.id))})">Переместить</button>`:''}
         ${renderProductTileSymbol(p)}
         <div class="pcard-name">${escapeHtml(p.name)}</div>
-        <div class="pcard-bottom"><div><div class="pcard-price">${money(p.price)}</div><div class="pcard-stock ${p.type==='simple'&&p.noStockTracking?'':(avail<=3?'low':'')}">${p.type==='simple' ? (p.noStockTracking ? 'Остаток: ∞' : 'Остаток: '+stockQtyText(avail)+' '+unitLabel(stockUnit(p))) : (avail===Infinity?'Остаток: ∞':'Доступно: '+avail)}</div></div></div>
+        ${renderProductTileFooter(p,avail)}
       </div>
     </div>`;
   }).join('');
