@@ -81,6 +81,26 @@ class MPosDocumentParityTest {
         assertTrue(shiftRows.any{it.left=="Ожидается в кассе"&&it.right=="135.00 BYN"})
         assertTrue(shiftRows.last().left=="Смена закрыта")
     }
+    @Test fun namedKitchenTicketsWrapLongNamesOnBothPaperWidths(){
+        for(width in listOf(58,80)){
+            val name="Стол 12 · Гости у окна · Семейный заказ"
+            val data=order().put("__printDocumentType","kitchen").put("orderLabel",name)
+            data.getJSONObject("__printerConfig").put("paperWidth",width)
+            data.getJSONArray("items").getJSONObject(0)
+                .put("name","Пицца с ветчиной, грибами и дополнительным сыром")
+                .put("comment","Без лука, хорошо пропечь, разрезать на восемь частей")
+                .put("selectedModifiers",JSONArray("""[{"name":"Дополнительный сыр","qty":1,"priceDelta":2}]"""))
+            val rows=MPosReceiptLayout.build(data).rows
+            assertEquals(name,rows.first().left)
+            assertTrue(rows.any{it.left=="↳ Дополнительный сыр"})
+            val bitmap=EscPosRaster.render(data)
+            val short=EscPosRaster.render(JSONObject(data.toString()).put("orderLabel","Стол 12"))
+            assertEquals(if(width==58)384 else 576,bitmap.width)
+            assertTrue("Long title must wrap rather than be clipped",bitmap.height>short.height)
+            save(bitmap,"kitchen-named-$width.png")
+            bitmap.recycle();short.recycle()
+        }
+    }
     @Test fun producesPreviewArtifactsAndCorrectRasterEnvelope(){
         for(width in listOf(58,80))for(kind in listOf("receipt","kitchen","shift-close")){
             val data=if(kind=="shift-close")shift()else order()

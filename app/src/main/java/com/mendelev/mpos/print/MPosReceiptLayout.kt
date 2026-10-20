@@ -22,7 +22,7 @@ internal object MPosReceiptLayout {
         fun sep(gap:Float=8f){rows+=Row(kind=Kind.SEPARATOR,size=small,gap=gap)}
         fun money(value:Double)=String.format(Locale.US,"%.2f BYN",value)
         fun qty(value:Double)=if(value%1.0==0.0)value.toLong().toString() else String.format(Locale.US,"%.2f",value)
-        fun modifiers(item:JSONObject,withPrices:Boolean) {
+        fun modifiers(item:JSONObject,withPrices:Boolean,kitchenSize:Float=regular) {
             for(modifier in objects(item.optJSONArray("selectedModifiers"))) {
                 val name=modifier.optString("name").trim()
                 if(name.isEmpty())continue
@@ -30,7 +30,7 @@ internal object MPosReceiptLayout {
                 val delta=number(modifier,"priceDelta")
                 val label="↳ "+(if(quantity>1)qty(quantity)+" × " else "")+name
                 val price=if(withPrices&&delta!=0.0)" ("+(if(delta>0)"+" else "")+money(delta)+")" else ""
-                add(label+price,if(withPrices)small else regular,gap=3f)
+                add(label+price,if(withPrices)small else kitchenSize,gap=3f)
             }
         }
         val kind=order.optString("__printDocumentType","receipt");val kitchen=kind=="kitchen"
@@ -44,9 +44,15 @@ internal object MPosReceiptLayout {
             pair("Наличные на начало",money(number(order,"openingCash")),gap=3f);pair("Внесения",money(number(order,"deposits")),gap=3f);pair("Изъятия",money(number(order,"withdrawals")),gap=3f)
             pair("Ожидается в кассе",money(number(order,"expectedCash")),medium,600,3f);pair("Фактически в кассе",money(number(order,"countedCash")),medium,600,3f);pair("Расхождение",money(number(order,"difference")),bold,700,8f);sep();add("Смена закрыта",medium,600,true,8f)
         } else if(kitchen) {
-            add(order.optString("receiptDisplayNumber","#—"),title,700,true,3f);add(date(number(order,"timestamp").toLong()),small,400,true,8f);sep(7f)
-            add(order.optString("orderType","Заказ"),medium,600,true,8f);sep()
-            for(item in objects(order.optJSONArray("items"))){add(qty(number(item,"qty",1.0))+" × "+item.optString("name"),bold,700,false,4f);modifiers(item,false);item.optString("comment").takeIf{it.isNotEmpty()}?.let{add("↳ "+it,regular,400,false,9f)}}
+            val kitchenTitle=if(narrow)40f else 44f
+            val kitchenItem=if(narrow)38f else 42f
+            val kitchenBody=if(narrow)28f else 30f
+            val kitchenType=if(narrow)30f else 32f
+            val kitchenDate=if(narrow)24f else 26f
+            val label=order.optString("orderLabel").trim().ifBlank{order.optString("receiptDisplayNumber").trim().ifBlank{"Заказ"}}
+            add(label,kitchenTitle,700,true,3f);add(date(number(order,"timestamp").toLong()),kitchenDate,400,true,8f);sep(7f)
+            add(order.optString("orderType","Заказ"),kitchenType,600,true,8f);sep()
+            for(item in objects(order.optJSONArray("items"))){add(qty(number(item,"qty",1.0))+" × "+item.optString("name"),kitchenItem,700,false,4f);modifiers(item,false,kitchenBody);item.optString("comment").takeIf{it.isNotEmpty()}?.let{add("↳ "+it,kitchenBody,400,false,9f)}}
         } else {
             cfg.optString("paymentReceiptTitle","ПРИЛАВОК").trim().takeIf{it.isNotEmpty()}?.let{add(it,title,700,true,14f)}
             add("Сотрудник: "+order.optString("employeeName","Сотрудник"),small,gap=2f)
