@@ -2563,7 +2563,7 @@ test('negative-stock checkbox participates in dirty tracking and persists only f
  f.fields['pf-allow-negative-stock'].checked=true;assert.equal(f.c.productEditorDirty(),true);assert.equal(await f.c.saveProduct('flour'),true);assert.equal(f.c.getProduct('flour').allowNegativeStock,true);assert.equal(f.c.getProduct('flour').noStockTracking,false);
  f.fields['pf-allow-negative-stock'].checked=false;assert.equal(await f.c.saveProduct('flour'),true);assert.equal(f.c.getProduct('flour').allowNegativeStock,false);
  const composite=editorFixture();composite.c._pmType='composite';composite.c._pmComponents=[{productId:'flour',qty:1}];composite.fields['pf-allow-negative-stock']={checked:true};assert.equal(await composite.c.saveProduct('pizza'),true);assert.equal(composite.c.getProduct('pizza').allowNegativeStock,false);
- const failed=editorFixture();failed.fields['pf-allow-negative-stock']={checked:true};const before=JSON.stringify(failed.state.products);failed.c.PrilavokCore.Storage.set=async()=>{throw Error('fixture storage failure')};assert.notEqual(await failed.c.saveProduct('flour'),true);assert.equal(JSON.stringify(failed.state.products),before);
+ const failed=editorFixture();failed.fields['pf-allow-negative-stock']={checked:true};const before=JSON.stringify(failed.state.products);failed.c.localStorage.setItem=()=>{throw Error('fixture storage failure')};assert.notEqual(await failed.c.saveProduct('flour'),true);assert.equal(JSON.stringify(failed.state.products),before);
 });
 test('negative stock remains physical warehouse availability rather than unlimited web stock',()=>{
  const f=fixture(),p=f.c.getProduct('flour');p.allowNegativeStock=true;p.stock=-5;
