@@ -952,6 +952,8 @@
   .pe-summary-row{padding:18px 20px 0;display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between;font-size:12px;}.pe-summary-row span{color:var(--muted);}.pe-summary>.pe-note{padding:0 20px;margin:20px 0;}.pe-summary-hint{padding:18px 20px;background:var(--bg);font-size:12px;line-height:1.6;color:var(--muted);}
   .pe-photo{border-top:1px solid var(--border);padding-top:24px;display:grid;grid-template-columns:120px 1fr;gap:20px;align-items:center;}.pe-photo .product-image-preview{width:120px;height:120px;margin:0;min-height:0;border-radius:16px;}.pe-photo .btn{font-size:12px;width:auto;min-height:44px;margin:0 4px 8px 0;}.pe-photo .pe-note{margin-bottom:12px;}
   .pe-usage-row{display:flex;width:100%;align-items:center;justify-content:space-between;gap:16px;text-align:left;padding:18px 0;border-bottom:1px solid var(--border);}.pe-usage-row strong{font-size:14px;}.pe-usage-row small{display:block;color:var(--muted);font-size:12px;margin-top:5px;}.pe-usage-facts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px;}.pe-usage-facts>div{background:var(--bg);border-radius:12px;padding:16px;}.pe-usage-facts strong{display:block;font-size:24px;}.pe-usage-facts span{font-size:11px;color:var(--muted);line-height:1.5;display:block;margin-top:6px;}.pe-empty{padding:30px 16px;background:var(--bg);border-radius:12px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6;}
+  .product-editor #pf-negative-stock-field label{display:flex;align-items:center;gap:12px;min-height:44px;color:var(--ink);font-size:14px;line-height:1.4;}
+  .product-editor #pf-allow-negative-stock{width:22px;min-width:22px;height:22px;min-height:22px;flex:0 0 22px;padding:0;margin:0;accent-color:var(--accent);}
   .pe-exit-actions{display:grid;gap:10px;}.configuration-access-note{padding:6px 0 0;text-align:left;}.configuration-card{padding:14px;}.purchase-configuration-card{margin:4px 0 14px;}.recipe-yield-card{margin-bottom:14px;}.recipe-yield-fields{margin-top:10px;}.no-stock-field{margin-top:4px;}.no-stock-toggle{display:flex;align-items:center;gap:10px;cursor:default;}.no-stock-toggle.can-edit{cursor:pointer;}.no-stock-checkbox{width:20px;height:20px;margin:0;}.product-editor .component-builder{border:0;background:transparent;padding:0;}.product-editor .component-builder-head{display:block;}.product-editor .component-total{margin-top:12px;color:var(--accent);}.product-editor .component-card{grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px;padding:8px 10px;}.product-editor .component-card-name{font-size:13px;line-height:1.35;}.product-editor .component-card-meta{margin-top:2px;line-height:1.35;}.product-editor .component-cost{padding:0 2px;font-size:11.5px;}.product-editor .component-qty button{width:44px;height:44px;}.product-editor .component-option{min-height:60px;}.product-editor .component-category-tab{min-height:44px;}.product-editor .component-options{max-height:320px;}.product-editor .icon-btn{min-width:44px;min-height:44px;}
   .product-editor button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
   @media(max-width:1100px){.pe-workspace{grid-template-columns:minmax(0,1fr);}.pe-summary{display:grid;grid-template-columns:1fr 1fr;}.pe-price-block{grid-row:span 3;}.pe-summary>.pe-note{margin:14px 0;}.pe-summary-hint{grid-column:1/-1;}.pe-nav{width:190px;}.pe-content{padding:22px;}}
@@ -1691,9 +1693,10 @@ function checkedStockConsumption(items){
   const consumption=stockConsumptionFor(items);
   for(const item of consumption.items){
     const p=getProduct(item.productId);
-    const stock=Number(p.stock)||0;
-    const tolerance=Number.EPSILON*8*Math.max(Math.abs(stock),item.qty);
-    if(!Number.isFinite(stock) || stock+tolerance<item.qty) throw new Error('Недостаточно остатка: '+p.name);
+    const stock=p.stock==null?0:Number(p.stock),required=p.allowNegativeStock===true?0:item.qty;
+    const tolerance=Number.EPSILON*8*Math.max(Math.abs(stock),required);
+    if(!Number.isFinite(stock)||!Number.isFinite(stock-item.qty))throw new Error('Некорректный остаток: '+p.name);
+    if(required>0 && stock+tolerance<required) throw new Error('Недостаточно остатка: '+p.name);
   }
   return consumption;
 }
@@ -1720,6 +1723,23 @@ function availableStock(p, resolve=getProduct){
     }
     return min;
   }catch(e){ return 0; }
+}
+// Sale limits are separate from physical warehouse availability and web snapshots.
+function saleAvailableStock(p, resolve=getProduct){
+  if(!p)return 0;
+  try{
+    const totals=productIngredients(p,1,new Set(),new Map(),resolve);
+    for(const [id] of totals){const item=resolve(id);if(productTracksStock(item)&&!Number.isFinite(item.stock==null?0:Number(item.stock)))return 0;}
+    let available=Infinity;
+    for(const [id,qty] of totals){
+      const ingredient=resolve(id);if(!productTracksStock(ingredient)||ingredient.allowNegativeStock===true)continue;
+      const stock=Number(ingredient.stock)||0,ratio=stock/qty;
+      if(!Number.isFinite(ratio))return 0;
+      const count=p.type==='simple'?ratio:Math.floor(ratio+Number.EPSILON*8*Math.max(1,Math.abs(ratio)));
+      available=Math.min(available,Math.max(0,count));
+    }
+    return available;
+  }catch(e){return 0;}
 }
 let compositeCostCache=new Map();
 function clearCompositeCostCache(){compositeCostCache.clear();}

@@ -14,7 +14,7 @@
     const quantity=global.roundStockQty(value);
     return Number.isFinite(quantity)?String(Number(quantity.toPrecision(12))):'0';
   };
-  const warehouseAvailability=global.availableStock;
+  const warehouseAvailability=global.availableStock,saleAvailability=global.saleAvailableStock;
   function reservationSnapshot(orders){
     const quantities=new Map(),blocked=new Set(),issues=[];
     function add(id,quantity){const total=(quantities.get(id)||0)+quantity;if(Number.isFinite(total))quantities.set(id,total);else blocked.add(id)}
@@ -54,6 +54,7 @@
     const own=checked(items),reserved=reservationSnapshot(state.parked);
     for(const item of own.items){
       const p=getProduct(item.productId);
+      if(p.allowNegativeStock===true)continue;
       if(reserved.blocked.has(item.productId))throw new Error('Не определён резерв товара «'+p.name+'» в повреждённом отложенном заказе. Исправьте или удалите этот заказ');
       const stock=Number(p.stock)||0,required=item.qty+(reserved.quantities.get(item.productId)||0),tolerance=Number.EPSILON*8*Math.max(Math.abs(stock),required);
       if(!Number.isFinite(required)||stock+tolerance<required)throw new Error('Недостаточно остатка с учётом отложенных заказов: '+p.name);
@@ -105,17 +106,21 @@
         if(products.has(id))return products.get(id);
         const product=getProduct(id);
         const projected=product&&productTracksStock(product)
-          ? {...product,stock:Math.max(0,(Number(product.stock)||0)-(reserved.get(id)||0))}
+          ? {...product,stock:(Number(product.stock)<0||product.allowNegativeStock===true)?(Number(product.stock)||0)-(reserved.get(id)||0):Math.max(0,(Number(product.stock)||0)-(reserved.get(id)||0))}
           : product;
         products.set(id,projected);return projected;
       }
-      const previous=global.availableStock;
+      const previous=global.availableStock,previousSale=global.saleAvailableStock;
       global.availableStock=function(product,resolve){
         if(resolve)return warehouseAvailability(product,resolve);
         return warehouseAvailability(product&&projectedProduct(product.id),projectedProduct);
       };
+      global.saleAvailableStock=function(product,resolve){
+        if(resolve)return saleAvailability(product,resolve);
+        return saleAvailability(product&&projectedProduct(product.id),projectedProduct);
+      };
       try{return renderer.apply(this,args);}
-      finally{global.availableStock=previous;}
+      finally{global.availableStock=previous;global.saleAvailableStock=previousSale;}
     };
   }
   // Scoped synchronous rendering only: payment, stock checks, exports and server availability

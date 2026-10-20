@@ -541,7 +541,7 @@ async function finalizePaymentSaved(payments){
   const nextProducts=storageSnapshot(state.products),nextOrders=storageSnapshot(state.orders),nextShifts=storageSnapshot(state.shifts);
   for(const item of stockConsumption.items){
     const p=nextProducts.find(product=>product.id===item.productId);
-    p.stock=roundStockQty(Math.max(0,Number(p.stock)-item.qty));
+    p.stock=roundStockQty(p.allowNegativeStock===true?Number(p.stock)-item.qty:Math.max(0,Number(p.stock)-item.qty));
   }
   nextOrders.push(order);
   const nextShift=nextShifts.find(item=>item.id===shift.id);

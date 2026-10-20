@@ -14,6 +14,7 @@ async function saveProduct(editingId){
   const price = parseFloat(document.getElementById('pf-price').value) || 0;
   const tileSymbol = limitTileSymbol(document.getElementById('pf-symbol')?.value||'');
   const noStockTracking = window._pmType==='simple' && !!document.getElementById('pf-no-stock')?.checked;
+  const allowNegativeStock = window._pmType==='simple' && !!document.getElementById('pf-allow-negative-stock')?.checked;
   const canEditOnline = canEditProductWebSetting();
   const onlineDescription = document.getElementById('pf-description')?.value.trim()||'';
   if(!name){ flash('Введите название'); return; }
@@ -38,6 +39,7 @@ async function saveProduct(editingId){
       p.name = name; p.category = category; p.price = price; p.type = type;
       p.tileSymbol = tileSymbol;
       p.noStockTracking = noStockTracking;
+      p.allowNegativeStock = allowNegativeStock;
       p.availableOnline = canEditOnline ? window._pmOnline !== false : getProduct(editingId)?.availableOnline !== false;
       p.availableInOnlineMenu = canEditOnline ? window._pmOnlineMenu !== false : getProduct(editingId)?.availableInOnlineMenu !== false;
       if(canEditOnline)p.description = onlineDescription;
@@ -56,7 +58,7 @@ async function saveProduct(editingId){
       const catKey = category.trim() || 'Без категории';
       const siblingOrders = state.products.filter(x=>productCategoryKey(x)===catKey).map(x=>x.sortOrder||0);
       const nextOrder = siblingOrders.length ? Math.max(...siblingOrders)+1 : 0;
-      p = {id: uid(), name, category, price, type, tileSymbol, noStockTracking, sortOrder: nextOrder, availableOnline: canEditOnline ? window._pmOnline !== false : false, availableInOnlineMenu: canEditOnline ? window._pmOnlineMenu !== false : false, description:canEditOnline?onlineDescription:'', imageUrl:''};
+      p = {id: uid(), name, category, price, type, tileSymbol, noStockTracking, allowNegativeStock, sortOrder: nextOrder, availableOnline: canEditOnline ? window._pmOnline !== false : false, availableInOnlineMenu: canEditOnline ? window._pmOnlineMenu !== false : false, description:canEditOnline?onlineDescription:'', imageUrl:''};
       if(type==='simple'){
         p.cost = parseFloat(document.getElementById('pf-cost')?.value) || 0;
         p.stock = parseFloat(document.getElementById('pf-stock')?.value) || 0;

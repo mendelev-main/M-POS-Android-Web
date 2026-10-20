@@ -116,6 +116,7 @@ function switchProductType(t){
 }
 function renderTypeFields(){
   const el = document.getElementById('pf-type-fields');
+  const negativeField=document.getElementById('pf-negative-stock-field');if(negativeField)negativeField.hidden=window._pmType!=='simple';
   const search=document.getElementById('comp-search');if(search)window._pmSearch=search.value;
   if(!el) return;
   const editing = window._pmEditingId ? getProduct(window._pmEditingId) : null;

@@ -2515,3 +2515,74 @@ test('an older supplier line keeps its recorded stock unit instead of current pu
  f.c.adminSessionIsActive=()=>true;assert.match(f.c.renderAdministrationIndicator(),/administration-session-glow/);assert.match(f.c.renderAdministrationIndicator(),/role="status"/);assert.doesNotMatch(f.c.renderTopbar(null),/class="tab administration-active"/);
  f.c.adminSessionIsActive=()=>false;assert.equal(f.c.renderAdministrationIndicator(),'');
  });
+
+test('negative stock is opt-in for simple goods and never disables stock tracking',()=>{
+ const f=fixture(),p=f.c.getProduct('flour');p.stock=0;
+ assert.equal(f.c.canFulfillCart([{productId:p.id,qty:2}]),false);
+ p.allowNegativeStock=true;assert.equal(f.c.productTracksStock(p),true);assert.equal(f.c.saleAvailableStock(p),Infinity);assert.equal(f.c.availableStock(p),0);
+ assert.deepEqual(plain(f.c.checkedStockConsumption([{productId:p.id,qty:2}])),{version:1,items:[{productId:p.id,qty:2}]});
+ p.stock=-3;assert.equal(f.c.availableStock(p),-3);assert.equal(f.c.canFulfillCart([{productId:p.id,qty:2}]),true);
+ p.allowNegativeStock=false;assert.equal(f.c.saleAvailableStock(p),0);assert.equal(f.c.canFulfillCart([{productId:p.id,qty:1}]),false);
+});
+test('recipe sales ignore shortages only for explicitly permitted simple ingredients',()=>{
+ const f=fixture(),flour=f.c.getProduct('flour'),water=f.c.getProduct('water'),pizza=f.c.getProduct('pizza');flour.stock=0;water.stock=0;flour.allowNegativeStock=true;
+ assert.equal(f.c.canFulfillCart([{productId:'pizza',qty:1}]),false);assert.equal(f.c.saleAvailableStock(pizza),0);
+ water.stock=.2;assert.equal(f.c.saleAvailableStock(pizza),2);assert.equal(f.c.canFulfillCart([{productId:'pizza',qty:2}]),true);assert.equal(f.c.canFulfillCart([{productId:'pizza',qty:3}]),false);
+ water.allowNegativeStock=true;assert.equal(f.c.saleAvailableStock(pizza),Infinity);assert.equal(f.c.availableStock(pizza),0);
+ const consumption=f.c.checkedStockConsumption([{productId:'pizza',qty:3}]);near(consumption.items.find(i=>i.productId==='flour').qty,.6);near(consumption.items.find(i=>i.productId==='water').qty,.3);
+ // Composite-level flags are not a permission: only simple ingredient settings apply.
+ flour.allowNegativeStock=false;pizza.allowNegativeStock=true;assert.equal(f.c.canFulfillCart([{productId:'pizza',qty:1}]),false);
+});
+test('negative-stock policy cannot bypass invalid recipes, quantities or non-finite stock',()=>{
+ const f=fixture(),p=f.c.getProduct('flour');p.allowNegativeStock=true;
+ for(const qty of [0,-1,NaN,Infinity])assert.throws(()=>f.c.checkedStockConsumption([{productId:p.id,qty}]));
+ for(const stock of [NaN,Infinity,-Infinity]){p.stock=stock;assert.throws(()=>f.c.checkedStockConsumption([{productId:p.id,qty:1}]));assert.equal(f.c.saleAvailableStock(p),0);}
+ p.stock=0;f.c.getProduct('dough').components.push({productId:'missing',qty:1});assert.throws(()=>f.c.checkedStockConsumption([{productId:'pizza',qty:1}]));assert.equal(f.c.saleAvailableStock(f.c.getProduct('pizza')),0);
+});
+test('permitted main products never exempt an unrelated modifier or another ingredient',()=>{
+ const f=fixture(),flour=f.c.getProduct('flour'),water=f.c.getProduct('water');flour.allowNegativeStock=true;flour.stock=0;water.stock=0;
+ const items=[{productId:'flour',qty:2,selectedModifiers:[{productId:'water',qty:.5}]}];assert.equal(f.c.canFulfillCart(items),false);
+ water.allowNegativeStock=true;const consumption=f.c.checkedStockConsumption(items);assert.deepEqual(plain(consumption.items),[{productId:'flour',qty:2},{productId:'water',qty:1}]);
+ water.noStockTracking=true;assert.deepEqual(plain(f.c.checkedStockConsumption(items).items),[{productId:'flour',qty:2}]);
+});
+test('payment saves negative stock and historical movements; return restores the exact quantity after policy changes',async()=>{
+ const f=fixture();f.c.getProduct('flour').stock=0;f.c.getProduct('flour').allowNegativeStock=true;f.cart('flour',2);
+ await f.c.finalizePayment([{method:'cash',amount:20}]);assert.equal(f.state.orders.length,1);near(f.c.getProduct('flour').stock,-2);
+ const order=f.state.orders[0];assert.deepEqual(plain(order.stockConsumption),{version:1,items:[{productId:'flour',qty:2}]});
+ near(JSON.parse(f.data.get('prilavok_products')).find(p=>p.id==='flour').stock,-2);assert.equal(JSON.parse(f.data.get('prilavok_products')).find(p=>p.id==='flour').allowNegativeStock,true);
+ f.c.getProduct('flour').allowNegativeStock=false;f.c.restoreOrderStock(order);near(f.c.getProduct('flour').stock,0);
+});
+test('negative recipe deductions preserve untracked ingredients and payment storage rollback',async()=>{
+ const f=fixture();f.c.getProduct('flour').stock=.1;f.c.getProduct('flour').allowNegativeStock=true;f.c.getProduct('water').noStockTracking=true;
+ const order=await f.sale();near(f.c.getProduct('flour').stock,-.1);near(f.c.getProduct('water').stock,10);assert.equal(order.stockConsumption.items.length,1);
+ const bad=fixture();bad.c.getProduct('flour').stock=0;bad.c.getProduct('flour').allowNegativeStock=true;bad.cart('flour',2);const before=JSON.stringify(bad.state.products);
+ bad.c.commitCriticalStorage=async()=>{throw Error('fixture storage failure')};await bad.c.finalizePayment([{method:'cash',amount:20}]);assert.equal(bad.state.orders.length,0);assert.equal(JSON.stringify(bad.state.products),before);assert.equal(bad.state.cart.length,1);
+});
+test('negative-stock checkbox participates in dirty tracking and persists only for simple goods',async()=>{
+ const f=editorFixture();f.fields['pf-allow-negative-stock']={checked:false};f.c._pmInitial=f.c.productEditorSnapshot();assert.equal(f.c.productEditorDirty(),false);
+ f.fields['pf-allow-negative-stock'].checked=true;assert.equal(f.c.productEditorDirty(),true);assert.equal(await f.c.saveProduct('flour'),true);assert.equal(f.c.getProduct('flour').allowNegativeStock,true);assert.equal(f.c.getProduct('flour').noStockTracking,false);
+ f.fields['pf-allow-negative-stock'].checked=false;assert.equal(await f.c.saveProduct('flour'),true);assert.equal(f.c.getProduct('flour').allowNegativeStock,false);
+ const composite=editorFixture();composite.c._pmType='composite';composite.c._pmComponents=[{productId:'flour',qty:1}];composite.fields['pf-allow-negative-stock']={checked:true};assert.equal(await composite.c.saveProduct('pizza'),true);assert.equal(composite.c.getProduct('pizza').allowNegativeStock,false);
+ const failed=editorFixture();failed.fields['pf-allow-negative-stock']={checked:true};const before=JSON.stringify(failed.state.products);failed.c.PrilavokCore.Storage.set=async()=>{throw Error('fixture storage failure')};assert.notEqual(await failed.c.saveProduct('flour'),true);assert.equal(JSON.stringify(failed.state.products),before);
+});
+test('negative stock remains physical warehouse availability rather than unlimited web stock',()=>{
+ const f=fixture(),p=f.c.getProduct('flour');p.allowNegativeStock=true;p.stock=-5;
+ assert.equal(f.c.buildAvailabilityItems(f.state.products).find(p=>p.externalId==='flour').quantity,0);assert.equal(f.c.availableStock(p),-5);assert.equal(f.c.saleAvailableStock(p),Infinity);
+});
+
+test('Android negative sales bypass shortages and reservations only for permitted ingredients',()=>{
+ const f=liveStockFixture();installLivePosStock(f);f.c.getProduct('flour').stock=0;f.c.getProduct('flour').allowNegativeStock=true;f.state.parked=[{id:'parked',items:[{productId:'flour',qty:10}]}];
+ assert.equal(f.c.canFulfillCart([{productId:'flour',qty:2}]),true);
+ f.c.getProduct('water').stock=1;f.state.parked.push({id:'strict',items:[{productId:'water',qty:.95}]});assert.equal(f.c.canFulfillCart([{productId:'pizza',qty:1}]),false);
+ f.c.getProduct('water').allowNegativeStock=true;assert.equal(f.c.canFulfillCart([{productId:'pizza',qty:1}]),true);
+});
+test('Android POS keeps negative counts visible and permitted cards enabled without leaking projected helpers',()=>{
+ const f=liveStockFixture();liveStockWorkspace(f,['flour']);installLivePosStock(f);const p=f.c.getProduct('flour');p.stock=-2;p.allowNegativeStock=true;
+ const availability=f.c.saleAvailableStock;assert.match(f.c.renderPosScreen(null),/Остаток: -2 шт/);assert.doesNotMatch(f.c.renderPosScreen(null),/pcard disabled/);assert.strictEqual(f.c.saleAvailableStock,availability);
+ p.allowNegativeStock=false;assert.match(f.c.renderPosScreen(null),/pcard disabled/);assert.match(f.c.renderPosScreen(null),/Остаток: -2 шт/);
+});
+test('Android precise negative deductions survive repeated payments and return without per-movement rounding',async()=>{
+ const f=preciseStockFixture();f.c.getProduct('flour').stock=0;f.c.getProduct('flour').allowNegativeStock=true;
+ f.c.getProduct('pizza').components=[{productId:'flour',qty:.0004}];for(let i=0;i<3;i++)await f.sale();
+ assert.equal(f.state.orders.length,3);near(f.c.getProduct('flour').stock,-.0012);for(const order of f.state.orders)f.c.restoreOrderStock(order);near(f.c.getProduct('flour').stock,0);
+});
