@@ -2,14 +2,17 @@ function invoiceReceivingItems(d){
   if(!d.lines.length)throw new Error('Добавьте товары');
   return d.lines.map(line=>{
     const p=getProduct(line.productId);if(!p||p.type!=='simple')throw new Error('Товар удалён или изменил тип');
-    if(line.qtyInput===''||line.totalInput==='')throw new Error('Заполните количество и сумму каждой строки');
-    const invoiceQty=Number(line.qtyInput),total=Number(line.totalInput);
+    if(String(line.qtyInput??'').trim()==='')throw new Error('Заполните количество каждой строки');
+    const invoiceQty=Number(line.qtyInput);
+    if(invoiceQty!==0&&String(line.totalInput??'').trim()==='')throw new Error('Заполните сумму каждой полученной строки');
+    const total=Number(line.totalInput||0);
     if(!Number.isFinite(invoiceQty)||invoiceQty<0||!Number.isFinite(total)||total<0||(invoiceQty===0&&total!==0))throw new Error('Проверьте количество и сумму: '+p.name);
     const isPack=['bottle','pack','box'].includes(line.unit);
     let qty;
-    if(isPack){const size=Number(line.packSize);if(!Number.isFinite(size)||size<=0)throw new Error('Укажите количество внутри: '+p.name);qty=convertProductQty(invoiceQty*size,line.contentUnit||stockUnit(p),stockUnit(p));}
+    if(invoiceQty===0)qty=0;
+    else if(isPack){const size=Number(line.packSize);if(!Number.isFinite(size)||size<=0)throw new Error('Укажите количество внутри: '+p.name);qty=convertProductQty(invoiceQty*size,line.contentUnit||stockUnit(p),stockUnit(p));}
     else qty=convertProductQty(invoiceQty,line.unit,stockUnit(p));
-    return {productId:p.id,productName:p.name,qty,unitCost:qty>0?total/qty:0,totalCost:total,stockUnit:stockUnit(p),invoiceQty,invoiceUnit:line.unit,packSize:isPack?Number(line.packSize):null,contentUnit:line.contentUnit||stockUnit(p),invoiceUnitPrice:invoiceQty>0?total/invoiceQty:0};
+    return {productId:p.id,productName:p.name,qty,unitCost:qty>0?total/qty:0,totalCost:total,stockUnit:stockUnit(p),invoiceQty,invoiceUnit:line.unit,packSize:isPack&&Number.isFinite(Number(line.packSize))&&Number(line.packSize)>0?Number(line.packSize):null,contentUnit:line.contentUnit||stockUnit(p),invoiceUnitPrice:invoiceQty>0?total/invoiceQty:0};
   });
 }
 
@@ -71,6 +74,7 @@ async function applyReceivingDocument(){
     const writes={products:nextProducts,purchaseOrders:nextPurchaseOrders,receivings:nextReceivings};if(!order)writes.receivingDraft=null;
     await commitCriticalStorage('receiving',writes);
     state.products=nextProducts;state.purchaseOrders=nextPurchaseOrders;state.receivings=nextReceivings;
+    criticalOperationBusy=false;
     void publishAvailability();
     if(!order)state.receivingCart=[];
     window._receivingPending=null;window._receivingDraft=null;window._receivingExpanded=false;finishReceivingPage();closeModal();render();flash('Приёмка подтверждена, себестоимость обновлена');

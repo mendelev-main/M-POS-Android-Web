@@ -2679,3 +2679,22 @@ test('receipt loyalty shows a completed row for an available gift and no unconfi
  await f.c.awaitReceiptLoyalty(order);assert.equal(order.loyaltySync.status,'pending');assert.equal(order.loyaltyReceiptProgress,undefined);
  f.c.loyaltyApi=async()=>({skipped:'consent_required',programs:[],events:[]});await f.c.awaitReceiptLoyalty(order);assert.equal(order.loyaltySync.status,'consent_required');assert.equal(order.loyaltyReceiptProgress,undefined);
 });
+
+test('zero receiving quantity clears line total and does not require absent package conversion',()=>{
+ const f=fixture();f.c._receivingDraft={lines:[{productId:'flour',qtyInput:'2',unit:'pack',packSize:'',priceInput:'',totalInput:'30',priceMode:'total'}]};
+ f.c.updateInvoiceLine(0,'qtyInput','0');assert.equal(f.c._receivingDraft.lines[0].totalInput,0);
+ const item=f.c.invoiceReceivingItems(f.c._receivingDraft)[0];assert.equal(item.qty,0);assert.equal(item.totalCost,0);assert.equal(item.packSize,null);assert.equal(f.c.receivingStockUpdates([item]).length,0);
+ const noSum=f.c.invoiceReceivingItems({lines:[{productId:'flour',qtyInput:'0',unit:'pack',packSize:'',totalInput:''}]})[0];assert.equal(noSum.qty,0);assert.equal(noSum.totalCost,0);
+ const resumed=f.c.receivingDraftForOrder({receivingDraftV2:{version:1,lines:[{productId:'flour',qtyInput:0,totalInput:30}]}},'purchase');assert.equal(resumed.lines[0].totalInput,0);
+ assert.throws(()=>f.c.invoiceReceivingItems({lines:[{productId:'flour',qtyInput:1,unit:'pack',packSize:'',totalInput:30}]}));
+});
+test('partial receiving closes supplier order while zero line changes neither stock nor cost',async()=>{
+ const f=invoiceFixture();const absent=f.c.getProduct('water');absent.stock=8;absent.cost=7;const before=JSON.stringify(absent);
+ f.state.purchaseOrders[0].items.push({productId:'water',qty:4});
+ f.c._receivingPending.draft.lines.push({productId:'water',qtyInput:'0',unit:'pack',packSize:'',totalInput:''});
+ assert.equal(await f.c.applyReceivingDocument(),true);
+ assert.equal(f.state.purchaseOrders[0].status,'received');assert.equal(f.state.purchaseOrders[0].shortage,true);
+ assert.equal(JSON.stringify(f.c.getProduct('water')),before);assert.equal(f.state.receivings[0].totalCost,60);
+ const missing=f.state.receivings[0].items.find(i=>i.productId==='water');assert.equal(missing.qty,0);assert.equal(missing.totalCost,0);
+ assert.equal(JSON.parse(f.data.get('prilavok_purchaseOrders'))[0].receivedItems.find(i=>i.productId==='water').qty,0);
+});

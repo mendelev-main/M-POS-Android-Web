@@ -2,6 +2,7 @@ function receivingDraftForOrder(order,orderId){
   const saved=order?.receivingDraftV2;
   const draft=saved?storageSnapshot(saved):{version:1,orderId:orderId||null,supplierId:order?.supplierId||'',invoiceNumber:'',invoiceDate:'',lines:(order?.items||state.receivingCart||[]).map(i=>({productId:i.productId,qtyInput:order?.receivingDraft?.[i.productId]?.qty??(!order?i.qty:(i.expectedQty===null?'':(i.requestedQty??i.expectedQty??i.qty??''))),unit:order?(i.requestedUnit??i.stockUnit??stockUnit(getProduct(i.productId))):(i.stockUnit??stockUnit(getProduct(i.productId))),packSize:order?(i.packSize??''):'',contentUnit:order?(i.contentUnit??i.stockUnit??stockUnit(getProduct(i.productId))):stockUnit(getProduct(i.productId)),priceInput:'',totalInput:order?.receivingDraft?.[i.productId]?.totalCost??(!order?i.totalCost:''),priceMode:'total'}))};
   draft.orderId=orderId||null;
+  for(const line of draft.lines){if(String(line.qtyInput??'').trim()!==''&&Number(line.qtyInput)===0)line.totalInput=0;}
   return draft;
 }
 
