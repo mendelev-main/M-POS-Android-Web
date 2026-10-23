@@ -1,4 +1,63 @@
 /* ---- Park (save receipt for later) ---- */
+function receiptLabelKey(value){return String(value||'').trim().normalize('NFC').toLocaleLowerCase('ru').replace(/\s+/g,' ');}
+function normalizeReceiptLabelTemplates(value){
+  if(!Array.isArray(value))return [];
+  const ids=new Set(),names=new Set();
+  return value.filter(row=>{
+    if(!row||typeof row.id!=='string'||!row.id||typeof row.name!=='string'||!row.name.trim()||row.name.trim().length>80)return false;
+    const key=receiptLabelKey(row.name);if(ids.has(row.id)||names.has(key))return false;
+    ids.add(row.id);names.add(key);return true;
+  }).map(row=>({id:row.id,name:row.name.trim()}));
+}
+function uniqueParkedOrderLabel(value,parked=state.parked){
+  const name=String(value||'').trim();if(!name)return '';
+  const used=new Set((parked||[]).map(order=>receiptLabelKey(order.orderLabel)));
+  if(!used.has(receiptLabelKey(name)))return name;
+  const suffix=name.match(/^(.*) \(([2-9]|[1-9]\d+)\)$/);
+  const base=suffix?suffix[1]:name;
+  let number=2;while(used.has(receiptLabelKey(base+' ('+number+')')))number++;
+  return base+' ('+number+')';
+}
+function receiptLabelTemplateButtons(){
+  const templates=normalizeReceiptLabelTemplates(state.receiptLabelTemplates);
+  return templates.length?`<div class="receipt-label-templates" aria-label="Шаблоны названий чеков">${templates.map(t=>`<button type="button" class="btn btn-secondary" onclick="chooseReceiptLabelTemplate(${escapeAttr(JSON.stringify(t.id))})">${escapeHtml(t.name)}</button>`).join('')}</div>`:'';
+}
+function chooseReceiptLabelTemplate(id){
+  const template=normalizeReceiptLabelTemplates(state.receiptLabelTemplates).find(t=>t.id===id);
+  const input=document.getElementById('park-order-label');if(!template||!input)return;
+  input.value=uniqueParkedOrderLabel(template.name);input.focus();
+}
+function renderReceiptLabelTemplateSettings(){
+ const editable=canEditCompanySettings(),templates=normalizeReceiptLabelTemplates(state.receiptLabelTemplates);
+ return `<div class="settings-card"><div class="settings-section-head"><div class="settings-section-title">Шаблоны названий чеков</div>${editable?'<button class="settings-plus-btn" aria-label="Добавить шаблон названия чека" onclick="openReceiptLabelTemplateModal()"><span class="ui-icon ui-icon-add" aria-hidden="true"></span></button>':''}</div><div class="setting-sub">Быстрые кнопки в окне «Отложить». Название можно изменить перед сохранением чека.</div><div class="settings-list">${templates.length?templates.map(t=>`<div class="list-row"><div class="settings-list-main"><div class="list-row-name">${escapeHtml(t.name)}</div></div>${editable?`<button class="btn btn-secondary settings-inline-button" onclick="openReceiptLabelTemplateModal(${escapeAttr(JSON.stringify(t.id))})">Изменить</button><button class="icon-btn danger settings-row-action" aria-label="Удалить шаблон названия чека" onclick="deleteReceiptLabelTemplate(${escapeAttr(JSON.stringify(t.id))})"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button>`:''}</div>`).join(''):'<div class="center-note">Шаблоны пока не добавлены.</div>'}</div></div>`;
+}
+function openReceiptLabelTemplateModal(id=''){
+ if(!requireAdministration())return false;
+ const template=normalizeReceiptLabelTemplates(state.receiptLabelTemplates).find(t=>t.id===id);
+ if(id&&!template)return false;
+ showModal(`<div class="modal-title">${id?'Изменить шаблон':'Новый шаблон названия чека'}</div><div class="field"><label for="receipt-template-name">Название</label><input id="receipt-template-name" type="text" maxlength="80" autocomplete="off" placeholder="Например: Стол 1" value="${escapeAttr(template?.name||'')}"></div><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="saveReceiptLabelTemplate(${escapeAttr(JSON.stringify(id))})">Сохранить</button></div>`);
+}
+async function saveReceiptLabelTemplate(id=''){
+ if(!requireAdministration()||criticalOperationBusy)return false;
+ const name=String(document.getElementById('receipt-template-name')?.value||'').trim();
+ if(!name||name.length>80){flash('Введите название до 80 символов');return false;}
+ const next=normalizeReceiptLabelTemplates(state.receiptLabelTemplates);
+ if(next.some(t=>t.id!==id&&receiptLabelKey(t.name)===receiptLabelKey(name))){flash('Такой шаблон уже есть');return false;}
+ if(id){const template=next.find(t=>t.id===id);if(!template){flash('Шаблон больше не существует');return false;}template.name=name;}
+ else next.push({id:uid(),name});
+ criticalOperationBusy=true;
+ try{await commitCriticalStorage('receipt-label-template-save',{receiptLabelTemplates:next});state.receiptLabelTemplates=next;criticalOperationBusy=false;closeModal();render();return true;}
+ catch(error){flash('Не удалось сохранить шаблон: '+(error?.message||error));return false;}
+ finally{criticalOperationBusy=false;}
+}
+async function deleteReceiptLabelTemplate(id){
+ if(!requireAdministration()||criticalOperationBusy)return false;
+ const next=normalizeReceiptLabelTemplates(state.receiptLabelTemplates).filter(t=>t.id!==id);
+ criticalOperationBusy=true;
+ try{await commitCriticalStorage('receipt-label-template-delete',{receiptLabelTemplates:next});state.receiptLabelTemplates=next;criticalOperationBusy=false;render();return true;}
+ catch(error){flash('Не удалось удалить шаблон: '+(error?.message||error));return false;}
+ finally{criticalOperationBusy=false;}
+}
 function kitchenPrintLineKey(item){
   return item?.cartLineId || [item?.productId||'', modifierSelectionSignature(item?.selectedModifiers||[]), item?.comment||''].join('|');
 }
@@ -17,7 +76,7 @@ function parkOrder(){
   if(!String(state.orderLabel||'').trim()){
     showModal(`
       <div class="modal-title">Подпись чека</div>
-      <div class="settings-note park-order-note">Добавьте подпись, чтобы потом было проще найти этот чек в отложенных.</div>
+      ${receiptLabelTemplateButtons()}
       <div class="field">
         <label>Подпись</label>
         <input id="park-order-label" type="text" placeholder="Например: Стол 4 или Александр" autocomplete="off" onkeydown="if(event.key==='Enter')confirmParkOrderLabel()">
@@ -46,7 +105,7 @@ async function parkOrderNow(){
     id:uid(), receiptDisplayNumber:'#'+(state.parked.length+1),
     items: state.cart.map(i=>{const product=getProduct(i.productId);return {...JSON.parse(JSON.stringify(i)),category:product?.category||i.category||''}}),
     total:cartTotal(), subtotal:cartSubtotal(), deliveryTariffSelected:!!state.deliveryTariffSelected,deliveryTariff:storageSnapshot(state.deliveryTariff||null), deliveryFee:state.orderType==='Доставка'?Number(state.deliveryFee||0):0,
-    orderLabel:state.orderLabel, orderType:state.orderType, customer:JSON.parse(JSON.stringify(state.customer)),
+    orderLabel:uniqueParkedOrderLabel(state.orderLabel), orderType:state.orderType, customer:JSON.parse(JSON.stringify(state.customer)),
     comment:state.orderComment||'', source:state.currentOrderSource||'', webOrderId:state.currentWebOrderId||'', webOrderStatus:state.currentWebOrderStatus||'',
     employeeName:employee?.name||employee?.fullName||'Сотрудник',registerName:'POS 1',timestamp:Date.now(),createdAt:Number(state.currentOrderCreatedAt)||Date.now(),kitchenPrinted:!!window.__currentOrderKitchenPrinted,
     printedItems:JSON.parse(JSON.stringify(window.__currentOrderPrintedItems||[]))

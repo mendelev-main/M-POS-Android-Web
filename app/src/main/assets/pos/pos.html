@@ -1242,6 +1242,8 @@
   .parked-modal-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;}.parked-modal-header .modal-title{margin:0;font-size:22px;}
   .parked-modal-close{display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;border-radius:12px;background:var(--bg);color:var(--muted);}.parked-modal-close svg{width:22px;height:22px;}
   .parked-orders-list{display:flex;flex-direction:column;gap:8px;}
+  .receipt-label-templates{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0;}
+  .receipt-label-templates .btn{min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere;border-radius:12px;}
   .parked-order-card{display:flex;align-items:center;gap:12px;min-width:0;padding:0 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);}
   .parked-order-tile{flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) 110px 104px;align-items:center;gap:16px;min-height:66px;padding:10px 0;text-align:left;}
   .parked-order-tile:active{background:var(--bg);}.parked-order-tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px;}
@@ -1338,6 +1340,7 @@ let state = {
   printer: {enabled:false, autoPrint:false, ip:'', port:9100 },
   company: {establishmentName:'', legalName:'', address:'', deliveryAddress:''},
   deliveryRates: [],
+  receiptLabelTemplates: [],
   deliveryFee: 0,
   deliveryTariffSelected: false,
   deliveryTariff: null,
@@ -1379,7 +1382,7 @@ const LS_PREFIX = 'prilavok_';
 let storageBroken = false;
 let storageCheckedOnce = false;
 const CRITICAL_STORAGE_JOURNAL_KEY = 'criticalStorageJournal';
-const CRITICAL_STORAGE_KEYS = new Set(['products','orders','shifts','employees','parked','purchaseOrders','receivings','receivingDraft','suppliers','discounts','layout','posNavigation','company','deliveryRates','hallTables','bookings','inventoryConfig','inventoryHistory','inventoryDraft','currentOrderSession','printer','theme','telegram','network','demandOverload','operationalOutbox','operationalRevision','webEvents','webOrderAcceptances','privacyRules']);
+const CRITICAL_STORAGE_KEYS = new Set(['products','orders','shifts','employees','parked','purchaseOrders','receivings','receivingDraft','suppliers','discounts','layout','posNavigation','company','deliveryRates','receiptLabelTemplates','hallTables','bookings','inventoryConfig','inventoryHistory','inventoryDraft','currentOrderSession','printer','theme','telegram','network','demandOverload','operationalOutbox','operationalRevision','webEvents','webOrderAcceptances','privacyRules']);
 let criticalStorageRecoveryPending = false;
 let criticalOperationBusy = false;
 
@@ -1468,7 +1471,7 @@ async function loadAll(){
   }
   storageCheckedOnce = true;
   await recoverCriticalStorageJournal();
-  const [products, shifts, employees, orders, parked, demandOverload, operationalOutbox, operationalRevision, receivings, suppliers, purchaseOrders, discounts, layout, printer, theme, company, deliveryRates, telegram, network, currentOrderSession, hallTables, bookings, webEvents, posNavigation, inventoryConfig, inventoryHistory, inventoryDraft] = await Promise.all([
+  const [products, shifts, employees, orders, parked, demandOverload, operationalOutbox, operationalRevision, receivings, suppliers, purchaseOrders, discounts, layout, printer, theme, company, deliveryRates, telegram, network, currentOrderSession, hallTables, bookings, webEvents, posNavigation, inventoryConfig, inventoryHistory, inventoryDraft, receiptLabelTemplates] = await Promise.all([
     loadKey('products', null),
     loadKey('shifts', []),
     loadKey('employees', []),
@@ -1495,7 +1498,8 @@ async function loadAll(){
     loadKey('posNavigation', {version:1,categories:[]}),
     loadKey('inventoryConfig', {enabled:false,frequency:'monthly',productIds:[],lastCompletedAt:null}),
     loadKey('inventoryHistory', []),
-    loadKey('inventoryDraft', null)
+    loadKey('inventoryDraft', null),
+    loadKey('receiptLabelTemplates', [])
   ]);
   const productRowsValid=products===null||(Array.isArray(products)&&products.every(item=>item&&typeof item==='object'&&!Array.isArray(item)));
   if(!productRowsValid)markStorageBroken('Некорректный формат products');
@@ -1537,6 +1541,7 @@ async function loadAll(){
   state.printer = Object.assign({enabled:false, autoPrint:false, ip:'', port:9100 }, storageRecord(printer,'printer',{}));
   state.company = Object.assign({establishmentName:'', legalName:'', address:'', deliveryAddress:''}, storageRecord(company,'company',{}));
   state.deliveryRates = storageRecordArray(deliveryRates,'deliveryRates');
+  state.receiptLabelTemplates = normalizeReceiptLabelTemplates(receiptLabelTemplates);
   state.telegram = Object.assign({enabled:false, botToken:'', chatId:'', threadId:'', deviceChatId:'', ownerChatId:'', notifyOnlineOrders:false, notifyShiftOpened:true, notifyShiftClosed:true, notifyMonthlyWarehouse:false, lastMonthlyWarehouseSent:''}, storageRecord(telegram,'telegram',{}));
   const networkShapeValid=!!network&&typeof network==='object'&&!Array.isArray(network);
   state.network = Object.assign({backendUrl:'https://project-dubrovno.up.railway.app', deviceKey:'', deviceName:'M POS iPad', lastSyncAt:null, lastSyncStatus:''}, storageRecord(network,'network',{}));
@@ -2195,6 +2200,7 @@ function renderSettingsScreen(){
         <div class="setting-sub">Создайте варианты скидок, которые можно будет назначать отдельному товару в текущем заказе.</div>
         <div class="settings-list">${state.discounts.length ? state.discounts.map(d=>`<div class="list-row"><div class="settings-list-main"><div class="list-row-name">${escapeHtml(d.name)}</div><div class="list-row-sub">${d.type==='percent'?Number(d.value)+'%':'Фиксированная скидка '+money(d.value)}</div></div>${canEditCompanySettings()?`<button class="icon-btn danger settings-row-action" aria-label="Удалить скидку" onclick="deleteDiscount('${escapeAttr(d.id)}')"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button>`:''}</div>`).join('') : '<div class="center-note">Скидок пока нет.</div>'}</div>
       </div>
+      ${renderReceiptLabelTemplateSettings()}
     </div>
   </div>`;
 }

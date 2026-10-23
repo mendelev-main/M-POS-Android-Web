@@ -1,8 +1,8 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "aa0c4de2b58b1860d05b5995771d95f312a95e68",
+  "sourceCommit": "704da805dbb4694ba7850a0980649d715d7e77f0",
   "files": {
-    "pos.html": "e329f1ca526bf8c1297b6f741d1e97e2b939d93396d1b04143bb0915da7fc05e",
+    "pos.html": "de1d428190159053f3b59752445d47c01c1ac9055436c1b063f55773096e229e",
     "network-printer.js": "24bcff55aaa2f0a198039e476a70a22054cd212024544e7af4020912d13488cd",
     "notification-native.js": "01df1dcaf6f7dc5c28372a842a4b123552547a7988d5a14776504453a7dc3069",
     "Web/fonts/Manrope-Variable.ttf": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
@@ -10,7 +10,7 @@
     "Web/js/core/storage.js": "4e9d29d56f1a1cbf663f21bedada61bce46236ee322efe44756b18dbec4d92db",
     "Web/js/features/analytics.js": "e47103546bf22a5ed92c77641cce17d11a28e3a0d2f5b6b7f4fc4eaca3d0bd8b",
     "Web/js/features/availability.js": "2a46389555a12b7b66d602a6311444b5d0bf751e12e20198043b2c44c7cc4967",
-    "Web/js/features/backup.js": "7441c7c016f5be3677fdaa5e4ea2e58a327e6af41fe051f172c3f2b2c8b4acd3",
+    "Web/js/features/backup.js": "67283b48327b6fc220e910e42378ec9ce66f5ee4ec07f15677446305472f86b0",
     "Web/js/features/cart-composition.js": "e49b90b60f494077b3ca36781432fb8c36c4f1eca5b30e1c2288c938df1e0438",
     "Web/js/features/cart-presentation.js": "bec369d6d16f1a6eba5088013bed414dbde169dc5e9f31ab768876c19d049b71",
     "Web/js/features/delivery-tariffs.js": "3fccee015f94aff434550593796278c50a0efe9270169d7fbc878e91f02def6f",
@@ -18,7 +18,7 @@
     "Web/js/features/hall-bookings.js": "44d342fdd3e0c81011b23f02fefb9e3221dcf08872eacbbb5938e0e4e52a53e8",
     "Web/js/features/inventory.js": "cadcd276c3464dba1139aa9edb3668caea158649cfd4b3cce1d4cb4aeddf8bc9",
     "Web/js/features/loyalty.js": "52d937ffcf5a95c8b5ddac9aad6b4f84d1afcf4d503468969f89546d13c3837b",
-    "Web/js/features/parked-orders.js": "e8dd48d584661aa384131c68a51afc5a1c6decb4f1a692c32272395e7745745b",
+    "Web/js/features/parked-orders.js": "581e3fc2d4a9cd35557458e512487789925b928719de7463a8ac2f0302807407",
     "Web/js/features/payment.js": "842bf5354adfcf8b88af7b56b86e15f45f580b3439a40db711e11dcf4f23ad61",
     "Web/js/features/pos-navigation.js": "feea61f760eb646630ee992f476f71940b91b26709fa808c0e1638930ef65cf7",
     "Web/js/features/privacy.js": "03e58c043917844569f4ec43a14889ebdb084183cae6ffbf90cae4d7c631b123",

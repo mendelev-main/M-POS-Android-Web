@@ -2628,3 +2628,36 @@ test('Android folders show negative recipe counts using the same projection as t
  f.state.posNavigation={version:1,categories:[{category:'Пицца',items:[{type:'folder',id:'folder',name:'Популярное',parentId:''},{type:'product',id:'a',parentId:'folder'}]}]};f.c._posFolderModal={category:'Пицца',id:'folder'};f.state.cart=[{productId:'a',qty:2}];installLivePosStock(f);
  f.c.renderPosFolderModal();assert.match(f.fields['modal-root'].innerHTML,/pcard-stock[^>]*>-2</);assert.doesNotMatch(f.fields['modal-root'].innerHTML,/pcard disabled/);assert.equal(f.c.getProduct('ingredient').stock,0);assert.equal(f.c.availableStock(f.c.getProduct('a')),0);
 });
+
+test('receipt templates persist, reject duplicates, respect administration and retain state on storage failure',async()=>{
+ const f=fixture();f.c.requireAdministration=()=>true;f.fields['receipt-template-name']={value:'Стол 1'};
+ assert.equal(await f.c.saveReceiptLabelTemplate(),true);
+ const id=f.state.receiptLabelTemplates[0].id;
+ assert.equal(JSON.parse(f.data.get('prilavok_receiptLabelTemplates'))[0].name,'Стол 1');
+ await f.c.loadAll();assert.equal(f.state.receiptLabelTemplates[0].name,'Стол 1');
+ f.fields['receipt-template-name'].value=' стол   1 ';assert.equal(await f.c.saveReceiptLabelTemplate(),false);assert.equal(f.state.receiptLabelTemplates.length,1);
+ f.fields['receipt-template-name'].value='Стол 2';assert.equal(await f.c.saveReceiptLabelTemplate(id),true);
+ const backup=await f.c.completeBackupData();assert.equal(backup.receiptLabelTemplates[0].name,'Стол 2');
+ assert.equal(f.c.validateBackupData(backup).receiptLabelTemplates[0].id,id);
+ delete backup.receiptLabelTemplates;assert.equal(f.c.validateBackupData(backup).receiptLabelTemplates.length,0);
+ f.c.requireAdministration=()=>false;assert.equal(await f.c.deleteReceiptLabelTemplate(id),false);assert.equal(f.state.receiptLabelTemplates.length,1);
+ f.c.requireAdministration=()=>true;const before=JSON.stringify(f.state.receiptLabelTemplates);f.c.commitCriticalStorage=async()=>{throw Error('quota')};
+ assert.equal(await f.c.deleteReceiptLabelTemplate(id),false);assert.equal(JSON.stringify(f.state.receiptLabelTemplates),before);
+ f.fields['receipt-template-name'].value='Новый';assert.equal(await f.c.saveReceiptLabelTemplate(),false);assert.equal(JSON.stringify(f.state.receiptLabelTemplates),before);
+});
+test('quick receipt buttons escape text, select an available name and preserve manual entry',()=>{
+ const f=fixture();f.cart();f.state.orderLabel='';f.state.receiptLabelTemplates=[{id:'table',name:'Стол 1'},{id:'unsafe',name:'<img onerror=x>'}];f.state.parked=[{orderLabel:'Стол 1'}];
+ let modal='';f.c.showModal=html=>{modal=html};f.c.parkOrder();
+ assert.match(modal,/receipt-label-templates/);assert.match(modal,/&lt;img onerror=x&gt;/);assert.doesNotMatch(modal,/<img|Добавьте подпись, чтобы/);
+ f.fields['park-order-label']={value:'',focus(){}};f.c.chooseReceiptLabelTemplate('table');assert.equal(f.fields['park-order-label'].value,'Стол 1 (2)');
+ f.c.chooseReceiptLabelTemplate('missing');assert.equal(f.fields['park-order-label'].value,'Стол 1 (2)');
+});
+test('parking duplicate labels allocates distinct names and re-parking a resumed receipt keeps its name',async()=>{
+ const f=fixture();f.state.parked=[{id:'base',orderLabel:'Стол 1',items:[],createdAt:1},{id:'second',orderLabel:'Стол 1 (2)',items:[],createdAt:2}];
+ f.cart();f.state.orderLabel='  стол 1  ';assert.equal(await f.c.parkOrderNow(),true);
+ const third=f.state.parked.at(-1);assert.equal(third.orderLabel,'стол 1 (3)');
+ assert.equal(await f.c.resumeParked(third.id),true);assert.equal(f.state.orderLabel,'стол 1 (3)');
+ assert.equal(await f.c.parkOrderNow(),true);assert.equal(f.state.parked.at(-1).orderLabel,'стол 1 (3)');
+ assert.equal(f.c.uniqueParkedOrderLabel('Заказ',[{orderLabel:'Заказ'},{orderLabel:'Заказ (3)'}]),'Заказ (2)');
+ assert.equal(f.c.uniqueParkedOrderLabel('',[]),'');
+});
