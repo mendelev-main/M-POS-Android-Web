@@ -4,14 +4,14 @@ function fixture(){let html='',deleted=0;const c={state:{cart:[],parked:[{id:'p'
 test('notification addon preserves compact renderer and WEB actions',()=>{const f=fixture();assert.strictEqual(f.c.openParkedModal,f.renderer);f.c.openParkedModal();assert.match(f.html(),/parked-orders-list/);assert.match(f.html(),/parked-order-tile/);assert.match(f.html(),/parked-modal-close/);assert.match(f.html(),/parked-web-ready-button/);assert.doesNotMatch(f.html(),/list-row-sub|>Закрыть<|>Открыть</);});
 test('tile deletion retains native confirmation before removing order',()=>{const f=fixture();f.c.requestDeleteParkedOrder('p');assert.equal(f.deleted(),0);assert.match(f.html(),/Удаление заказа/);assert.match(f.html(),/deleteParked\('p'\)/);f.c.deleteParked('p');assert.equal(f.deleted(),1);});
 
-test('parked name search is case insensitive, handles whitespace and ё, and restores all rows when cleared',()=>{
- const f=fixture(),cards=[{dataset:{orderLabel:'Стол 4'}},{dataset:{orderLabel:'Семён'}},{dataset:{orderLabel:'Без подписи'}}],empty={hidden:true};
- f.c.document.querySelectorAll=()=>cards;f.c.document.getElementById=()=>empty;
- f.c.openParkedModal();assert.match(f.html(),/parked-order-search/);assert.match(f.html(),/data-order-label="Стол 4"/);
- const before=JSON.stringify(f.c.state.parked);
- f.c.filterParkedOrders('  сТоЛ  ');assert.deepEqual(cards.map(x=>x.hidden),[false,true,true]);assert.equal(empty.hidden,true);
- f.c.filterParkedOrders('семен');assert.deepEqual(cards.map(x=>x.hidden),[true,false,true]);
- f.c.filterParkedOrders('нет такого');assert.equal(empty.hidden,false);
- f.c.filterParkedOrders('');assert.ok(cards.every(x=>!x.hidden));assert.equal(empty.hidden,true);
- assert.equal(JSON.stringify(f.c.state.parked),before);assert.ok(f.c.parkedOrderMatchesName('', 'без подписи'));
+test('parked receipts sort by Russian name with natural numbers, unnamed last, newest first for equal names',()=>{
+ const f=fixture();f.c.state.parked=[
+ {id:'ten',orderLabel:'Стол 10',createdAt:10},{id:'blank',orderLabel:'',createdAt:90},
+ {id:'two-old',orderLabel:'стол 2',createdAt:1},{id:'two-new',orderLabel:' Стол 2 ',createdAt:2},
+ {id:'a',orderLabel:'Александр',createdAt:3},{id:'spaces',orderLabel:'   ',createdAt:80}
+ ];
+ const before=JSON.stringify(f.c.state.parked);f.c.openParkedModal();
+ const ids=[...f.html().matchAll(/onclick="resumeParked\('([^']+)'\)"/g)].map(m=>m[1]);
+ assert.deepEqual(ids,['a','two-new','two-old','ten','blank','spaces']);
+ assert.equal(JSON.stringify(f.c.state.parked),before);assert.doesNotMatch(f.html(),/parked-order-search|Поиск по названию/);
 });
