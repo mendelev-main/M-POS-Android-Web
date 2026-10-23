@@ -79,6 +79,17 @@ internal object MPosReceiptLayout {
             else if(payments.size>1){add("Платежи",small);for((i,payment) in payments.withIndex()){val method=payment.optString("method");val label=if(method=="cash")"Наличные" else if(method=="card")"Карта" else "Платёж";pair("Платёж ${i+1} · $label",money(number(payment,"amount")),gap=3f);if(method=="cash"&&number(payment,"cashGiven")>0){pair("  Внесено",money(number(payment,"cashGiven")),small,gap=2f);pair("  Сдача",money(number(payment,"change")),small,gap=4f)}}}
             else if(payments.isNotEmpty()){val p=payments.first();val cash=p.optString("method",order.optString("method"))=="cash";pair(if(cash)"Наличные" else "Карта",money(number(p,"amount",number(order,"total"))),gap=3f);val given=number(p,"cashGiven",number(order,"cashGiven"));if(cash&&given>0){pair("Внесено",money(given),gap=3f);pair("Сдача",money(number(p,"change",number(order,"change"))),medium,600,10f)}}
             else {val cash=order.optString("method")=="cash";pair(if(cash)"Наличные" else "Карта",money(number(order,"total")),gap=3f);if(cash&&number(order,"cashGiven")>0){pair("Внесено",money(number(order,"cashGiven")),gap=3f);pair("Сдача",money(number(order,"change")),medium,600,10f)}}
+            if(kind=="receipt"&&!order.has("returnedAt")&&!order.optJSONObject("customer")?.optString("id").isNullOrBlank()&&order.optJSONObject("loyaltySync")?.optString("status")=="synced") {
+                for(program in objects(order.optJSONArray("loyaltyReceiptProgress"))) {
+                    val goal=number(program,"goal");val filled=number(program,"filled")
+                    if(!goal.isFinite()||goal%1.0!=0.0||goal<1||goal>1000||!filled.isFinite()||filled<0||filled>goal)continue
+                    val name=program.optString("name").trim();if(name.isEmpty())continue
+                    sep(7f);add("Акция · "+name,medium,600,false,5f)
+                    (0 until goal.toInt()).toList().chunked(12).forEach { dots ->
+                        add(dots.joinToString(" "){if(it<filled.toInt())"●" else "○"},medium,400,false,5f)
+                    }
+                }
+            }
             sep(9f);pair(date(number(order,"timestamp").toLong()),order.optString("receiptDisplayNumber","#—"),small,gap=8f)
             val phrases=cfg.optJSONArray("receiptRandomPhrases")?.let{(0 until it.length()).map{index->it.optString(index).trim()}.filter{it.isNotEmpty()}} ?: emptyList()
             if(phrases.isNotEmpty()){add("",small,center=true,gap=5f);add(choosePhrase(phrases),center=true,gap=10f)}

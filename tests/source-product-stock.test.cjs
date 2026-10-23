@@ -2661,3 +2661,20 @@ test('parking duplicate labels allocates distinct names and re-parking a resumed
  assert.equal(f.c.uniqueParkedOrderLabel('Заказ',[{orderLabel:'Заказ'},{orderLabel:'Заказ (3)'}]),'Заказ (2)');
  assert.equal(f.c.uniqueParkedOrderLabel('',[]),'');
 });
+
+test('paid receipt stores confirmed post-sale loyalty progress and waits for one shared publication',async()=>{
+ const f=fixture();const order={id:'receipt',customer:{id:'customer'},items:[],loyaltySync:{status:'pending'}};f.state.orders=[order];
+ let release,calls=0;const gate=new Promise(resolve=>{release=resolve});
+ f.c.loyaltyApi=async()=>{calls++;await gate;return {programs:[{id:'p',name:'Пицца',required_quantity:6,progress:4,rewards:0}],events:[{programId:'p',progress:4,rewards:0}]}};
+ const sending=f.c.publishPaidOrderLoyalty(order),printing=f.c.awaitReceiptLoyalty(order);assert.strictEqual(sending,printing);
+ release();await printing;assert.equal(calls,1);assert.equal(order.loyaltyReceiptProgress[0].filled,4);assert.equal(order.loyaltyReceiptProgress[0].goal,6);
+ assert.equal(JSON.parse(f.data.get('prilavok_orders'))[0].loyaltyReceiptProgress[0].filled,4);
+ f.c.loyaltyApi=async()=>({programs:[{id:'p',name:'Пицца',required_quantity:6,progress:5,rewards:0}]});await f.c.publishPaidOrderLoyalty(order);assert.equal(order.loyaltyReceiptProgress[0].filled,4);
+});
+test('receipt loyalty shows a completed row for an available gift and no unconfirmed progress',async()=>{
+ const f=fixture();assert.equal(f.c.receiptLoyaltyProgress([{id:'p',name:'Пицца',required_quantity:6,progress:0,rewards:1}])[0].filled,6);
+ assert.equal(f.c.receiptLoyaltyProgress([{required_quantity:0,progress:0,rewards:0}]).length,0);
+ const order={id:'offline',customer:{id:'customer'},items:[],loyaltySync:{status:'pending'}};f.state.orders=[order];f.c.loyaltyApi=async()=>{throw Error('offline')};
+ await f.c.awaitReceiptLoyalty(order);assert.equal(order.loyaltySync.status,'pending');assert.equal(order.loyaltyReceiptProgress,undefined);
+ f.c.loyaltyApi=async()=>({skipped:'consent_required',programs:[],events:[]});await f.c.awaitReceiptLoyalty(order);assert.equal(order.loyaltySync.status,'consent_required');assert.equal(order.loyaltyReceiptProgress,undefined);
+});

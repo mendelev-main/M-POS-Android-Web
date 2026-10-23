@@ -136,7 +136,28 @@ async function confirmPosLoyaltyConsent(){
  }catch(e){flash(e.message||'Согласие не сохранено. Повторите попытку')}
  finally{session.busy=false;if(button)button.disabled=false}
 }
-async function publishPaidOrderLoyalty(order){
+const paidLoyaltyTasks=new WeakMap();
+function publishPaidOrderLoyalty(order){
+ if(!order?.customer?.id)return Promise.resolve();
+ if(paidLoyaltyTasks.has(order))return paidLoyaltyTasks.get(order);
+ const task=performPaidOrderLoyalty(order).finally(()=>paidLoyaltyTasks.delete(order));
+ paidLoyaltyTasks.set(order,task);return task;
+}
+function awaitReceiptLoyalty(order){
+ if(!order?.customer?.id||order.returnedAt)return Promise.resolve();
+ if(paidLoyaltyTasks.has(order))return paidLoyaltyTasks.get(order);
+ if(['pending','sending'].includes(order.loyaltySync?.status))return publishPaidOrderLoyalty(order);
+ return Promise.resolve();
+}
+function receiptLoyaltyProgress(programs,events=[]){
+ return (Array.isArray(programs)?programs:[]).flatMap(program=>{
+  const goal=Number(program.required_quantity),event=events.find(e=>String(e.programId)===String(program.id));
+  const progress=Number(event?.progress??program.progress),rewards=Number(event?.rewards??program.rewards);
+  if(!Number.isSafeInteger(goal)||goal<1||goal>1000||!Number.isFinite(progress)||progress<0||!Number.isFinite(rewards)||rewards<0)return [];
+  return [{id:String(program.id),name:String(program.name||'Программа лояльности'),goal,filled:rewards>0?goal:Math.min(goal,Math.floor(progress))}];
+ });
+}
+async function performPaidOrderLoyalty(order){
  if(!order?.customer?.id||order.loyaltySync?.status==='sending')return;
  order.loyaltySync={...(order.loyaltySync||{}),status:'sending',attemptedAt:Date.now()};
  try{await window.PrilavokCore.Storage.set('orders',state.orders)}catch(e){order.loyaltySync={...(order.loyaltySync||{}),status:'pending',error:'local-persist-before-send',at:Date.now()};markStorageBroken(e);return}
@@ -147,7 +168,7 @@ async function publishPaidOrderLoyalty(order){
   order.loyaltyMembershipUnknown=false;
   await window.PrilavokCore.Storage.set('orders',state.orders);
  }
- const data=await loyaltyApi('/api/loyalty/sales',{method:'POST',body:JSON.stringify({orderId:order.id,customerId:order.customer.id,consentVersion:order.loyaltyConsentVersion??null,occurredAt:Number.isFinite(order.timestamp)?new Date(order.timestamp).toISOString():null,items:(order.items||[]).map(x=>({productId:x.productId,quantity:x.qty})),redemptions:order.loyaltyRedemptions||{},rewardAllocations:order.loyaltyRewardAllocations||{}})});order.loyaltySync={status:data.skipped==='consent_required'?'consent_required':'synced',at:Date.now(),events:data.events||[],skipped:data.skipped||null};if(data.skipped==='consent_required')flash('Чек оплачен. Лояльность не начислена: участие не подтверждено');await window.PrilavokCore.Storage.set('orders',state.orders);if(typeof window.dispatchEvent==='function'&&typeof window.CustomEvent==='function')window.dispatchEvent(new window.CustomEvent('mpos-loyalty-synced',{detail:{customerId:String(order.customer.id)}}));if(String(state.customer?.id)===String(order.customer.id))void loadCustomerLoyalty(order.customer.id).catch(()=>{});if(order.returnedAt&&order.loyaltyReversal?.status==='pending')await reverseOrderLoyalty(order)}
+ const data=await loyaltyApi('/api/loyalty/sales',{method:'POST',body:JSON.stringify({orderId:order.id,customerId:order.customer.id,consentVersion:order.loyaltyConsentVersion??null,occurredAt:Number.isFinite(order.timestamp)?new Date(order.timestamp).toISOString():null,items:(order.items||[]).map(x=>({productId:x.productId,quantity:x.qty})),redemptions:order.loyaltyRedemptions||{},rewardAllocations:order.loyaltyRewardAllocations||{}})});order.loyaltySync={status:data.skipped==='consent_required'?'consent_required':'synced',at:Date.now(),events:data.events||[],skipped:data.skipped||null};if(!data.skipped&&!Array.isArray(order.loyaltyReceiptProgress))order.loyaltyReceiptProgress=receiptLoyaltyProgress(data.programs,data.events||[]);if(data.skipped==='consent_required')flash('Чек оплачен. Лояльность не начислена: участие не подтверждено');await window.PrilavokCore.Storage.set('orders',state.orders);if(typeof window.dispatchEvent==='function'&&typeof window.CustomEvent==='function')window.dispatchEvent(new window.CustomEvent('mpos-loyalty-synced',{detail:{customerId:String(order.customer.id)}}));if(String(state.customer?.id)===String(order.customer.id))void loadCustomerLoyalty(order.customer.id).catch(()=>{});if(order.returnedAt&&order.loyaltyReversal?.status==='pending')await reverseOrderLoyalty(order)}
  catch(e){flash(['LOYALTY_CONSENT_REQUIRED','LOYALTY_EVENT_TIME_INVALID'].includes(e?.code)?'Чек оплачен. Лояльность не начислена: требуется проверка участия':'Чек оплачен. Начисление лояльности ожидает связи с сервером');order.loyaltySync={status:['LOYALTY_CONSENT_REQUIRED','LOYALTY_EVENT_TIME_INVALID'].includes(e?.code)?'consent_required':'pending',error:String(e?.message||e),at:Date.now()};try{await window.PrilavokCore.Storage.set('orders',state.orders)}catch(storageError){markStorageBroken(storageError)}}
 }
 async function reverseOrderLoyalty(order){

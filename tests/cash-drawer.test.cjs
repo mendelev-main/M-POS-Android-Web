@@ -50,3 +50,11 @@ test('printer test prints once and sends one pulse to the selected drawer printe
  for(const key of ['mp-print-receipts','mp-auto','mp-drawer-enabled'])f.fields[key]={checked:true};
  f.c.testPrinterFromPage();assert.equal(f.posts.filter(p=>p.action==='print'&&p.order.__networkTest).length,1);assert.equal(drawerJobs(f).length,1);assert.equal(drawerJobs(f)[0].order.__drawerReason,'test');
 });
+
+test('loyalty receipt waits for confirmed progress while cash drawer and kitchen stay immediate',async()=>{
+ const f=fixture([receipt('a',{printOrders:true})]);let release;f.c.awaitReceiptLoyalty=()=>new Promise(resolve=>{release=resolve});
+ const order={...cash,customer:{id:'customer'}};const printing=f.c.printCompletedOrder(order);
+ assert.equal(drawerJobs(f).length,1);assert.equal(f.posts.filter(p=>p.action==='print'&&p.order.__printDocumentType==='receipt').length,0);
+ order.loyaltyReceiptProgress=[{name:'Пицца',goal:6,filled:4}];release();await printing;
+ const receipts=f.posts.filter(p=>p.action==='print'&&p.order.__printDocumentType==='receipt');assert.equal(receipts.length,2);assert.equal(receipts[0].order.loyaltyReceiptProgress[0].filled,4);
+});

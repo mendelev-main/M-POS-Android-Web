@@ -132,6 +132,12 @@ class MPosDocumentParityTest {
         val report=JSONObject().put("company","ПРИЛАВОК").put("sections",JSONArray().put(JSONObject().put("title","Товары").put("headers",JSONArray(listOf("Товар","Остаток"))).put("rows",rows))).put("notes",JSONArray(listOf("Пояснение ".repeat(350))))
         val pages=PreviewPages(842,595,"warehouse-long");MPosWarehousePdf.write(report,File(directory,"warehouse-long.pdf"),pages);assertTrue(pages.number>2)
     }
+    @Test fun loyaltyReceiptPreviews(){
+        for(width in listOf(58,80)) {
+            val data=JSONObject("""{"customer":{"id":"customer"},"loyaltySync":{"status":"synced"},"loyaltyReceiptProgress":[{"name":"Пицца","goal":6,"filled":4},{"name":"Кофе","goal":6,"filled":6}],"items":[{"name":"Маргарита","qty":2,"price":12}],"total":24,"method":"card"}""").put("__printerConfig",JSONObject().put("paperWidth",width))
+            val bitmap=EscPosRaster.render(data);save(bitmap,"receipt-loyalty-$width.png");bitmap.recycle()
+        }
+    }
     private fun save(bitmap:Bitmap,name:String){File(directory,name).outputStream().use{assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,it))}}
     /** Same layout/Canvas calls as PdfDocument; Robolectric 4.14 has no PDF native bridge. */
     private inner class PreviewPages(private val width:Int,private val height:Int,private val name:String):MPosDocumentPages {
