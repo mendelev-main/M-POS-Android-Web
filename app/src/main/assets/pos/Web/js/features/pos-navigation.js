@@ -234,6 +234,16 @@ function openPosCategory(category){
   render();
 }
 function closePosCategory(){ if(window._posFolderModal){closeModal();return;} if(state.posFolder){state.posFolder='';state.search='';render();return;} state.posPath=null; state.search=''; state.editMode=false; render(); }
+function highlightPosProductTiles(productId){
+  if(!productId||state.editMode)return;
+  for(const tile of document.querySelectorAll('.layout-tile[data-tile-type="product"]')){
+    if(tile.dataset.id!==String(productId))continue;
+    const card=tile.querySelector('.pcard');if(!card)continue;
+    card.classList.remove('product-tile-pressed');void card.offsetWidth;
+    card.classList.add('product-tile-pressed');
+    setTimeout(()=>card.classList.remove('product-tile-pressed'),680);
+  }
+}
 function handlePosGridClick(e){
   if(Date.now()<(window._posSuppressClickUntil||0))return;
   const tile=e.target.closest('.layout-tile');
