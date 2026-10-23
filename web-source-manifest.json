@@ -1,6 +1,6 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "ddca9c8223b354bc5a8c4a9582cd3ebc3179370c",
+  "sourceCommit": "f26acce8538fb7993f06cb0c32cd19bbf3990959",
   "files": {
     "pos.html": "5d6b421366831962ef48197017ee6ee39cf85187eabbf044f3d6c797642c52d7",
     "network-printer.js": "0b99f65eccd79e09038bce293d53ffc80075faa888dd703bff64ded44966aaf1",

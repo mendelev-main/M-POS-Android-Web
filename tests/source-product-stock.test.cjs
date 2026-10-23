@@ -2458,6 +2458,7 @@ test('fast payment awaits client membership before capturing the version',async(
 test('offline payment records unknown membership and resolves it before sending only once',async()=>{
  const f=fixture();f.cart();f.state.customer={id:'c'};f.state.loyaltyCustomerId='';f.c.loyaltyApi=async()=>{throw Error('offline')};
  await f.c.finalizePayment([{method:'cash',amount:10}]);const order=f.state.orders[0];assert.ok(order);assert.equal(order.loyaltyMembershipUnknown,true);
+ await f.c.awaitReceiptLoyalty(order);
  order.loyaltySync={status:'pending'};let posted;
  f.c.loyaltyApi=async(path,options)=>options?(posted=JSON.parse(options.body),{events:[]}):{membership:{active:true,version:5}};
  await f.c.publishPaidOrderLoyalty(order);assert.equal(posted.consentVersion,5);assert.equal(order.loyaltyMembershipUnknown,false);
