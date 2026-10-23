@@ -1467,6 +1467,23 @@ test('repeated employee save while storage is pending cannot create duplicates',
 });
 
 function navigationFixture(){const f=fixture();f.state.products=[{id:'a',name:'А',category:'Пицца',type:'simple',stock:10,price:5,sortOrder:0},{id:'b',name:'Б',category:'Пицца',type:'simple',stock:10,price:6,sortOrder:1},{id:'c',name:'В',category:'Пицца',type:'simple',stock:10,sortOrder:2}];f.fields['modal-root']={innerHTML:''};f.fields['pos-folder-grid']={dataset:{},addEventListener:()=>{}};f.c.closeModal=()=>{f.c._posFolderModal=null;f.fields['modal-root'].innerHTML='';};f.state.posPath='Пицца';f.state.posFolder='';f.state.editMode=true;f.fields['pos-folder-name']={value:'Популярное'};return f;}
+test('repeated folder sales keep folder open until explicit close',()=>{
+ const f=navigationFixture();f.state.editMode=false;f.state.tab='pos';
+ f.state.posNavigation={version:1,categories:[{category:'Пицца',items:[{type:'folder',id:'folder',name:'Папка',parentId:''},{type:'product',id:'a',parentId:'folder'}]}]};
+ f.c.openPosFolder('folder');f.c.addToCart('a');f.c.addToCart('a');
+ assert.equal(f.state.cart[0].qty,2);assert.equal(f.c._posFolderModal.id,'folder');
+ f.c.closeModal();assert.equal(f.c._posFolderModal,null);
+});
+test('product dialogs return to original folder on cancel or successful add, but never resurrect an exited category',()=>{
+ const f=navigationFixture();f.state.editMode=false;f.state.tab='pos';
+ vm.runInContext(inline.match(/^function closeModal[^\n]+/m)[0],f.c);
+ f.state.posNavigation={version:1,categories:[{category:'Пицца',items:[{type:'folder',id:'folder',name:'Папка',parentId:''},{type:'product',id:'a',parentId:'folder'}]}]};
+ f.c.openPosFolder('folder');const p=f.c.getProduct('a');p.price=0;
+ f.c.addToCart('a');assert.equal(f.c._posFolderModal,null);f.c.closeModal();assert.equal(f.c._posFolderModal.id,'folder');assert.equal(f.state.cart.length,0);
+ f.c.addToCart('a');f.fields['manual-sale-price']={value:'7.50'};f.c.confirmManualPrice();assert.equal(f.state.cart[0].price,7.5);assert.equal(f.c._posFolderModal.id,'folder');
+ f.c.document.querySelectorAll=()=>[];f.c.openModifierSelection('a');f.c.closeModal();assert.equal(f.c._posFolderModal.id,'folder');
+ f.c.openManualPriceModal(p);f.state.posPath=null;f.c.closeModal();assert.equal(f.c._posFolderModal,null);assert.equal(f.c._cartProductFolder,null);
+});
 test('navigation folders persist without changing products and restore after restart',async()=>{
  const f=navigationFixture(),before=JSON.stringify(f.state.products);await f.c.savePosFolder();const folder=f.state.posNavigation.categories[0].items.find(i=>i.type==='folder');assert.ok(folder);await f.c.movePosProduct('a',folder.id);assert.equal(JSON.stringify(f.state.products),before);assert.ok(f.writes.every(k=>k==='prilavok_posNavigation'));assert.equal(f.c.posVisibleCategoryItems().filter(i=>i.type==='product').length,2);
  f.c.openPosFolder(folder.id);assert.equal(f.c.posVisibleCategoryItems()[0].id,'a');f.c.closePosCategory();assert.equal(f.state.posPath,'Пицца');assert.equal(f.state.posFolder,'');

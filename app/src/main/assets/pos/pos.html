@@ -1243,6 +1243,7 @@
   .parked-modal-close{display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;border-radius:12px;background:var(--bg);color:var(--muted);}.parked-modal-close svg{width:22px;height:22px;}
   .parked-orders-list{display:flex;flex-direction:column;gap:8px;}
   .parked-order-card{display:flex;align-items:center;gap:12px;min-width:0;padding:0 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);}
+  .parked-order-card[hidden],#parked-search-empty[hidden]{display:none;}
   .parked-order-tile{flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) 110px 104px;align-items:center;gap:16px;min-height:66px;padding:10px 0;text-align:left;}
   .parked-order-tile:active{background:var(--bg);}.parked-order-tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px;}
   .parked-order-heading{display:flex;flex-direction:column;gap:3px;min-width:0;}
@@ -2621,7 +2622,7 @@ function showModal(html, wide){
       <div class="modal ${wide?'wide':''}">${html}</div>
     </div>`;
 }
-function closeModal(){if(window._pendingBackupImport){cancelPreparedBackupImages(window._pendingBackupImport.imageIds);window._pendingBackupImport=null}window._posFolderModal=null;document.getElementById('modal-root').innerHTML = '';}
+function closeModal(){if(window._pendingBackupImport){cancelPreparedBackupImages(window._pendingBackupImport.imageIds);window._pendingBackupImport=null}window._posFolderModal=null;document.getElementById('modal-root').innerHTML = '';if(typeof restoreCartProductFolder==='function')restoreCartProductFolder();}
 
 /* ============================= BACKUP ============================= */
 /* Backup runtime: Web/js/features/backup.js */
