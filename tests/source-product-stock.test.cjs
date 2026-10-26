@@ -1183,8 +1183,30 @@ test('deleted order cannot be received and missing product cannot partially appl
  const f=invoiceFixture();f.state.purchaseOrders[0].status='deleted';const before=JSON.stringify(f.state);f.c.applyReceivingDocument();assert.equal(JSON.stringify(f.state),before);
  const g=invoiceFixture();g.c._receivingPending.draft.lines.push({productId:'missing',qtyInput:'2',unit:'',totalInput:'3'});const original=JSON.stringify(g.state);g.c.applyReceivingDocument();assert.equal(JSON.stringify(g.state),original);
 });
-test('cost cannot be manually changed in an existing product save',async()=>{
- const f=editorFixture();f.fields['pf-cost'].value='999';await f.c.saveProduct('flour');near(f.c.getProduct('flour').cost,2);
+test('administration can correct existing cost and negative stock without an open shift',async()=>{
+ const f=editorFixture();f.state.shifts=[];f.fields['pf-cost'].value='3.5';f.fields['pf-stock'].value='-2';
+ assert.equal(await f.c.saveProduct('flour'),true);near(f.c.getProduct('flour').cost,3.5);near(f.c.getProduct('flour').stock,-2);
+});
+test('manual cost and stock corrections preserve base units',async()=>{
+ const f=editorFixture();Object.assign(f.c.getProduct('flour'),{stockUnit:'kg',stockDisplayUnit:'kg'});
+ f.c._pmBaseUnit='kg';f.c._pmUnit='g';f.fields['pf-stock'].value='12500';f.fields['pf-cost'].value='0.003';
+ assert.equal(await f.c.saveProduct('flour'),true);near(f.c.getProduct('flour').stock,12.5);near(f.c.getProduct('flour').cost,3);
+});
+test('invalid manual cost or stock cannot change saved products',async()=>{
+ for(const [field,value] of [['pf-cost','-1'],['pf-cost','Infinity'],['pf-cost','bad'],['pf-stock','Infinity'],['pf-stock','bad']]){
+  const f=editorFixture(),before=JSON.stringify(f.state.products);f.fields[field].value=value;
+  assert.notEqual(await f.c.saveProduct('flour'),true);assert.equal(JSON.stringify(f.state.products),before);assert.equal(f.writes.length,0);
+ }
+});
+test('ending administration before save blocks cost and stock corrections',async()=>{
+ const f=editorFixture(),before=JSON.stringify(f.state.products);f.fields['pf-cost'].value='3';f.fields['pf-stock'].value='-2';
+ f.c.currentShiftEmployeeIsAdmin=()=>false;
+ assert.equal(await f.c.saveProduct('flour'),false);assert.equal(JSON.stringify(f.state.products),before);assert.equal(f.writes.length,0);
+});
+test('failed persistence keeps previous cost and stock',async()=>{
+ const f=editorFixture(),before=JSON.stringify(f.state.products);f.fields['pf-cost'].value='3';f.fields['pf-stock'].value='-2';
+ f.c.localStorage.setItem=()=>{throw Error('fixture storage failure')};
+ assert.notEqual(await f.c.saveProduct('flour'),true);assert.equal(JSON.stringify(f.state.products),before);
 });
 test('text and native share payload preserve fractional package request',()=>{
  const f=fixture();const order={id:'p',supplierName:'Supplier',items:[{productId:'flour',productName:'Мука',qty:0,requestedQty:1.5,requestedUnit:'box'}],timestamp:1};f.state.purchaseOrders=[order];

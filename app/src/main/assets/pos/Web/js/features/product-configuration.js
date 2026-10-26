@@ -126,14 +126,14 @@ function renderTypeFields(){
       <p class="pe-note">${editing?.stockUnit?'При смене кг ↔ г или л ↔ мл значения карточки пересчитываются.':'Первое назначение единицы сохраняет текущие числа: остаток 5 станет 5 выбранных единиц. Проверьте существующие рецептуры.'} Приёмки и продажи используют базовую единицу: ${unitLabel(window._pmBaseUnit)}. Цена продажи не пересчитывается.</p></div>
       <div class="grid-2">
         <div class="field"><label>Себестоимость за 1 ${unitLabel(window._pmUnit)}</label>
-          <input type="number" id="pf-cost" ${editing?'readonly aria-readonly="true"':''} inputmode="decimal" value="${escapeAttr(String(window._pmSimpleDraft?.cost??''))}" placeholder="0">
+          <input type="number" id="pf-cost" ${!window._pmStockUnlocked?'disabled':''} min="0" step="any" inputmode="decimal" value="${escapeAttr(String(window._pmSimpleDraft?.cost??''))}" placeholder="0">
         </div>
         <div class="field"><label>${editing?'Текущий остаток':'Начальный остаток'}, ${unitLabel(window._pmUnit)}</label>
           <input type="number" id="pf-stock" inputmode="decimal" value="${escapeAttr(String(window._pmSimpleDraft?.stock??''))}" placeholder="0" ${!window._pmStockUnlocked?'disabled':''}>
           ${!window._pmStockUnlocked ? `<div class="center-note configuration-access-note">Данные конфигурации доступны только администратору.</div>` : ''}
         </div>
       </div>
-      <p class="pe-note">${editing?'Себестоимость изменяется только при приёмке по средневзвешенной стоимости.':'Укажите начальную себестоимость. После создания её будут изменять приёмки.'}</p>
+      <p class="pe-note">В сессии администрирования можно исправить себестоимость и остаток. При следующей приёмке себестоимость пересчитается по средневзвешенной стоимости.</p>
       <div class="pe-card configuration-card purchase-configuration-card"><strong>Как обычно закупаем</strong><p class="pe-note">Эти значения автоматически подставятся в следующий заказ, но их всегда можно изменить.</p><div class="pe-two-fields"><div class="field"><label for="pf-purchase-unit">Единица закупки</label><select id="pf-purchase-unit" onchange="captureSimpleProductDraft();renderTypeFields()">${purchaseUnitOptions({...editing,type:'simple',stockUnit:window._pmBaseUnit},window._pmSimpleDraft?.purchaseUnit??editing?.purchaseUnit??window._pmBaseUnit)}</select></div><div class="field"><label for="pf-pack-size">Количество внутри</label><input id="pf-pack-size" type="number" min="0" step="any" inputmode="decimal" value="${escapeAttr(String(window._pmSimpleDraft?.packSize??editing?.purchasePackSize??''))}" placeholder="Например, 12"></div></div><div class="field"><label for="pf-purchase-content-unit">Единица внутри</label><select id="pf-purchase-content-unit">${productUnitOptions(window._pmBaseUnit,window._pmSimpleDraft?.contentUnit??editing?.purchaseContentUnit??window._pmBaseUnit)}</select></div></div>
       <div class="field"><label for="pf-min-stock">Минимальный остаток, ${unitLabel(window._pmUnit)}</label><input id="pf-min-stock" type="number" min="0" step="any" inputmode="decimal" value="${escapeAttr(String(window._pmSimpleDraft?.minimum??''))}" placeholder="Не задан"><p class="pe-note">Подсказка в карточке; не блокирует продажи и не создаёт заказ поставщику.</p></div>
       <div class="field no-stock-field">

@@ -45,8 +45,8 @@ async function saveProduct(editingId){
       if(canEditOnline)p.description = onlineDescription;
       if(window._pmRemoveImage) p.imageUrl = '';
       if(type==='simple'){
-        p.cost = parseFloat(document.getElementById('pf-cost').value) || 0;
-        p.stock = parseFloat(document.getElementById('pf-stock').value) || 0;
+        p.cost = Number(document.getElementById('pf-cost').value);
+        p.stock = Number(document.getElementById('pf-stock').value);
         delete p.components;
       } else {
         p.components = window._pmComponents;
@@ -60,8 +60,8 @@ async function saveProduct(editingId){
       const nextOrder = siblingOrders.length ? Math.max(...siblingOrders)+1 : 0;
       p = {id: uid(), name, category, price, type, tileSymbol, noStockTracking, allowNegativeStock, sortOrder: nextOrder, availableOnline: canEditOnline ? window._pmOnline !== false : false, availableInOnlineMenu: canEditOnline ? window._pmOnlineMenu !== false : false, description:canEditOnline?onlineDescription:'', imageUrl:''};
       if(type==='simple'){
-        p.cost = parseFloat(document.getElementById('pf-cost')?.value) || 0;
-        p.stock = parseFloat(document.getElementById('pf-stock')?.value) || 0;
+        p.cost = Number(document.getElementById('pf-cost')?.value||0);
+        p.stock = Number(document.getElementById('pf-stock')?.value||0);
       } else {
         p.components = window._pmComponents;
         p.recipeYield=Number(document.getElementById('pf-recipe-yield')?.value||window._pmRecipeYield||1);p.recipeUnit=document.getElementById('pf-recipe-unit')?.value||window._pmRecipeUnit||'piece';p.recipeYieldManual=!!window._pmRecipeYieldManual;
@@ -70,8 +70,11 @@ async function saveProduct(editingId){
     }
     validateModifierGroups(window._pmModifierGroups||[],editingId||p.id);
     p.modifierGroups=(window._pmModifierGroups||[]).map(normalizeModifierGroup);
+    if(p.type==='simple'){
+      if(!Number.isFinite(p.cost)||p.cost<0)throw new Error('Себестоимость должна быть неотрицательным числом');
+      if(!Number.isFinite(p.stock))throw new Error('Укажите корректный остаток');
+    }
     saveProductConfiguration(p);
-    if(editingId && p.type==='simple')p.cost=Number(getProduct(editingId)?.type==='simple'?getProduct(editingId).cost:compositeCost(getProduct(editingId)))||0;
     if(p.type==='simple'){
       const purchaseUnit=document.getElementById('pf-purchase-unit'),packSize=document.getElementById('pf-pack-size'),contentUnit=document.getElementById('pf-purchase-content-unit');
       if(purchaseUnit){p.purchaseUnit=purchaseUnit.value;p.purchaseContentUnit=contentUnit?.value||p.stockUnit;const raw=packSize?.value||'';if(raw!==''){if(!Number.isFinite(Number(raw))||Number(raw)<=0)throw new Error('Объём упаковки должен быть больше нуля');p.purchasePackSize=Number(raw);}else delete p.purchasePackSize;}
