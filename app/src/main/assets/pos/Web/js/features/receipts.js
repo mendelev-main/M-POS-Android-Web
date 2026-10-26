@@ -67,8 +67,8 @@ function viewReceiptModal(orderId){
     <div id="receipt-body">${receiptBodyHtml(order)}</div>${receiptPaymentCorrectionHistory(order)}
     <div class="receipt-modal-actions">
       <button class="btn receipt-action receipt-action-print" onclick="printReceipt('${order.id}')">Печать</button>
-      ${order.returnedAt ? `<div class="receipt-action receipt-return-sticker">Возврат</div>` : `<button type="button" class="btn receipt-action receipt-action-return" onclick="window.openReturnConfirm('${escapeAttr(order.id)}')">Вернуть</button>`}
       ${receiptPaymentCorrectionButton(order)}
+      ${order.returnedAt ? `<div class="receipt-action receipt-return-sticker">Возврат</div>` : `<button type="button" class="btn receipt-action receipt-action-return" onclick="window.openReturnConfirm('${escapeAttr(order.id)}')">Вернуть</button>`}
       <button class="btn receipt-action receipt-action-close" onclick="closeModal()">Закрыть</button>
     </div>
   `);
@@ -234,8 +234,9 @@ function renderReceiptsScreen(){
         ${selected ? `
           <div class="receipt-detail-title">Чек ${escapeHtml(selected.receiptDisplayNumber||'')}</div>
           <div id="receipt-body" class="receipt-detail-body">${receiptBodyHtml(selected)}</div>${receiptPaymentCorrectionHistory(selected)}
-          <div class="receipt-modal-actions receipt-detail-actions">${receiptPaymentCorrectionButton(selected)}
+          <div class="receipt-modal-actions receipt-detail-actions">
             <button class="btn receipt-action receipt-action-print receipt-detail-action" onclick="printReceipt('${escapeAttr(selected.id)}')">Печать</button>
+            ${receiptPaymentCorrectionButton(selected)}
             ${selected.returnedAt ? `<div class="receipt-action receipt-return-sticker receipt-detail-action">Возврат</div>` : `<button type="button" class="btn receipt-action receipt-action-return receipt-detail-action" onclick="window.openReturnConfirm('${escapeAttr(selected.id)}')">Вернуть</button>`}
           </div>
         ` : `<div class="center-note">Выберите чек слева.</div>`}

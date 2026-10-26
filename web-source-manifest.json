@@ -1,8 +1,8 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "e9e0c7ce0682ab23a8fcf8b9398f9f57244aed67",
+  "sourceCommit": "4d94b97f7d1e089c59ed31543599e866929c3cf4",
   "files": {
-    "pos.html": "2b447b780fe09b4f4c5ecf4348a70af49b0c24e3fd293cff5100d1271c5e9f2a",
+    "pos.html": "60da45e982b7c39b3c1ac0775ec994a1776b864d0adba130526fb6b2adfc9e18",
     "network-printer.js": "c63f34cb4acf62c75b198c7cc7bdd43a84ce0a058495bec2621f23270872f05d",
     "notification-native.js": "01df1dcaf6f7dc5c28372a842a4b123552547a7988d5a14776504453a7dc3069",
     "Web/fonts/Manrope-Variable.ttf": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
@@ -12,7 +12,7 @@
     "Web/js/features/availability.js": "2a46389555a12b7b66d602a6311444b5d0bf751e12e20198043b2c44c7cc4967",
     "Web/js/features/backup.js": "67283b48327b6fc220e910e42378ec9ce66f5ee4ec07f15677446305472f86b0",
     "Web/js/features/cart-composition.js": "d087f2933434174399658dce6b40519bed27ce158255222d217bd7d1e643b746",
-    "Web/js/features/cart-presentation.js": "5b6e42ed7e768215353ff254340f376effcf10b5f5594db3d357e4537ef36ada",
+    "Web/js/features/cart-presentation.js": "300187a7aafdc724cc3141325c1b24683a68a1379badc712d88decf35f3fbf03",
     "Web/js/features/delivery-tariffs.js": "3fccee015f94aff434550593796278c50a0efe9270169d7fbc878e91f02def6f",
     "Web/js/features/employees.js": "dfd0757756138d3f5ebfeb7bf152d48334abac046ca299d0d1a5868891e92ceb",
     "Web/js/features/hall-bookings.js": "44d342fdd3e0c81011b23f02fefb9e3221dcf08872eacbbb5938e0e4e52a53e8",
@@ -29,7 +29,7 @@
     "Web/js/features/product-persistence.js": "9c0827646bc9ea8f4db607ead4ea835e0048c549d2aec0080f048a3d2322bf82",
     "Web/js/features/product-photo.js": "a3eacce4e8c560e4e8b98e8c68726eee05220aa3e763a6d9cd9f8fced95f2294",
     "Web/js/features/purchase-orders.js": "0a3bc675e3f06291fe07378866be86674175451762fc4e788f3948c717e687db",
-    "Web/js/features/receipts.js": "dd5f4b08f59be09fc3f2d8ba29f6e621ff057e5747119e87d2fbabd380a63d68",
+    "Web/js/features/receipts.js": "2813397fc5ea10761dbf414ddc0b7a5885a847c426eaba6f9af0d8e6408d00c7",
     "Web/js/features/receiving-drafts.js": "af8d9be92fa3686466800016ee61bc5532c7c601ff4f17f823eb0ebc1fd2b178",
     "Web/js/features/receiving-ui.js": "8719ad718461b3a6869e323d94ac17648ee944a920d58bb00fdc069138ec3ff1",
     "Web/js/features/receiving.js": "4776d030adf1861f65d01f93330f61ab361cbb65272ed9247f43def12fff35d4",
