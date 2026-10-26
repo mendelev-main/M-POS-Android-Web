@@ -1,3 +1,61 @@
+// Correct the recorded tender, without repeating a sale, refund or device action.
+let receiptPaymentCorrection=null;
+function receiptPaymentName(method){return method==='cash'?'Наличные':method==='card'?'Карта':'Наличные + карта';}
+function receiptPaymentCorrectionError(order){
+ if(!order)return 'Чек не найден';
+ if(order.returnedAt)return 'Способ оплаты возвращённого чека изменить нельзя';
+ if(!['cash','card'].includes(order.method))return 'Изменение разделённой оплаты пока недоступно';
+ const total=Number(order.total);
+ if(!Number.isFinite(total)||total<0||!Number.isSafeInteger(Math.round(total*100)))return 'Некорректная сумма чека';
+ if(order.payments!=null&&(!Array.isArray(order.payments)||order.payments.length!==1||order.payments[0]?.method!==order.method||!Number.isFinite(Number(order.payments[0]?.amount))||Math.round(Number(order.payments[0].amount)*100)!==Math.round(total*100)))return 'Некорректные данные оплаты чека';
+ const shift=state.shifts.find(s=>s.id===order.shiftId);
+ if(!shift||!['open','closed'].includes(shift.status))return 'Не найдена кассовая смена чека';
+ if(currentShiftEmployeeIsAdmin())return '';
+ if(shift.status!=='open'||currentShift()?.id!==shift.id)return 'После закрытия смены изменить оплату может только администратор';
+ return '';
+}
+function receiptPaymentCorrectionButton(order){
+ if(!order||order.returnedAt||!['cash','card'].includes(order.method))return '';
+ return `<button type="button" class="btn receipt-action receipt-action-payment" onclick="openReceiptPaymentCorrection(${escapeAttr(JSON.stringify(order.id))})">Изменить оплату</button>`;
+}
+function receiptPaymentCorrectionHistory(order){
+ const rows=Array.isArray(order?.paymentCorrections)?order.paymentCorrections:[];
+ if(!rows.length)return '';
+ return `<section class="receipt-payment-history"><strong>Исправления оплаты</strong>${rows.slice().reverse().map(h=>`<div><span>${escapeHtml(receiptPaymentName(h.from))} → ${escapeHtml(receiptPaymentName(h.to))}</span><small>${escapeHtml(fmtDate(h.at))} · ${escapeHtml(h.employeeName||'Сотрудник')}${h.administration?' · Администратор':''}</small></div>`).join('')}</section>`;
+}
+function openReceiptPaymentCorrection(orderId){
+ if(criticalOperationBusy){flash('Сохранение операции ещё не завершено');return false;}
+ const order=state.orders.find(o=>o.id===orderId),error=receiptPaymentCorrectionError(order);
+ if(error){flash(error);return false;}
+ const to=order.method==='cash'?'card':'cash';
+ receiptPaymentCorrection={orderId,to,baseline:JSON.stringify(order)};
+ showModal(`<div class="modal-title">Изменить способ оплаты</div><div class="receipt-payment-change"><span>${receiptPaymentName(order.method)}</span><span aria-hidden="true">→</span><strong>${receiptPaymentName(to)}</strong></div><p class="settings-note">Чек ${escapeHtml(order.receiptDisplayNumber||'')} на ${fullMoney(order.total)}. Изменятся способ оплаты и итоги исходной смены. Сумма и товары останутся прежними.</p><p class="setting-sub">Исправляется запись в приложении. Операция по банковскому терминалу не выполняется.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="confirmReceiptPaymentCorrection()">${to==='card'?'Изменить на карту':'Изменить на наличные'}</button></div>`);
+ return true;
+}
+async function confirmReceiptPaymentCorrection(){
+ if(criticalOperationBusy){flash('Сохранение операции ещё не завершено');return false;}
+ const draft=receiptPaymentCorrection;if(!draft)return false;
+ const order=state.orders.find(o=>o.id===draft.orderId),error=receiptPaymentCorrectionError(order);
+ if(error){flash(error);return false;}
+ if(JSON.stringify(order)!==draft.baseline){flash('Чек изменился. Откройте изменение оплаты заново');return false;}
+ if(!['cash','card'].includes(draft.to)||draft.to===order.method)return false;
+ const nextOrders=storageSnapshot(state.orders),next=nextOrders.find(o=>o.id===order.id),admin=currentShiftEmployeeIsAdmin();
+ const employee=admin?state.employees.find(e=>e.role==='admin'):state.employees.find(e=>e.id===currentShift()?.employeeId);
+ const actorShift=currentShift();
+ const history={id:uid(),at:Date.now(),from:order.method,to:draft.to,administration:admin,employeeId:employee?.id||(admin?'':actorShift?.employeeId||''),employeeName:employee?.name||employee?.fullName||(admin?'Администратор':actorShift?.employeeName||'Сотрудник'),previousPayments:storageSnapshot(order.payments??null),previousCashGiven:order.cashGiven??null,previousChange:order.change??null};
+ next.paymentCorrections=[...(Array.isArray(next.paymentCorrections)?next.paymentCorrections:[]),history];
+ next.method=draft.to;next.payments=[{method:draft.to,amount:Math.round(Number(next.total)*100)/100,cashGiven:null,change:null}];
+ // The actual banknote amount is unknown after a correction. Do not invent change.
+ next.cashGiven=null;next.change=null;
+ criticalOperationBusy=true;
+ try{await commitCriticalStorage('correct-receipt-payment',{orders:nextOrders});}
+ catch(e){flash('Оплата не изменена: '+(e?.message||e));return false;}
+ finally{criticalOperationBusy=false;}
+ state.orders=nextOrders;receiptPaymentCorrection=null;
+ try{closeModal();state.selectedReceiptId=next.id;render();flash('Способ оплаты изменён');}catch(e){console.error('Оплата сохранена, но экран не обновлён');}
+ return true;
+}
+
 function showReceipt(order){
   showPaymentReceipt(order);
 }
@@ -6,10 +64,11 @@ function viewReceiptModal(orderId){
   if(!order) return;
   showModal(`
     <div class="modal-title">Чек</div>
-    <div id="receipt-body">${receiptBodyHtml(order)}</div>
+    <div id="receipt-body">${receiptBodyHtml(order)}</div>${receiptPaymentCorrectionHistory(order)}
     <div class="receipt-modal-actions">
       <button class="btn receipt-action receipt-action-print" onclick="printReceipt('${order.id}')">Печать</button>
       ${order.returnedAt ? `<div class="receipt-action receipt-return-sticker">Возврат</div>` : `<button type="button" class="btn receipt-action receipt-action-return" onclick="window.openReturnConfirm('${escapeAttr(order.id)}')">Вернуть</button>`}
+      ${receiptPaymentCorrectionButton(order)}
       <button class="btn receipt-action receipt-action-close" onclick="closeModal()">Закрыть</button>
     </div>
   `);
@@ -174,8 +233,8 @@ function renderReceiptsScreen(){
       <div class="card receipt-detail-card">
         ${selected ? `
           <div class="receipt-detail-title">Чек ${escapeHtml(selected.receiptDisplayNumber||'')}</div>
-          <div id="receipt-body" class="receipt-detail-body">${receiptBodyHtml(selected)}</div>
-          <div class="receipt-modal-actions receipt-detail-actions">
+          <div id="receipt-body" class="receipt-detail-body">${receiptBodyHtml(selected)}</div>${receiptPaymentCorrectionHistory(selected)}
+          <div class="receipt-modal-actions receipt-detail-actions">${receiptPaymentCorrectionButton(selected)}
             <button class="btn receipt-action receipt-action-print receipt-detail-action" onclick="printReceipt('${escapeAttr(selected.id)}')">Печать</button>
             ${selected.returnedAt ? `<div class="receipt-action receipt-return-sticker receipt-detail-action">Возврат</div>` : `<button type="button" class="btn receipt-action receipt-action-return receipt-detail-action" onclick="window.openReturnConfirm('${escapeAttr(selected.id)}')">Вернуть</button>`}
           </div>

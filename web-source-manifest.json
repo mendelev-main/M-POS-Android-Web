@@ -1,8 +1,8 @@
 {
   "sourceRepository": "mendelev-main/prilavok-pos-ipad",
-  "sourceCommit": "c2448973607ccbd235ce28f574d248cf1e651bbd",
+  "sourceCommit": "209011bad642fe5b97d87d2d8dffc944bb514320",
   "files": {
-    "pos.html": "5d6b421366831962ef48197017ee6ee39cf85187eabbf044f3d6c797642c52d7",
+    "pos.html": "06f83b1c24922d219e59e6d705c896b6bad189cac22d3b51a382c65cc6bb73a5",
     "network-printer.js": "0b99f65eccd79e09038bce293d53ffc80075faa888dd703bff64ded44966aaf1",
     "notification-native.js": "01df1dcaf6f7dc5c28372a842a4b123552547a7988d5a14776504453a7dc3069",
     "Web/fonts/Manrope-Variable.ttf": "3ae11c49db0455a3cc33e37d380f20fdb8c7f8b41dc07625c177e3d87a9d6ae6",
@@ -29,7 +29,7 @@
     "Web/js/features/product-persistence.js": "9c0827646bc9ea8f4db607ead4ea835e0048c549d2aec0080f048a3d2322bf82",
     "Web/js/features/product-photo.js": "a3eacce4e8c560e4e8b98e8c68726eee05220aa3e763a6d9cd9f8fced95f2294",
     "Web/js/features/purchase-orders.js": "0a3bc675e3f06291fe07378866be86674175451762fc4e788f3948c717e687db",
-    "Web/js/features/receipts.js": "b019a3a0936c5b344ffcff6f833490b733c2c2cb121bbe3773357e855d0e9768",
+    "Web/js/features/receipts.js": "dd5f4b08f59be09fc3f2d8ba29f6e621ff057e5747119e87d2fbabd380a63d68",
     "Web/js/features/receiving-drafts.js": "af8d9be92fa3686466800016ee61bc5532c7c601ff4f17f823eb0ebc1fd2b178",
     "Web/js/features/receiving-ui.js": "8719ad718461b3a6869e323d94ac17648ee944a920d58bb00fdc069138ec3ff1",
     "Web/js/features/receiving.js": "4776d030adf1861f65d01f93330f61ab361cbb65272ed9247f43def12fff35d4",
