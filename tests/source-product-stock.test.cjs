@@ -2778,3 +2778,13 @@ test('transfer preserves target web order identity and supports legacy kitchen s
  assert.equal(f.state.currentWebOrderId,'target-web');assert.equal(f.state.currentOrderSource,'web');assert.equal(f.c.__currentOrderPrintedItems.length,1);assert.equal(f.c.__currentOrderPrintedItems[0].qty,1);
  assert.equal(JSON.parse(f.data.get('prilavok_currentOrderSession')).webOrderId,'target-web');
 });
+
+test('automatic kitchen printing after a transfer sends only quantities missing from the combined ledger',async()=>{
+ const f=transferFixture();f.c.confirmMoveCurrentOrderChoice('target');await f.c.moveCurrentOrderIntoParked();
+ const posts=[];f.c.webkit={messageHandlers:{printer:{postMessage:p=>posts.push(plain(p))}}};f.c.document.documentElement={};f.c.document.querySelectorAll=()=>[];
+ f.data.set('printers',JSON.stringify([{id:'kitchen',ip:'192.0.2.10',enabled:true,printOrders:true,printReceipts:false,copies:1}]));vm.runInContext(printerScript,f.c);
+ const order={id:'combined',items:plain(f.state.cart),method:'card',total:31,kitchenPrinted:true,printedItems:plain(f.c.__currentOrderPrintedItems)};
+ f.c.printCompletedOrder(order);const kitchen=posts.filter(p=>p.action==='print'&&p.order.__printDocumentType==='kitchen');assert.equal(kitchen.length,1);assert.equal(kitchen[0].order.items.length,1);assert.equal(kitchen[0].order.items[0].qty,2);assert.equal(kitchen[0].order.items[0].comment,'Без лука');
+ posts.length=0;order.printedItems=f.c.kitchenPrintedSnapshot(order.items);f.c.printCompletedOrder(order);assert.equal(posts.length,0);
+ delete order.printedItems;f.c.printCompletedOrder(order);assert.equal(posts.length,0);
+});
