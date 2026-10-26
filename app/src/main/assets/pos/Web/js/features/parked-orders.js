@@ -235,7 +235,7 @@ function confirmMoveCurrentOrderChoice(id){
  showModal(`<div class="modal-title">Переместить и открыть чек?</div><div class="settings-note">Товары текущего заказа будут добавлены в <b>${escapeHtml(target.orderLabel||'Без подписи')}</b>. Чек откроется в рабочей зоне.</div><p class="setting-sub">Клиент, название, способ получения и доставка сохранятся от выбранного чека. Скидки программы лояльности пересчитаются для его клиента.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="openMoveCurrentOrderModal()">Назад</button><button class="btn btn-primary" onclick="moveCurrentOrderIntoParked()">Переместить и открыть</button></div>`);return true;
 }
 function remapTransferredKitchenLines(items,printedItems,kitchenPrinted){
- const source=storageSnapshot(items||[]),ledger=new Map((Array.isArray(printedItems)?printedItems:(kitchenPrinted?kitchenPrintedSnapshot(source):[])).map(p=>[String(p.key||''),Number(p.qty)||0]));
+ const source=storageSnapshot(items||[]),ledger=new Map((Array.isArray(printedItems)&&(printedItems.length||!kitchenPrinted)?printedItems:(kitchenPrinted?kitchenPrintedSnapshot(source):[])).map(p=>[String(p.key||''),Number(p.qty)||0]));
  const printed=[];
  for(const item of source){
   const oldKey=kitchenPrintLineKey(item),qty=Number(item.qty),price=Number(item.price);

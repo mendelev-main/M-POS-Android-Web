@@ -60,7 +60,7 @@
   window.togglePrinterDrawer=()=>{const field=document.getElementById('mp-drawer-enabled');if(!field)return;field.disabled=!document.getElementById('mp-print-receipts')?.checked;if(field.disabled)field.checked=false};
   function configuredFor(k){return loadPrinters().filter(p=>p.enabled!==false&&p.ip&&(k==='orders'?p.printOrders===true:p.printReceipts!==false))}function networkOrder(o,p,kind){let order={...(o||{})};if(kind==='orders'&&Array.isArray(order.items)&&Array.isArray(p.orderCategories)&&p.orderCategories.length)order.items=order.items.filter(i=>p.orderCategories.includes(i.category));return{...order,currency:o?.currency||'BYN',__printDocumentType:kind==='orders'?'kitchen':kind==='bill'?'bill':'receipt',__networkPrinterIp:p.ip,__networkPrinterPort:NETWORK_PORT,__printerConfig:p}}
   function automaticKitchenOrder(order){
-    if(Array.isArray(order?.printedItems)&&typeof window.kitchenPrintDelta==='function'){
+    if(Array.isArray(order?.printedItems)&&order.printedItems.length>0&&typeof window.kitchenPrintDelta==='function'){
       const items=window.kitchenPrintDelta(order.items||[],order.printedItems);
       return items.length?{...order,items}:null;
     }

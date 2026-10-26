@@ -2786,5 +2786,5 @@ test('automatic kitchen printing after a transfer sends only quantities missing 
  const order={id:'combined',items:plain(f.state.cart),method:'card',total:31,kitchenPrinted:true,printedItems:plain(f.c.__currentOrderPrintedItems)};
  f.c.printCompletedOrder(order);const kitchen=posts.filter(p=>p.action==='print'&&p.order.__printDocumentType==='kitchen');assert.equal(kitchen.length,1);assert.equal(kitchen[0].order.items.length,1);assert.equal(kitchen[0].order.items[0].qty,2);assert.equal(kitchen[0].order.items[0].comment,'Без лука');
  posts.length=0;order.printedItems=f.c.kitchenPrintedSnapshot(order.items);f.c.printCompletedOrder(order);assert.equal(posts.length,0);
- delete order.printedItems;f.c.printCompletedOrder(order);assert.equal(posts.length,0);
+ order.printedItems=[];f.c.printCompletedOrder(order);assert.equal(posts.length,0);delete order.printedItems;f.c.printCompletedOrder(order);assert.equal(posts.length,0);
 });
