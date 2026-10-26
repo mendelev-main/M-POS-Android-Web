@@ -205,3 +205,70 @@ async function deleteParked(id){
 function requestDeleteParkedOrder(id){
   return typeof window.confirmDeleteParkedOrder==='function'?window.confirmDeleteParkedOrder(id):deleteParked(id);
 }
+
+/* Move the current cart into one parked receipt and open it atomically. */
+let parkedOrderTransfer=null;
+function currentOrderTransferSnapshot(){
+ const snapshot=currentOrderSessionSnapshot();delete snapshot.updatedAt;snapshot.createdAt=Number(state.currentOrderCreatedAt)||0;return snapshot;
+}
+function currentOrderTransferError(){
+ if(!state.cart.length)return 'В текущем заказе нет товаров';
+ if(state.currentWebOrderId)return 'Заказ с сайта нужно завершить отдельно, чтобы сохранить его связь с сайтом';
+ if(hasPaidSplitPayment())return 'Сначала завершите начатую разделённую оплату';
+ return '';
+}
+function openMoveCurrentOrderModal(){
+ if(criticalOperationBusy){flash('Сохранение операции ещё не завершено');return false;}
+ const error=currentOrderTransferError();if(error){flash(error);return false;}
+ parkedOrderTransfer=null;
+ const collator=new Intl.Collator('ru',{numeric:true,sensitivity:'base'});
+ const list=state.parked.slice().sort((a,b)=>collator.compare(String(a.orderLabel||'').trim(),String(b.orderLabel||'').trim()));
+ showModal(`<div class="parked-modal-header"><div class="modal-title">Переместить заказ в чек</div><button class="parked-modal-close" aria-label="Закрыть выбор чека" onclick="closeModal()"><span class="ui-icon ui-icon-close" aria-hidden="true"></span></button></div><p class="settings-note">Выберите отложенный чек. Текущие товары добавятся к нему, и объединённый чек откроется в рабочей зоне.</p><div class="parked-orders-list">${list.length?list.map(o=>`<article class="parked-order-card transfer-order-card"><button class="parked-order-tile" onclick="confirmMoveCurrentOrderChoice(${escapeAttr(JSON.stringify(o.id))})" aria-label="Переместить в чек ${escapeAttr(o.orderLabel||'Без подписи')}"><div class="parked-order-heading"><span class="parked-order-name">${escapeHtml(o.orderLabel||'Без подписи')}</span><span class="parked-order-date">${fmtDate(o.createdAt||o.timestamp)}</span></div>${parkedOrderTypeBadge(o.orderType)}<div class="parked-order-total">${fullMoney(o.total)}</div></button></article>`).join(''):'<div class="parked-empty"><div class="parked-empty-title">Нет отложенных чеков</div><div>Сначала создайте чек, в который нужно перенести товары.</div></div>'}</div>`,true);
+ document.querySelector?.('#modal-root .modal')?.classList?.add('parked-orders-modal');return true;
+}
+function confirmMoveCurrentOrderChoice(id){
+ if(criticalOperationBusy)return false;
+ const error=currentOrderTransferError(),target=state.parked.find(o=>o.id===id);
+ if(error||!target){flash(error||'Отложенный чек больше не существует');return false;}
+ if(Array.isArray(target.paymentDraft?.parts)&&target.paymentDraft.parts.some(p=>p.paid)){flash('В выбранном чеке уже начата оплата');return false;}
+ parkedOrderTransfer={id,source:JSON.stringify(currentOrderTransferSnapshot()),target:JSON.stringify(target)};
+ showModal(`<div class="modal-title">Переместить и открыть чек?</div><div class="settings-note">Товары текущего заказа будут добавлены в <b>${escapeHtml(target.orderLabel||'Без подписи')}</b>. Чек откроется в рабочей зоне.</div><p class="setting-sub">Клиент, название, способ получения и доставка сохранятся от выбранного чека. Скидки программы лояльности пересчитаются для его клиента.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="openMoveCurrentOrderModal()">Назад</button><button class="btn btn-primary" onclick="moveCurrentOrderIntoParked()">Переместить и открыть</button></div>`);return true;
+}
+function remapTransferredKitchenLines(items,printedItems,kitchenPrinted){
+ const source=storageSnapshot(items||[]),ledger=new Map((Array.isArray(printedItems)?printedItems:(kitchenPrinted?kitchenPrintedSnapshot(source):[])).map(p=>[String(p.key||''),Number(p.qty)||0]));
+ const printed=[];
+ for(const item of source){
+  const oldKey=kitchenPrintLineKey(item),qty=Number(item.qty),price=Number(item.price);
+  if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<0)throw new Error('Некорректные товары в чеке');
+  item.cartLineId=uid();
+  if(ledger.has(oldKey)){const done=ledger.get(oldKey);if(!Number.isFinite(done)||done<0)throw new Error('Некорректная отметка кухонной печати');printed.push({key:item.cartLineId,qty:done});ledger.delete(oldKey);}
+ }
+ return {items:source,printed};
+}
+async function moveCurrentOrderIntoParked(){
+ if(criticalOperationBusy){flash('Сохранение операции ещё не завершено');return false;}
+ const draft=parkedOrderTransfer;if(!draft)return false;
+ const error=currentOrderTransferError(),target=state.parked.find(o=>o.id===draft.id);
+ if(error||!target){flash(error||'Отложенный чек больше не существует');return false;}
+ if(JSON.stringify(target)!==draft.target||JSON.stringify(currentOrderTransferSnapshot())!==draft.source){flash('Один из чеков изменился. Выберите чек заново');return false;}
+ let nextParked,session;
+ try{
+  const left=remapTransferredKitchenLines(target.items,target.printedItems,target.kitchenPrinted),right=remapTransferredKitchenLines(state.cart,window.__currentOrderPrintedItems,window.__currentOrderKitchenPrinted);
+  const items=[...left.items,...right.items],subtotal=items.reduce((sum,item)=>sum+itemTotal(item),0),fee=target.orderType==='Доставка'?Number(target.deliveryFee||0):0;
+  if(!Number.isFinite(subtotal)||!Number.isFinite(fee)||fee<0)throw new Error('Некорректная сумма чека');
+  const targetComment=String(target.comment||''),sourceComment=String(state.orderComment||'');
+  session={items,createdAt:Number(target.createdAt||target.timestamp)||Date.now(),orderLabel:target.orderLabel||'',orderType:target.orderType||'На месте',customer:Object.assign({name:'',phone:'',address:''},storageSnapshot(target.customer||{})),deliveryFee:fee,deliveryTariffSelected:target.deliveryTariffSelected===true,deliveryTariff:storageSnapshot(target.deliveryTariff||null),orderComment:targetComment+(sourceComment&&sourceComment!==targetComment?(targetComment?'\n':'')+sourceComment:''),source:target.source||'',webOrderId:target.webOrderId||'',webOrderStatus:target.webOrderStatus||'',kitchenPrinted:!!(target.kitchenPrinted||window.__currentOrderKitchenPrinted),printedItems:[...left.printed,...right.printed],loyaltyPrograms:[],loyaltyRedemptions:{},loyaltyCustomerId:'',updatedAt:Date.now()};
+  nextParked=state.parked.filter(o=>o.id!==target.id).map(storageSnapshot);
+  criticalOperationBusy=true;
+  await commitCriticalStorage('move-current-order-into-parked',{parked:nextParked,currentOrderSession:session});
+ }catch(e){flash('Товары не перемещены: '+(e?.message||e));return false;}
+ finally{criticalOperationBusy=false;}
+ resetCurrentOrderState();state.cart=session.items;state.parked=nextParked;
+ state.currentOrderCreatedAt=session.createdAt;state.orderLabel=session.orderLabel;state.orderType=session.orderType;state.customer=session.customer;
+ state.deliveryFee=session.deliveryFee;state.deliveryTariffSelected=session.deliveryTariffSelected;state.deliveryTariff=session.deliveryTariff;
+ state.orderComment=session.orderComment;state.currentOrderSource=session.source;state.currentWebOrderId=session.webOrderId;state.currentWebOrderStatus=session.webOrderStatus;
+ window.__currentOrderKitchenPrinted=session.kitchenPrinted;window.__currentOrderPrintedItems=session.printedItems;parkedOrderTransfer=null;
+ try{closeModal();render();flash('Товары перемещены, чек открыт');}catch(e){console.error('Товары перемещены, но экран не обновлён');}
+ if(state.customer?.id){const customer=state.customer;void loadCustomerLoyalty(customer.id).catch(()=>{if(state.customer===customer)flash('Чек открыт. Программа лояльности временно недоступна');});}
+ return true;
+}

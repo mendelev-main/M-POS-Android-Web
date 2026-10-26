@@ -2739,3 +2739,42 @@ test('duplicate confirmation waits for one atomic correction and return uses cor
  f.c.commitCriticalStorage=()=>{calls++;return new Promise(resolve=>{release=resolve})};const pending=f.c.confirmReceiptPaymentCorrection();assert.equal(await f.c.confirmReceiptPaymentCorrection(),false);assert.equal(calls,1);assert.equal(f.state.orders[0].method,'cash');release();assert.equal(await pending,true);
  f.c.commitCriticalStorage=original;await f.c.processFullReturn(o.id);assert.equal(f.state.orders[0].returnAmount,10);assert.equal(f.state.shifts[0].cashMovements.length,0);
 });
+
+function transferFixture(){
+ const f=fixture();f.c.showModal=()=>{};f.c.render=()=>{};
+ f.state.currentOrderCreatedAt=100;f.state.cart=[{cartLineId:'collision',productId:'pizza',name:'Пицца',price:10,qty:2,comment:'Без лука',manualPrice:true,selectedModifiers:[{productId:'flour',qty:0.1,priceDelta:1}]}];f.state.orderLabel='Исходный';f.state.orderComment='Комментарий источника';
+ f.state.parked=[{id:'target',orderLabel:'Стол 2',items:[{cartLineId:'collision',productId:'pizza',name:'Пицца',price:8,qty:1,discountId:'special'}],total:8,orderType:'Доставка',deliveryFee:3,deliveryTariffSelected:true,deliveryTariff:{id:'city',name:'По городу',amount:3},customer:{name:'Тестовый гость',phone:'',address:'Тестовый адрес'},comment:'Комментарий цели',timestamp:80,createdAt:50,printedItems:[{key:'collision',qty:1}],kitchenPrinted:true},{id:'untouched',orderLabel:'Стол 10',items:[],total:0}];
+ return f;
+}
+test('transfer opens combined parked receipt preserving target settings and all distinct source lines',async()=>{
+ const f=transferFixture(),stock=JSON.stringify(f.state.products),other=JSON.stringify(f.state.parked[1]),source=plain(f.state.cart[0]);let prints=0;f.c.printKitchenOrderNow=()=>prints++;
+ assert.equal(f.c.confirmMoveCurrentOrderChoice('target'),true);assert.equal(await f.c.moveCurrentOrderIntoParked(),true);
+ assert.equal(f.state.parked.length,1);assert.equal(JSON.stringify(f.state.parked[0]),other);assert.equal(f.state.cart.length,2);assert.equal(f.state.cart[0].price,8);assert.equal(f.state.cart[0].discountId,'special');
+ const moved=plain(f.state.cart[1]);delete moved.cartLineId;delete source.cartLineId;assert.deepEqual(moved,source);
+ assert.notEqual(f.state.cart[0].cartLineId,f.state.cart[1].cartLineId);assert.equal(f.state.orderLabel,'Стол 2');assert.equal(f.state.currentOrderCreatedAt,50);assert.equal(f.state.orderType,'Доставка');assert.equal(f.state.deliveryFee,3);assert.equal(f.state.deliveryTariff.id,'city');assert.equal(f.state.customer.name,'Тестовый гость');assert.match(f.state.orderComment,/Комментарий цели\nКомментарий источника/);
+ assert.equal(JSON.stringify(f.state.products),stock);assert.equal(prints,0);assert.equal(f.c.cartTotal(),31);
+ const session=JSON.parse(f.data.get('prilavok_currentOrderSession'));assert.equal(session.items.length,2);assert.equal(session.orderLabel,'Стол 2');assert.equal(JSON.parse(f.data.get('prilavok_parked')).length,1);assert.equal(await f.c.moveCurrentOrderIntoParked(),false);
+});
+test('transfer retains independent kitchen marks even when source and destination line IDs collide',async()=>{
+ const f=transferFixture();f.c.__currentOrderKitchenPrinted=true;f.c.__currentOrderPrintedItems=[{key:'collision',qty:1}];f.c.confirmMoveCurrentOrderChoice('target');assert.equal(await f.c.moveCurrentOrderIntoParked(),true);
+ const printed=f.c.__currentOrderPrintedItems;assert.equal(printed.length,2);assert.notEqual(printed[0].key,printed[1].key);
+ const delta=f.c.kitchenPrintDelta(f.state.cart,printed);assert.equal(delta.length,1);assert.equal(delta[0].qty,1);assert.equal(delta[0].comment,'Без лука');
+});
+test('transfer commits both cart and parked list before changing runtime and blocks duplicate clicks',async()=>{
+ const f=transferFixture();f.c.confirmMoveCurrentOrderChoice('target');const before=JSON.stringify({cart:f.state.cart,parked:f.state.parked});let release,commitCount=0;
+ f.c.commitCriticalStorage=()=>{commitCount++;return new Promise(r=>{release=r})};const transfer=f.c.moveCurrentOrderIntoParked();assert.equal(JSON.stringify({cart:f.state.cart,parked:f.state.parked}),before);assert.equal(await f.c.moveCurrentOrderIntoParked(),false);assert.equal(commitCount,1);release();assert.equal(await transfer,true);
+});
+test('transfer write failure leaves both receipts and print ledger intact for retry',async()=>{
+ const f=transferFixture();f.c.confirmMoveCurrentOrderChoice('target');const before=JSON.stringify({cart:f.state.cart,parked:f.state.parked});const commit=f.c.commitCriticalStorage;
+ f.c.commitCriticalStorage=async()=>{throw Error('injected write failure')};assert.equal(await f.c.moveCurrentOrderIntoParked(),false);assert.equal(JSON.stringify({cart:f.state.cart,parked:f.state.parked}),before);
+ f.c.commitCriticalStorage=commit;assert.equal(await f.c.moveCurrentOrderIntoParked(),true);
+});
+test('transfer refuses stale source or destination, missing destination and already paid parts',async()=>{
+ for(const mutate of [f=>{f.state.cart[0].qty++},f=>{f.state.parked[0].items[0].qty++},f=>{f.state.parked.shift()}]){const f=transferFixture();f.c.confirmMoveCurrentOrderChoice('target');mutate(f);const before=JSON.stringify({cart:f.state.cart,parked:f.state.parked});assert.equal(await f.c.moveCurrentOrderIntoParked(),false);assert.equal(JSON.stringify({cart:f.state.cart,parked:f.state.parked}),before);}
+ const f=transferFixture();f.state._splitPayments=[{paid:true,method:'cash',amount:10}];assert.equal(f.c.confirmMoveCurrentOrderChoice('target'),false);f.state._splitPayments=[];f.state.currentWebOrderId='web-source';assert.equal(f.c.confirmMoveCurrentOrderChoice('target'),false);
+});
+test('transfer preserves target web order identity and supports legacy kitchen snapshots',async()=>{
+ const f=transferFixture();const target=f.state.parked[0];target.webOrderId='target-web';target.source='web';target.webOrderStatus='accepted';delete target.printedItems;f.c.confirmMoveCurrentOrderChoice('target');assert.equal(await f.c.moveCurrentOrderIntoParked(),true);
+ assert.equal(f.state.currentWebOrderId,'target-web');assert.equal(f.state.currentOrderSource,'web');assert.equal(f.c.__currentOrderPrintedItems.length,1);assert.equal(f.c.__currentOrderPrintedItems[0].qty,1);
+ assert.equal(JSON.parse(f.data.get('prilavok_currentOrderSession')).webOrderId,'target-web');
+});
