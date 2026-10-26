@@ -2698,3 +2698,44 @@ test('partial receiving closes supplier order while zero line changes neither st
  const missing=f.state.receivings[0].items.find(i=>i.productId==='water');assert.equal(missing.qty,0);assert.equal(missing.totalCost,0);
  assert.equal(JSON.parse(f.data.get('prilavok_purchaseOrders'))[0].receivedItems.find(i=>i.productId==='water').qty,0);
 });
+
+function paymentCorrectionUi(f){f.c.showModal=html=>{f.paymentHtml=html};f.c.render=()=>{};}
+test('receipt payment correction moves exact total between tenders without reselling or changing stock',async()=>{
+ const f=fixture(false);paymentCorrectionUi(f);const order=await f.sale([{method:'cash',amount:10,cashGiven:20,change:10}]);
+ const stock=JSON.stringify(f.state.products),items=JSON.stringify(order.items),shifts=JSON.stringify(f.state.shifts);let effects=0;
+ f.c.requestCashDrawer=()=>effects++;f.c.sendOrderToPrint=()=>effects++;f.c.publishPaidOrderLoyalty=()=>effects++;
+ assert.equal(f.c.openReceiptPaymentCorrection(order.id),true);assert.match(f.paymentHtml,/Изменить на карту/);
+ assert.equal(await f.c.confirmReceiptPaymentCorrection(),true);const updated=f.state.orders[0];
+ assert.equal(updated.method,'card');assert.deepEqual(plain(updated.payments),[{method:'card',amount:10,cashGiven:null,change:null}]);assert.equal(updated.cashGiven,null);assert.equal(updated.change,null);
+ assert.equal(updated.paymentCorrections[0].from,'cash');assert.equal(updated.paymentCorrections[0].previousCashGiven,20);assert.equal(updated.paymentCorrections[0].previousPayments[0].change,10);
+ assert.equal(JSON.stringify(updated.items),items);assert.equal(JSON.stringify(f.state.products),stock);assert.equal(JSON.stringify(f.state.shifts),shifts);assert.equal(f.state.orders.length,1);assert.equal(effects,0);
+ const t=f.c.shiftTotals('shift');assert.equal(t.cash,0);assert.equal(t.card,10);assert.equal(t.count,1);assert.equal(t.total,10);assert.equal(f.c.cashDrawerBalance(f.state.shifts[0],t),100);
+ assert.equal(JSON.parse(f.data.get('prilavok_orders'))[0].method,'card');assert.equal(await f.c.confirmReceiptPaymentCorrection(),false);
+ assert.equal(f.c.openReceiptPaymentCorrection(updated.id),true);assert.equal(await f.c.confirmReceiptPaymentCorrection(),true);assert.equal(f.state.orders[0].method,'cash');assert.equal(f.state.orders[0].paymentCorrections.length,2);assert.equal(f.c.shiftTotals('shift').cash,10);
+});
+test('closed shift tender correction requires admin and preserves counted cash while reports recalculate',async()=>{
+ const f=fixture(false);paymentCorrectionUi(f);const o=await f.sale();f.state.shifts[0].status='closed';f.state.shifts[0].countedCash=110;
+ assert.equal(f.c.openReceiptPaymentCorrection(o.id),false);assert.match(f.messages.at(-1),/администратор/);
+ f.c.currentShiftEmployeeIsAdmin=()=>true;assert.equal(f.c.openReceiptPaymentCorrection(o.id),true);assert.equal(await f.c.confirmReceiptPaymentCorrection(),true);
+ const report=f.c.buildShiftReportPayload(f.state.shifts[0]);assert.equal(report.cash,0);assert.equal(report.card,10);assert.equal(report.countedCash,110);assert.equal(report.expectedCash,100);assert.equal(report.difference,10);assert.equal(f.state.orders[0].paymentCorrections[0].administration,true);
+});
+test('correction rechecks permissions and concurrent receipt changes at confirmation',async()=>{
+ const f=fixture(false);paymentCorrectionUi(f);const o=await f.sale();f.c.openReceiptPaymentCorrection(o.id);f.state.shifts[0].status='closed';assert.equal(await f.c.confirmReceiptPaymentCorrection(),false);assert.equal(o.method,'cash');
+ f.state.shifts[0].status='open';f.c.openReceiptPaymentCorrection(o.id);o.returnedAt=100;assert.equal(await f.c.confirmReceiptPaymentCorrection(),false);delete o.returnedAt;
+ f.c.openReceiptPaymentCorrection(o.id);o.orderLabel='changed';assert.equal(await f.c.confirmReceiptPaymentCorrection(),false);assert.match(f.messages.at(-1),/Чек изменился/);assert.equal(f.state.orders[0].method,'cash');
+});
+test('payment correction storage failure is atomic and retry retains original tender audit',async()=>{
+ const f=fixture();paymentCorrectionUi(f);await f.sale();const before=JSON.stringify(f.state.orders);f.c.openReceiptPaymentCorrection(f.state.orders[0].id);
+ const commit=f.c.commitCriticalStorage;f.c.commitCriticalStorage=async()=>{throw Error('injected write failure')};assert.equal(await f.c.confirmReceiptPaymentCorrection(),false);assert.equal(JSON.stringify(f.state.orders),before);assert.match(f.messages.at(-1),/Оплата не изменена/);
+ f.c.commitCriticalStorage=commit;assert.equal(await f.c.confirmReceiptPaymentCorrection(),true);assert.equal(f.state.orders[0].paymentCorrections.length,1);
+});
+test('correction rejects split, returned, malformed payments and missing shifts, supports legacy single tender',async()=>{
+ const f=fixture();paymentCorrectionUi(f);const o=await f.sale();
+ for(const patch of [{method:'split'},{returnedAt:5},{payments:[{method:'cash',amount:9}]},{payments:[{method:'card',amount:10}]},{shiftId:'missing'},{total:NaN}])assert.ok(f.c.receiptPaymentCorrectionError({...o,...patch}));
+ delete o.payments;assert.equal(f.c.openReceiptPaymentCorrection(o.id),true);assert.equal(await f.c.confirmReceiptPaymentCorrection(),true);assert.equal(f.state.orders[0].paymentCorrections[0].previousPayments,null);
+});
+test('duplicate confirmation waits for one atomic correction and return uses corrected tender',async()=>{
+ const f=fixture();paymentCorrectionUi(f);const o=await f.sale();f.c.openReceiptPaymentCorrection(o.id);let release,calls=0;const original=f.c.commitCriticalStorage;
+ f.c.commitCriticalStorage=()=>{calls++;return new Promise(resolve=>{release=resolve})};const pending=f.c.confirmReceiptPaymentCorrection();assert.equal(await f.c.confirmReceiptPaymentCorrection(),false);assert.equal(calls,1);assert.equal(f.state.orders[0].method,'cash');release();assert.equal(await pending,true);
+ f.c.commitCriticalStorage=original;await f.c.processFullReturn(o.id);assert.equal(f.state.orders[0].returnAmount,10);assert.equal(f.state.shifts[0].cashMovements.length,0);
+});
