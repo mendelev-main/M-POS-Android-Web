@@ -172,13 +172,15 @@ function renderInventoryWorkScreen(){
  };
  const rows=[...groups].map(([category,items])=>`<section class="inventory-category-group"><div class="inventory-category-heading"><h3>${escapeHtml(category)}</h3><span class="inventory-category-count">${items.length}</span></div>${items.map(renderItem).join('')}</section>`).join('');
  return `<div class="screen content-screen inventory-work-screen ${state.tab==='inventoryWork'?'active':''}">
-   <div class="content-head inventory-work-head"><div><div class="content-title">${d.type==='adhoc'?'Внеплановая инвентаризация':'Инвентаризация'}</div><div class="setting-sub">Зафиксировано: ${fixed} из ${d.items.length}</div></div>${isAdmin?'<button class="btn btn-danger inventory-cancel-button" onclick="requestCancelInventory()">Отменить инвентаризацию</button>':''}</div>
-   <div class="inventory-work-layout">
-     <div class="card inventory-work-list">${rows||'<div class="center-note">Нет товаров для пересчёта</div>'}</div>
+   <div class="content-head inventory-work-head"><div class="inventory-work-heading"><div class="content-title">${d.type==='adhoc'?'Внеплановая инвентаризация':'Инвентаризация'}</div><div class="setting-sub">Зафиксировано: ${fixed} из ${d.items.length}</div></div>
      <div class="inventory-work-actions">
        <button class="btn btn-secondary inventory-work-action" onclick="pauseInventory()">Продолжить позже</button>
        <button class="btn btn-primary inventory-work-action" onclick="completeInventory()">Завершить инвентаризацию</button>
+       ${isAdmin?'<button class="btn btn-danger inventory-cancel-button" aria-label="Отменить инвентаризацию" title="Отменить инвентаризацию" onclick="requestCancelInventory()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>':''}
      </div>
+   </div>
+   <div class="inventory-work-layout">
+     <div class="card inventory-work-list">${rows||'<div class="center-note">Нет товаров для пересчёта</div>'}</div>
    </div>
  </div>`;
 }

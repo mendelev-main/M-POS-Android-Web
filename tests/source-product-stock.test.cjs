@@ -2810,3 +2810,18 @@ test('automatic kitchen printing after a transfer sends only quantities missing 
  posts.length=0;order.printedItems=f.c.kitchenPrintedSnapshot(order.items);f.c.printCompletedOrder(order);assert.equal(posts.length,0);
  order.printedItems=[];f.c.printCompletedOrder(order);assert.equal(posts.length,0);delete order.printedItems;f.c.printCompletedOrder(order);assert.equal(posts.length,0);
 });
+
+test('inventory fixation preserves the current list and screen scroll through root rendering',async()=>{
+ const f=fixture();f.state.loaded=true;f.state.tab='inventoryWork';
+ f.state.inventoryDraft={id:'count-scroll',items:[{productId:'flour',name:'Мука',unit:'kg',actual:3,expected:10}]};
+ let list={scrollTop:420},screen={scrollTop:18,querySelector:()=>list};
+ f.c.document.querySelector=selector=>selector==='.inventory-work-screen.active'?screen:null;
+ const app={set innerHTML(value){list={scrollTop:0};screen={scrollTop:0,querySelector:()=>list}}};
+ f.fields.app=app;
+ for(const name of ['renderTopbar','renderPosScreen','renderProductsScreen','renderReceivingScreen','renderPurchaseOrdersScreen','renderShiftScreen','renderReceiptsScreen','renderSettingsScreen','renderNetworkScreen','renderAnalyticsScreen','renderBookingsScreen','renderInventoryScreen','renderInventoryWorkScreen'])f.c[name]=()=>'';
+ vm.runInContext(inline.slice(inline.indexOf('function render(){'),inline.indexOf('function renderStorageWarning(){')),f.c);
+ assert.equal(await f.c.fixInventoryItem('flour'),true);
+ assert.equal(list.scrollTop,420);assert.equal(screen.scrollTop,18);assert.ok(f.state.inventoryDraft.items[0].fixedAt);
+ // A render from another screen must not reuse stale inventory positions.
+ f.state.tab='products';f.c.document.querySelector=()=>null;f.c.render();assert.equal(list.scrollTop,0);
+});
