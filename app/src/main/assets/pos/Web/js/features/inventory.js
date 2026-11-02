@@ -89,6 +89,38 @@ async function fixInventoryItem(id){
  finally{criticalOperationBusy=false}
  state.products=nextProducts;state.inventoryDraft=nextDraft;void publishAvailability();render();flash('Остаток зафиксирован');return true;
 }
+// A correction replaces the original count, not stock movements made since it.
+function openInventoryCorrection(id){
+ const draft=state.inventoryDraft,item=draft?.items.find(x=>x.productId===id);
+ if(!item?.fixedAt)return false;
+ window._inventoryCorrection={draftId:draft.id,productId:id,itemSnapshot:JSON.stringify(item)};
+ showModal(`<div class="modal-title">Исправить остаток</div><div class="setting-sub">${escapeHtml(item.name)}</div><p>Зафиксировано: <strong>${stockQtyText(item.actual)} ${escapeHtml(unitLabel(item.unit))}</strong></p><div class="field"><label for="inventory-correction-actual">Верное количество при пересчёте, ${escapeHtml(unitLabel(item.unit))}</label><input id="inventory-correction-actual" type="number" min="0" step="any" inputmode="decimal" value="${escapeAttr(String(item.actual))}"></div><p class="setting-sub">Исправьте количество, которое было при фиксации. Продажи и приёмки после неё сохранятся. Для нового пересчёта текущего склада начните отдельную инвентаризацию.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Отмена</button><button class="btn btn-primary" onclick="confirmInventoryCorrection()">Сохранить исправление</button></div>`,true);
+ return true;
+}
+async function confirmInventoryCorrection(){
+ if(criticalOperationBusy){flash('Сохранение операции ещё не завершено');return false;}
+ const pending=window._inventoryCorrection,draft=state.inventoryDraft,item=draft?.items.find(x=>x.productId===pending?.productId);
+ if(!pending||draft?.id!==pending.draftId||!item?.fixedAt||JSON.stringify(item)!==pending.itemSnapshot){flash('Инвентаризация изменилась. Откройте исправление заново');return false;}
+ const text=String(document.getElementById('inventory-correction-actual')?.value??'').trim(),value=Number(text.replace(',','.'));
+ if(!text||!Number.isFinite(value)||value<0){flash('Введите корректный остаток товара');return false;}
+ const p=getProduct(item.productId);
+ if(p?.type!=='simple'||!productTracksStock(p)||stockUnit(p)!==(item.unit||'')){flash('Товар или единица учёта изменились. Исправление недоступно');return false;}
+ const actual=roundStockQty(value),previousActual=Number(item.actual),expected=Number(item.expected),stockBefore=Number(p.stock);
+ if(!Number.isFinite(previousActual)||previousActual<0||!Number.isFinite(expected)||!Number.isFinite(stockBefore)){flash('Некорректные данные остатка');return false;}
+ if(actual===previousActual){window._inventoryCorrection=null;closeModal();return true;}
+ const delta=roundStockQty(actual-previousActual),stockAfter=roundStockQty(stockBefore+delta),difference=roundStockQty(actual-expected);
+ if(!Number.isFinite(stockAfter)||!Number.isFinite(difference)){flash('Слишком большое значение остатка');return false;}
+ const nextProducts=storageSnapshot(state.products),nextDraft=storageSnapshot(draft),nextItem=nextDraft.items.find(x=>x.productId===item.productId);
+ nextProducts.find(x=>x.id===item.productId).stock=stockAfter;
+ nextItem.actual=actual;nextItem.difference=difference;
+ nextItem.corrections=[...(nextItem.corrections||[]),{correctedAt:Date.now(),previousActual,actual,delta,stockBefore,stockAfter}];
+ criticalOperationBusy=true;
+ try{await commitCriticalStorage('inventory-correction',{products:nextProducts,inventoryDraft:nextDraft})}
+ catch(e){flash('Исправление не сохранено: '+(e?.message||e));return false;}
+ finally{criticalOperationBusy=false;}
+ state.products=nextProducts;state.inventoryDraft=nextDraft;window._inventoryCorrection=null;
+ closeModal();void publishAvailability();render();flash('Остаток исправлен');return true;
+}
 function requestCancelInventory(){
  if(!state.inventoryDraft)return;
  if(!currentShiftEmployeeIsAdmin()){flash('Отменить инвентаризацию может только администратор');return;}
@@ -167,7 +199,7 @@ function renderInventoryWorkScreen(){
  const renderItem=x=>{
    const unit=unitLabel(x.unit),done=!!x.fixedAt,p=getProduct(x.productId),currentExpected=done?roundStockQty(Number(x.expected)||0):roundStockQty(Number(p?.stock)||0),diff=roundStockQty(Number(x.difference||0)),diffText=diff>0?'+'+stockQtyText(diff):stockQtyText(diff);
    const before=done?`<div class="setting-sub inventory-item-expected">Расчётный остаток: ${stockQtyText(currentExpected)} ${unit}</div><div class="inventory-item-difference ${diff<0?'is-shortage':diff>0?'is-surplus':'is-balanced'}">Разница: ${diffText} ${unit}</div>`:(isAdmin?`<div class="setting-sub">Учётный остаток: ${stockQtyText(currentExpected)} ${unit}</div>`:'');
-   const control=done?`<div class="inventory-fixed-summary"><div class="setting-sub">Зафиксированный остаток</div><div class="inventory-fixed-value">${stockQtyText(x.actual)} ${unit}</div></div>`:`<div class="inventory-entry"><label class="setting-sub inventory-entry-label" for="inventory-actual-${escapeAttr(x.productId)}">Факт, ${escapeHtml(unit)}</label><div class="inventory-entry-controls"><input id="inventory-actual-${escapeAttr(x.productId)}" class="inventory-actual-input" type="number" min="0" step="0.001" inputmode="decimal" value="${x.actual===null?'':escapeAttr(String(x.actual))}" placeholder="0" onchange="updateInventoryActual('${escapeAttr(x.productId)}',this.value)"><button class="btn btn-primary inventory-fix-button" onclick="fixInventoryItem('${escapeAttr(x.productId)}')">Фиксировать</button></div></div>`;
+   const control=done?`<div class="inventory-fixed-summary"><div class="setting-sub">Зафиксированный остаток</div><div class="inventory-fixed-value">${stockQtyText(x.actual)} ${unit}</div><button class="btn btn-secondary inventory-correction-button" onclick="openInventoryCorrection(${productInlineArg(x.productId)})">Изменить</button></div>`:`<div class="inventory-entry"><label class="setting-sub inventory-entry-label" for="inventory-actual-${escapeAttr(x.productId)}">Факт, ${escapeHtml(unit)}</label><div class="inventory-entry-controls"><input id="inventory-actual-${escapeAttr(x.productId)}" class="inventory-actual-input" type="number" min="0" step="0.001" inputmode="decimal" value="${x.actual===null?'':escapeAttr(String(x.actual))}" placeholder="0" onchange="updateInventoryActual('${escapeAttr(x.productId)}',this.value)"><button class="btn btn-primary inventory-fix-button" onclick="fixInventoryItem('${escapeAttr(x.productId)}')">Фиксировать</button></div></div>`;
    return `<div class="list-row inventory-work-row"><div class="inventory-row-main"><div class="list-row-name">${escapeHtml(x.name)}</div><div class="inventory-item-meta">${before}</div></div>${control}</div>`;
  };
  const rows=[...groups].map(([category,items])=>`<section class="inventory-category-group"><div class="inventory-category-heading"><h3>${escapeHtml(category)}</h3><span class="inventory-category-count">${items.length}</span></div>${items.map(renderItem).join('')}</section>`).join('');

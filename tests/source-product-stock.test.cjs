@@ -2825,3 +2825,56 @@ test('inventory fixation preserves the current list and screen scroll through ro
  // A render from another screen must not reuse stale inventory positions.
  f.state.tab='products';f.c.document.querySelector=()=>null;f.c.render();assert.equal(list.scrollTop,0);
 });
+
+function inventoryCorrectionFixture(){
+ const f=fixture();f.c.showModal=()=>{};f.c.currentShiftEmployeeIsAdmin=()=>false;
+ Object.assign(f.c.getProduct('flour'),{stock:3,stockUnit:'kg'});
+ f.state.inventoryDraft={id:'count-correction',type:'adhoc',items:[{productId:'flour',name:'Мука',unit:'kg',expected:10,actual:3,difference:-7,fixedAt:100}]};
+ f.fields['inventory-correction-actual']={value:'5'};assert.equal(f.c.openInventoryCorrection('flour'),true);return f;
+}
+test('inventory correction changes original count by delta and keeps subsequent stock movements',async()=>{
+ const f=inventoryCorrectionFixture();f.c.getProduct('flour').stock=5; // 3 counted, -2 sold, +4 received
+ assert.equal(await f.c.confirmInventoryCorrection(),true);near(f.c.getProduct('flour').stock,7);
+ const x=f.state.inventoryDraft.items[0];assert.equal(x.expected,10);assert.equal(x.actual,5);assert.equal(x.difference,-5);assert.equal(x.fixedAt,100);
+ assert.equal(x.corrections.length,1);assert.equal(x.corrections[0].previousActual,3);assert.equal(x.corrections[0].delta,2);
+ assert.equal(JSON.parse(f.data.get('prilavok_products')).find(p=>p.id==='flour').stock,7);
+ assert.equal(JSON.parse(f.data.get('prilavok_inventoryDraft')).items[0].actual,5);
+ assert.equal(await f.c.confirmInventoryCorrection(),false);near(f.c.getProduct('flour').stock,7);
+ assert.equal(f.c.openInventoryCorrection('flour'),true);f.fields['inventory-correction-actual'].value='1';
+ assert.equal(await f.c.confirmInventoryCorrection(),true);near(f.c.getProduct('flour').stock,3);assert.equal(f.state.inventoryDraft.items[0].corrections.length,2);
+});
+test('inventory correction accepts zero and preserves negative current stock after later sales',async()=>{
+ const f=inventoryCorrectionFixture();f.c.getProduct('flour').stock=1;f.fields['inventory-correction-actual'].value='0';
+ assert.equal(await f.c.confirmInventoryCorrection(),true);near(f.c.getProduct('flour').stock,-2);assert.equal(f.state.inventoryDraft.items[0].actual,0);
+});
+test('inventory correction rejects invalid, stale and completed counts without writes',async()=>{
+ for(const value of ['', '-1', 'Infinity', 'bad']){
+  const f=inventoryCorrectionFixture(),before=JSON.stringify(f.state.products);f.fields['inventory-correction-actual'].value=value;
+  assert.equal(await f.c.confirmInventoryCorrection(),false);assert.equal(JSON.stringify(f.state.products),before);assert.equal(f.writes.length,0);
+ }
+ for(const change of [f=>{f.state.inventoryDraft=null},f=>{f.state.inventoryDraft.id='another'},f=>{f.state.inventoryDraft.items[0].actual=4},f=>{f.c.getProduct('flour').stockUnit='l'},f=>{f.c.getProduct('flour').noStockTracking=true}]){
+  const f=inventoryCorrectionFixture();change(f);const before=JSON.stringify(f.state.products);
+  assert.equal(await f.c.confirmInventoryCorrection(),false);assert.equal(JSON.stringify(f.state.products),before);assert.equal(f.writes.length,0);
+ }
+});
+test('inventory correction journal failure preserves fixed record and stock',async()=>{
+ const f=inventoryCorrectionFixture(),before=JSON.stringify({products:f.state.products,draft:f.state.inventoryDraft});
+ f.c.localStorage.setItem=()=>{throw Error('injected journal failure')};
+ assert.equal(await f.c.confirmInventoryCorrection(),false);assert.equal(JSON.stringify({products:f.state.products,draft:f.state.inventoryDraft}),before);assert.match(f.messages.at(-1),/не сохранено/);
+});
+test('interrupted inventory correction recovers product and corrected count together',async()=>{
+ const f=inventoryCorrectionFixture();f.data.set('prilavok_products',JSON.stringify(plain(f.state.products)));f.data.set('prilavok_inventoryDraft',JSON.stringify(plain(f.state.inventoryDraft)));
+ const set=f.c.localStorage.setItem;let fail=true;f.c.localStorage.setItem=(k,v)=>{if(k==='prilavok_inventoryDraft'&&fail){fail=false;throw Error('injected write failure')}return set(k,v)};
+ assert.equal(await f.c.confirmInventoryCorrection(),false);assert.equal(f.c.getProduct('flour').stock,3);
+ const restarted=fixture();for(const [k,v] of f.data)restarted.data.set(k,v);await restarted.c.loadAll();
+ assert.equal(restarted.c.getProduct('flour').stock,5);assert.equal(restarted.state.inventoryDraft.items[0].actual,5);assert.equal(restarted.state.inventoryDraft.items[0].corrections.length,1);
+});
+
+test('Android correction increments warehouse revision and survives cancellation history',async()=>{
+ const f=guardedInventoryFixture();countedFlour(f);assert.equal(await f.c.fixInventoryItem('flour'),true);
+ f.c.showModal=()=>{};f.fields['inventory-correction-actual']={value:'5'};assert.equal(f.c.openInventoryCorrection('flour'),true);
+ const revision=JSON.parse(f.data.get('prilavok_products')).find(p=>p.id==='flour')._androidStockRevision;
+ assert.equal(await f.c.confirmInventoryCorrection(),true);assert.equal(f.c.getProduct('flour').stock,5);
+ assert.equal(JSON.parse(f.data.get('prilavok_products')).find(p=>p.id==='flour')._androidStockRevision,revision+1);
+ assert.equal(await f.c.confirmCancelInventory(),true);assert.equal(f.state.inventoryHistory[0].items[0].actual,5);assert.equal(f.state.inventoryHistory[0].items[0].corrections.length,1);assert.equal(f.c.getProduct('flour').stock,5);
+});
