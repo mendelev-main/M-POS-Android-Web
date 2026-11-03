@@ -2554,13 +2554,14 @@ function productCategoryKey(p){ return (p.category||'').trim() || 'Без кат
 
 /* Cart composition runtime: Web/js/features/cart-composition.js */
 
-function flash(msg){
+function flash(msg,kind=''){
+  if(kind==='negative-stock')document.querySelectorAll('.flash-toast-negative-stock').forEach(el=>el.remove());
   const el = document.createElement('div');
-  el.className = 'flash-toast';
+  el.className = 'flash-toast'+(kind==='negative-stock'?' flash-toast-negative-stock':'');
   el.setAttribute('role','status');
   el.textContent = msg;
   document.body.appendChild(el);
-  setTimeout(()=>el.remove(), 1800);
+  setTimeout(()=>el.remove(), kind==='negative-stock'?3200:1800);
 }
 
 /* Parked orders runtime: Web/js/features/parked-orders.js */

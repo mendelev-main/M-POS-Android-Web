@@ -2878,3 +2878,41 @@ test('Android correction increments warehouse revision and survives cancellation
  assert.equal(JSON.parse(f.data.get('prilavok_products')).find(p=>p.id==='flour')._androidStockRevision,revision+1);
  assert.equal(await f.c.confirmCancelInventory(),true);assert.equal(f.state.inventoryHistory[0].items[0].actual,5);assert.equal(f.state.inventoryHistory[0].items[0].corrections.length,1);assert.equal(f.c.getProduct('flour').stock,5);
 });
+
+test('adding composite shows permitted negative ingredient without deducting warehouse stock',()=>{
+ const f=fixture(),p=f.c.getProduct('flour');p.name='Томатный соус';p.stock=0;p.allowNegativeStock=true;
+ f.c.addConfiguredCartItem(f.c.getProduct('pizza'),[]);
+ assert.equal(f.state.cart[0].qty,1);assert.equal(p.stock,0);assert.match(f.messages.at(-1),/Томатный соус — отрицательный остаток/);
+ f.c.addConfiguredCartItem(f.c.getProduct('pizza'),[]);assert.equal(f.state.cart[0].qty,2);assert.equal(f.messages.filter(m=>m.includes('отрицательный остаток')).length,2);
+});
+test('negative warning considers whole cart and parked reservations, excludes unrelated ingredients',()=>{
+ const f=fixture(),p=f.c.getProduct('flour');p.stock=.2;p.allowNegativeStock=true;
+ f.c.addConfiguredCartItem(f.c.getProduct('pizza'),[]);assert.equal(f.messages.length,0);
+ f.c.changeQty(f.c.cartItemKey(f.state.cart[0]),1);assert.match(f.messages.at(-1),/Мука — отрицательный остаток/);
+ const count=f.messages.length;f.c.changeQty(f.c.cartItemKey(f.state.cart[0]),-1);assert.equal(f.messages.length,count);
+ const g=fixture();g.c.getProduct('flour').stock=.2;g.c.getProduct('flour').allowNegativeStock=true;g.state.parked=[{items:[{productId:'pizza',qty:1}]}];
+ g.c.addConfiguredCartItem(g.c.getProduct('pizza'),[]);assert.match(g.messages.at(-1),/Мука — отрицательный остаток/);
+});
+test('negative warning includes selected modifiers and deduplicates shared nested ingredients',()=>{
+ const f=fixture();for(const id of ['flour','water'])Object.assign(f.c.getProduct(id),{stock:0,allowNegativeStock:true});
+ f.c.addConfiguredCartItem(f.c.getProduct('pizza'),[{productId:'dough',qty:1,priceDelta:1}]);
+ const message=f.messages.at(-1);assert.equal(message.split('Мука').length-1,1);assert.equal(message.split('Вода').length-1,1);
+});
+test('untracked ingredients and blocked additions do not show a negative-stock warning',()=>{
+ const f=fixture();Object.assign(f.c.getProduct('flour'),{stock:0,allowNegativeStock:true,noStockTracking:true});f.c.addConfiguredCartItem(f.c.getProduct('pizza'),[]);assert.equal(f.messages.length,0);
+ const g=fixture();Object.assign(g.c.getProduct('flour'),{stock:0,allowNegativeStock:true});g.c.getProduct('water').stock=0;g.c.addConfiguredCartItem(g.c.getProduct('pizza'),[]);
+ assert.equal(g.state.cart.length,0);assert.equal(g.messages.some(m=>m.includes('отрицательный остаток')),false);assert.match(g.messages.at(-1),/Недостаточно остатка/);
+});
+test('repeated negative banners replace each other and render product names as plain text',()=>{
+ const f=fixture();let children=[];f.c.document.querySelectorAll=()=>children.filter(e=>e.className.includes('flash-toast-negative-stock'));
+ f.c.document.createElement=()=>({setAttribute(){},remove(){children=children.filter(e=>e!==this)}});f.c.document.body={appendChild:e=>children.push(e)};
+ vm.runInContext(inline.slice(inline.indexOf("function flash(msg"),inline.indexOf('/* Parked orders runtime:')),f.c);
+ f.c.flash('<img src=x> — отрицательный остаток','negative-stock');f.c.flash('Другой соус — отрицательный остаток','negative-stock');
+ assert.equal(children.length,1);assert.equal(children[0].textContent,'Другой соус — отрицательный остаток');assert.equal(children[0].innerHTML,undefined);
+});
+
+test('Android failed cart persistence suppresses negative stock banner',()=>{
+ const f=fixture();Object.assign(f.c.getProduct('flour'),{stock:0,allowNegativeStock:true});installRuntimeSafety(f);f.state.loaded=true;
+ f.c.localStorage.setItem=()=>{throw Error('fixture disk failure')};f.c.addConfiguredCartItem(f.c.getProduct('pizza'),[]);
+ assert.equal(f.state.cart.length,0);assert.equal(f.messages.some(m=>m.includes('отрицательный остаток')),false);
+});
