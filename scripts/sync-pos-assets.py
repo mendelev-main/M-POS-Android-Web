@@ -36,14 +36,14 @@ shutil.copy2(ios / "notification-native.js", target / "notification-native.js")
 source_html = (ios / "pos.html").read_text()
 android_html = source_html.replace(
     '<script src="Web/js/core/storage.js"></script>',
-    '<script src="android-bridge.js"></script>\n<script src="android-network.js"></script>\n<script src="Web/js/core/storage.js"></script>',
+    '<script src="android-bridge.js"></script>\n<script src="android-storage.js"></script>\n<script src="android-network.js"></script>\n<script src="Web/js/core/storage.js"></script>',
 ).replace(
     '<script src="network-printer.js"></script>',
     '<script src="network-printer.js"></script>\n<script src="android-web-ready.js"></script>\n<script src="notification-native.js"></script>\n<script src="android-web-ready.js"></script>',
 )
 android_html = android_html.replace(
     "<script>loadAll();</script>",
-    '<script src="android-purchase-validation.js"></script>\n<script src="android-bookings-customers.js"></script>\n<script src="android-loyalty-ui.js"></script>\n<script src="android-customer-input.js"></script>\n<script src="android-loyalty-pricing.js"></script>\n<script src="android-inventory.js"></script>\n<script src="android-safety.js"></script>\n<script src="android-admin.js"></script>\n<script src="android-integrations.js"></script>\n<script src="android-pos-stock.js"></script>\n<script>loadAll();</script>',
+    '<script src="android-purchase-validation.js"></script>\n<script src="android-bookings-customers.js"></script>\n<script src="android-loyalty-ui.js"></script>\n<script src="android-customer-input.js"></script>\n<script src="android-loyalty-pricing.js"></script>\n<script src="android-inventory.js"></script>\n<script src="android-safety.js"></script>\n<script src="android-admin.js"></script>\n<script src="android-integrations.js"></script>\n<script src="android-pos-stock.js"></script>\n<script src="android-storage-startup.js"></script>\n<script>loadAll();</script>',
 )
 (target / "pos.html").write_text(android_html)
 (target / "android-bridge.js").write_bytes(bridge)

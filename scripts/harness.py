@@ -15,7 +15,7 @@ PLATFORM_SCRIPTS = (
     'android-customer-input', 'android-loyalty-ui', 'android-loyalty-pricing',
     'android-inventory', 'android-purchase-validation', 'android-bookings-customers',
     'android-safety', 'android-admin', 'android-integrations', 'android-pos-stock',
-    'android-bridge', 'android-network',
+    'android-bridge', 'android-storage', 'android-storage-startup', 'android-network',
 )
 
 

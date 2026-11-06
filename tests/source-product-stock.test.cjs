@@ -2941,3 +2941,28 @@ test('Android payment quota failure reports exact write boundary and still prese
  const d=f.c.storageDiagnosticData();assert.equal(d.failure.name,'QuotaExceededError');assert.equal(d.failure.key,'criticalStorageJournal');assert.equal(d.failure.operation,'write');assert.doesNotMatch(JSON.stringify(d),/DO-NOT-DISPLAY|private original/);
  f.c.addConfiguredCartItem(f.c.getProduct('pizza'),[]);assert.match(f.messages.at(-1),/Достигнут лимит/);assert.equal(f.c.storageDiagnosticData().failure.name,'QuotaExceededError');
 });
+
+function installDurableStorage(f,native=new Map(),control={ready:false}){
+ Object.defineProperty(f.c.localStorage,'length',{get:()=>f.data.size,configurable:true});f.c.localStorage.key=i=>[...f.data.keys()][i]??null;
+ f.c.__mposStorageCall=raw=>{
+  const r=JSON.parse(raw);
+  if(r.action==='set'&&r.key===control.failKey){control.failKey=null;return '{"ok":false,"name":"InvalidStateError"}';}
+  if(r.action==='status')return JSON.stringify({ok:true,ready:control.ready,keys:[...native.keys()]});
+  if(r.action==='initialize'){for(const [k,v] of Object.entries(r.entries))native.set(k,v);control.ready=true;return JSON.stringify({ok:true,keys:[...native.keys()]});}
+  if(r.action==='get')return JSON.stringify({ok:true,value:native.get(r.key)??null});
+  if(r.action==='set')native.set(r.key,r.value);if(r.action==='remove')native.delete(r.key);
+  return '{"ok":true}';
+ };
+ vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-storage.js'),'utf8'),f.c);installLivePosStock(f);installRuntimeSafety(f);f.state.loaded=true;return {native,control};
+}
+test('payment succeeds beyond old WebView quota with native persistence and retains the full receipt history',async()=>{
+ const f=fixture();f.state.orders=[{id:'large-history',comment:'synthetic'.repeat(700000),total:0,items:[]}];f.data.set('prilavok_orders',JSON.stringify(f.state.orders));
+ const legacy=f.data.get('prilavok_orders');const {native}=installDurableStorage(f);f.cart();await f.c.finalizePayment([{method:'cash',amount:10}]);
+ assert.equal(f.state.orders.length,2);assert.equal(JSON.parse(native.get('prilavok_orders')).length,2);assert.equal(native.get('prilavok_criticalStorageJournal'),'null');assert.equal(f.data.get('prilavok_orders'),legacy);near(f.c.getProduct('flour').stock,9.8);
+});
+test('interrupted native payment recovers journal on restart without importing stale WebView history',async()=>{
+ const f=fixture();f.state.orders=[{id:'old',total:0,items:[]}];f.data.set('prilavok_orders',JSON.stringify(f.state.orders));const durable=installDurableStorage(f);f.cart();durable.control.failKey='prilavok_orders';
+ await f.c.finalizePayment([{method:'cash',amount:10}]);assert.equal(f.state.orders.length,1);assert.notEqual(durable.native.get('prilavok_criticalStorageJournal'),'null');
+ const restarted=fixture();restarted.data.set('prilavok_orders','[]');installDurableStorage(restarted,durable.native,durable.control);await restarted.c.loadAll();
+ assert.equal(restarted.state.orders.length,2);near(restarted.c.getProduct('flour').stock,9.8);assert.equal(durable.native.get('prilavok_criticalStorageJournal'),'null');
+});

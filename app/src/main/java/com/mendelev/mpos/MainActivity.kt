@@ -37,6 +37,7 @@ class MainActivity : AppCompatActivity() {
         private const val START_URL = "$APP_ORIGIN/assets/pos/pos.html"
     }
 
+    private lateinit var posStorage: com.mendelev.mpos.storage.PosKeyValueStore
     private lateinit var webView: WebView
     private lateinit var imageStore: ProductImageStore
     private lateinit var photos: ProductPhotoManager
@@ -138,6 +139,17 @@ class MainActivity : AppCompatActivity() {
         } else {
             throw IllegalStateException("Android System WebView не поддерживает безопасный bridge")
         }
+        posStorage = com.mendelev.mpos.storage.PosKeyValueStore(applicationContext)
+        val storageToken = java.util.UUID.randomUUID().toString() + java.util.UUID.randomUUID().toString()
+        webView.addJavascriptInterface(com.mendelev.mpos.storage.PosStorageBridge(posStorage, storageToken), "MPosStorage")
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            // The bearer remains in a closure, only in our main trusted document.
+            WebViewCompat.addDocumentStartJavaScript(webView,
+                """if(window===window.top){Object.defineProperty(window,'__mposStorageCall',{value:(request)=>MPosStorage.call(${JSONObject.quote(storageToken)},request),writable:false,configurable:false});}""",
+                setOf(APP_ORIGIN))
+        } else {
+            throw IllegalStateException("Обновите Android System WebView для безопасного локального хранилища")
+        }
         webView.keepScreenOn = true
         webView.loadUrl(START_URL)
 
@@ -172,6 +184,7 @@ class MainActivity : AppCompatActivity() {
             webView.removeAllViews()
             webView.destroy()
         }
+        if (::posStorage.isInitialized) posStorage.close()
         super.onDestroy()
     }
 
