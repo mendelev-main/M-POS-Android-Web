@@ -1,6 +1,6 @@
 package com.mendelev.mpos.storage
 
-import androidx.test.core.app.ApplicationProvider
+import org.robolectric.RuntimeEnvironment
 import android.content.Context
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -12,7 +12,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28])
 class PosKeyValueStoreTest {
-    private fun context(): Context = ApplicationProvider.getApplicationContext<Context>().also { it.deleteDatabase("pos-storage.db") }
+    private fun context(): Context = RuntimeEnvironment.getApplication().also { it.deleteDatabase("pos-storage.db") }
     @Test fun importsLargeHistoryAndJournalWithoutCursorWindowLimit() {
         val context=context()
         val orders="[\""+"Тестовый чек 🧾 ".repeat(220000)+"\"]"
