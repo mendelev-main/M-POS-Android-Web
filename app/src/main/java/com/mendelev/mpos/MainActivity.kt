@@ -148,7 +148,9 @@ class MainActivity : AppCompatActivity() {
                 """if(window===window.top){Object.defineProperty(window,'__mposStorageCall',{value:(request)=>MPosStorage.call(${JSONObject.quote(storageToken)},request),writable:false,configurable:false});}""",
                 setOf(APP_ORIGIN))
         } else {
-            throw IllegalStateException("Обновите Android System WebView для безопасного локального хранилища")
+            startupView.removeCallbacks(startupTimeout)
+            startupView.text = "Обновите Android System WebView и перезапустите M POS. Исходные данные не удалены."
+            return
         }
         webView.keepScreenOn = true
         webView.loadUrl(START_URL)

@@ -6,7 +6,9 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 /** Persistence only. JSON and transaction recovery remain owned by the POS JavaScript. */
-class PosKeyValueStore(context: Context) : SQLiteOpenHelper(context, "pos-storage.db", null, 1) {
+class PosKeyValueStore(context: Context) : SQLiteOpenHelper(context, "pos-storage.db", null, 1,
+    android.database.DatabaseErrorHandler { throw android.database.sqlite.SQLiteDatabaseCorruptException("POS database unreadable; original file preserved") }
+) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE chunks (name TEXT NOT NULL, part INTEGER NOT NULL, value TEXT NOT NULL, PRIMARY KEY(name,part))")
         db.execSQL("CREATE TABLE metadata (name TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)")

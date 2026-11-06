@@ -159,3 +159,5 @@
 - Статический preflight до/после passed. Локальные JS/JVM тесты, lint/сборка не запускались. Actions и физическая проверка на исходном устройстве пока ожидаются. Нельзя откатываться на старый APK с устаревшей WebView-копией; текущая резервная копия экспортируется штатно после обновления.
 
 - Первый CI 42287001856: JS функциональные проверки прошли, отдельный parity-check требует учесть два новых платформенных script tag. Компиляция JVM-тестов потребовала RuntimeEnvironment вместо не подключённого ApplicationProvider; production Kotlin компилируется. Исправлено без ослабления source-hash проверки.
+
+- Второй CI 42287453886: весь JS passed. Robolectric API 28 выявил cast SQLiteOpenHelper→AutoCloseable в тестовом Kotlin use (compileSdk 35 предоставляет этот интерфейс, API 28 ещё нет). Тесты переведены на явный try/finally close; production использует close напрямую. Дополнительно установлен недеструктивный corruption handler и понятный startup экран вместо crash на неподдерживаемом WebView.
