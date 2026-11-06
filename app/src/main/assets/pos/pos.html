@@ -110,6 +110,8 @@
   .main{flex:1;min-height:0;min-width:0;overflow:hidden;}
   .screen{display:none;height:100%;width:100%;min-width:0;max-width:100%;}
   .screen.active{display:flex;}
+  .storage-diagnostics-list{max-height:32vh;overflow:auto;}
+  .storage-warning-action{width:auto;min-height:36px;padding:6px 12px;margin-left:8px;}
   .flash-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);max-width:calc(100vw - 32px);background:var(--navy);color:#fff;padding:12px 20px;border-radius:100px;font-weight:600;font-size:14px;line-height:1.35;text-align:center;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.25);pointer-events:none;}
   .clipboard-copy-buffer{position:fixed;opacity:0;pointer-events:none;}
 
@@ -1428,7 +1430,7 @@ function storageDiagnosticData(){
 function openStorageDiagnostics(){
  const d=storageDiagnosticData(),size=n=>(n/1024/1024).toFixed(2)+' МиБ символов';
  const reason=d.failure?`${storageFailureHint()} · ${d.failure.name}`:'Ошибка ещё не зарегистрирована';
- showModal(`<div class="modal-title">Диагностика хранилища</div><p>${escapeHtml(reason)}</p><div class="setting-sub">Раздел: ${escapeHtml(d.failure?.key||'—')} · Операция: ${escapeHtml(d.failure?.operation||'—')}</div><p>Объём сохранённых строк: ${size(d.characters)}. Это размер строк, а не свободная память планшета.</p><div class="setting-sub">Незавершённая запись: ${d.journalPending?'да':'нет'}${d.readError?' · часть разделов недоступна для чтения':''}</div><div style="max-height:32vh;overflow:auto">${d.sizes.slice(0,12).map(x=>`<div class="list-row"><span>${escapeHtml(x.key)}</span><span>${size(x.characters)}</span></div>`).join('')}</div><p class="setting-sub">Здесь только код ошибки и размеры разделов. Содержимое чеков, пароли и контакты не показаны. Не очищайте данные приложения.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Закрыть</button></div>`,true);
+ showModal(`<div class="modal-title">Диагностика хранилища</div><p>${escapeHtml(reason)}</p><div class="setting-sub">Раздел: ${escapeHtml(d.failure?.key||'—')} · Операция: ${escapeHtml(d.failure?.operation||'—')}</div><p>Объём сохранённых строк: ${size(d.characters)}. Это размер строк, а не свободная память планшета.</p><div class="setting-sub">Незавершённая запись: ${d.journalPending?'да':'нет'}${d.readError?' · часть разделов недоступна для чтения':''}</div><div class="storage-diagnostics-list">${d.sizes.slice(0,12).map(x=>`<div class="list-row"><span>${escapeHtml(x.key)}</span><span>${size(x.characters)}</span></div>`).join('')}</div><p class="setting-sub">Здесь только код ошибки и размеры разделов. Содержимое чеков, пароли и контакты не показаны. Не очищайте данные приложения.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Закрыть</button></div>`,true);
 }
 
 // Проверяем прямо при загрузке, реально ли доступен localStorage
@@ -1953,7 +1955,7 @@ function render(){
   if(window._posFolderModal)renderPosFolderModal();
 }
 function renderStorageWarning(){
-  return `<div id="storage-warning" class="storage-warning" role="alert">${escapeHtml(storageFailureHint())}. Операции с записью временно заблокированы. <button class="btn btn-secondary" style="width:auto;min-height:36px;padding:6px 12px;margin-left:8px" onclick="openStorageDiagnostics()">Диагностика хранилища</button></div>`;
+  return `<div id="storage-warning" class="storage-warning" role="alert">${escapeHtml(storageFailureHint())}. Операции с записью временно заблокированы. <button class="btn btn-secondary storage-warning-action" onclick="openStorageDiagnostics()">Диагностика хранилища</button></div>`;
 }
 
 function renderAdministrationIndicator(){
