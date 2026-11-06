@@ -10,7 +10,7 @@
   function assertWritable(restore=false,financial=false,backupOwner=false){
     if(committing||recovering||(importing&&!backupOwner)||(!financial&&criticalOperationBusy))throw blocked('Выполняется сохранение другой операции. Дождитесь завершения и повторите действие');
     if(criticalStorageRecoveryPending)throw blocked('Незавершённая операция хранения. Перезапустите M POS для восстановления данных');
-    if(storageBroken&&!restore)throw blocked(storageFailureHint()+'. Откройте «Диагностика хранилища» в красной панели');
+    if(storageBroken&&!restore)throw blocked('Хранилище: '+storageFailureHint()+'. Откройте «Диагностика хранилища» в красной панели');
   }
   const markBroken=global.markStorageBroken;
   global.markStorageBroken=function(reason,key,operation){if(!reason?.mposWriteBlocked)markBroken(reason,key,operation)};
