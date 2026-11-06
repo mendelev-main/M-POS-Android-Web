@@ -1392,15 +1392,43 @@ const fmtDate = (ts) => new Date(ts).toLocaleString('ru-RU',{day:'2-digit',month
 const hasCloudStorage = (typeof window.storage !== 'undefined');
 const LS_PREFIX = 'prilavok_';
 let storageBroken = false;
+let storageFailureDetails = null;
 let storageCheckedOnce = false;
 const CRITICAL_STORAGE_JOURNAL_KEY = 'criticalStorageJournal';
 const CRITICAL_STORAGE_KEYS = new Set(['products','orders','shifts','employees','parked','purchaseOrders','receivings','receivingDraft','suppliers','discounts','layout','posNavigation','company','deliveryRates','receiptLabelTemplates','hallTables','bookings','inventoryConfig','inventoryHistory','inventoryDraft','currentOrderSession','printer','theme','telegram','network','demandOverload','operationalOutbox','operationalRevision','webEvents','webOrderAcceptances','privacyRules']);
 let criticalStorageRecoveryPending = false;
 let criticalOperationBusy = false;
 
-function markStorageBroken(reason){
-  storageBroken = true;
-  console.error('Хранилище недоступно:', reason);
+function storageFailureHint(){
+ const name=storageFailureDetails?.name;
+ if(name==='QuotaExceededError')return 'Достигнут лимит хранилища приложения';
+ if(name==='SecurityError')return 'Доступ к хранилищу приложения запрещён';
+ if(name==='SyntaxError')return 'Не удалось прочитать сохранённые данные';
+ return 'Не удалось записать или прочитать данные приложения';
+}
+function markStorageBroken(reason,key='',operation=''){
+ storageBroken=true;
+ if(!storageFailureDetails){
+  const names=['QuotaExceededError','SecurityError','SyntaxError','TypeError','InvalidStateError','UnknownError','Error'];
+  const name=names.includes(reason?.name)?reason.name:'Error';
+  const candidate=String(reason?.mposStorageKey||key||'');
+  storageFailureDetails={name,key:CRITICAL_STORAGE_KEYS.has(candidate)||candidate===CRITICAL_STORAGE_JOURNAL_KEY||candidate==='__test__'?candidate:'не определён',operation:['read','write'].includes(reason?.mposStorageOperation||operation)?(reason?.mposStorageOperation||operation):'не определена'};
+ }
+ console.error('Хранилище недоступно:',reason);
+ try{if(!document.getElementById('storage-warning'))document.getElementById('app')?.insertAdjacentHTML?.('afterbegin',renderStorageWarning());}catch(e){}
+}
+function storageDiagnosticData(){
+ const sizes=[];let characters=0,readError=false;
+ for(const key of [...CRITICAL_STORAGE_KEYS,CRITICAL_STORAGE_JOURNAL_KEY]){
+  try{const raw=localStorage.getItem(LS_PREFIX+key);if(raw!==null){sizes.push({key,characters:raw.length});characters+=raw.length;}}catch(e){readError=true;}
+ }
+ sizes.sort((a,b)=>b.characters-a.characters);
+ return {failure:storageFailureDetails?{...storageFailureDetails}:null,characters,readError,journalPending:criticalStorageRecoveryPending,sizes};
+}
+function openStorageDiagnostics(){
+ const d=storageDiagnosticData(),size=n=>(n/1024/1024).toFixed(2)+' МиБ символов';
+ const reason=d.failure?`${storageFailureHint()} · ${d.failure.name}`:'Ошибка ещё не зарегистрирована';
+ showModal(`<div class="modal-title">Диагностика хранилища</div><p>${escapeHtml(reason)}</p><div class="setting-sub">Раздел: ${escapeHtml(d.failure?.key||'—')} · Операция: ${escapeHtml(d.failure?.operation||'—')}</div><p>Объём сохранённых строк: ${size(d.characters)}. Это размер строк, а не свободная память планшета.</p><div class="setting-sub">Незавершённая запись: ${d.journalPending?'да':'нет'}${d.readError?' · часть разделов недоступна для чтения':''}</div><div style="max-height:32vh;overflow:auto">${d.sizes.slice(0,12).map(x=>`<div class="list-row"><span>${escapeHtml(x.key)}</span><span>${size(x.characters)}</span></div>`).join('')}</div><p class="setting-sub">Здесь только код ошибки и размеры разделов. Содержимое чеков, пароли и контакты не показаны. Не очищайте данные приложения.</p><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Закрыть</button></div>`,true);
 }
 
 // Проверяем прямо при загрузке, реально ли доступен localStorage
@@ -1413,7 +1441,7 @@ function testLocalStorage(){
     const ok = localStorage.getItem(testKey) === '1';
     localStorage.removeItem(testKey);
     return ok;
-  }catch(e){ return false; }
+  }catch(e){markStorageBroken(e,'__test__','write');return false;}
 }
 
 // Compatibility facade: keep callers, fallbacks and the storage warning unchanged.
@@ -1925,9 +1953,7 @@ function render(){
   if(window._posFolderModal)renderPosFolderModal();
 }
 function renderStorageWarning(){
-  return `<div class="storage-warning">
-    Не удалось сохранить данные в этом браузере — после обновления страницы всё сбросится. Обычно это означает, что страница открыта через встроенный предпросмотр хостинга. Откройте прямую опубликованную ссылку в отдельной вкладке Safari.
-  </div>`;
+  return `<div id="storage-warning" class="storage-warning" role="alert">${escapeHtml(storageFailureHint())}. Операции с записью временно заблокированы. <button class="btn btn-secondary" style="width:auto;min-height:36px;padding:6px 12px;margin-left:8px" onclick="openStorageDiagnostics()">Диагностика хранилища</button></div>`;
 }
 
 function renderAdministrationIndicator(){

@@ -32,7 +32,7 @@
       return raw !== null ? JSON.parse(raw) : fallback;
     } catch (error) {
       // Let the POS facade preserve its existing storage warning.
-      if (onError) onError(error);
+      if (onError) onError(error, key, 'read');
       else console.error('[PrilavokStorage] read failed', key, error);
       return fallback;
     }

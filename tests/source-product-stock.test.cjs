@@ -2916,3 +2916,28 @@ test('Android failed cart persistence suppresses negative stock banner',()=>{
  f.c.localStorage.setItem=()=>{throw Error('fixture disk failure')};f.c.addConfiguredCartItem(f.c.getProduct('pizza'),[]);
  assert.equal(f.state.cart.length,0);assert.equal(f.messages.some(m=>m.includes('отрицательный остаток')),false);
 });
+
+test('storage diagnostics expose failure category and sizes without stored content or writes',()=>{
+ const f=fixture();f.data.set('prilavok_orders',JSON.stringify([{privateCustomer:'DO-NOT-DISPLAY',token:'SECRET-VALUE'}]));f.data.set('prilavok_network','SECRET-NETWORK');
+ const error=new Error('SENSITIVE-ERROR-CONTENT');error.name='QuotaExceededError';f.c.markStorageBroken(error,'orders','write');
+ const before=[...f.data],d=f.c.storageDiagnosticData();assert.equal(d.failure.name,'QuotaExceededError');assert.equal(d.failure.key,'orders');assert.equal(d.failure.operation,'write');
+ assert.equal(d.characters,[...f.data.values()].reduce((n,v)=>n+v.length,0));assert.doesNotMatch(JSON.stringify(d),/DO-NOT-DISPLAY|SECRET|SENSITIVE/);
+ assert.deepEqual([...f.data],before);assert.equal(f.writes.length,0);
+ let markup='';f.c.showModal=html=>{markup=html};f.c.openStorageDiagnostics();assert.match(markup,/QuotaExceededError/);assert.doesNotMatch(markup,/DO-NOT-DISPLAY|SECRET|SENSITIVE/);
+ f.c.markStorageBroken(new Error('later failure'));assert.equal(f.c.storageDiagnosticData().failure.name,'QuotaExceededError');
+});
+test('storage read failure retains the affected key without disclosing invalid JSON',async()=>{
+ const f=fixture();f.data.set('prilavok_orders','secret invalid JSON');assert.deepEqual(plain(await f.c.loadKey('orders',[])),[]);
+ const d=f.c.storageDiagnosticData();assert.equal(d.failure.name,'SyntaxError');assert.equal(d.failure.key,'orders');assert.equal(d.failure.operation,'read');assert.doesNotMatch(JSON.stringify(d),/secret invalid/);
+});
+
+test('Android payment quota failure reports exact write boundary and still preserves financial state',async()=>{
+ const f=fixture();installRuntimeSafety(f);f.state.loaded=true;f.cart();
+ f.data.set('prilavok_orders',JSON.stringify([{id:'old',comment:'DO-NOT-DISPLAY'}]));
+ const before=JSON.stringify({orders:f.state.orders,products:f.state.products,cart:f.state.cart});
+ f.c.localStorage.setItem=()=>{const e=new Error('private original payload');e.name='QuotaExceededError';throw e};
+ await f.c.finalizePayment([{method:'cash',amount:10}]);
+ assert.equal(JSON.stringify({orders:f.state.orders,products:f.state.products,cart:f.state.cart}),before);
+ const d=f.c.storageDiagnosticData();assert.equal(d.failure.name,'QuotaExceededError');assert.equal(d.failure.key,'criticalStorageJournal');assert.equal(d.failure.operation,'write');assert.doesNotMatch(JSON.stringify(d),/DO-NOT-DISPLAY|private original/);
+ f.c.addConfiguredCartItem(f.c.getProduct('pizza'),[]);assert.match(f.messages.at(-1),/Достигнут лимит/);assert.equal(f.c.storageDiagnosticData().failure.name,'QuotaExceededError');
+});

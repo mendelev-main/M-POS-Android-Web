@@ -10,13 +10,18 @@
   function assertWritable(restore=false,financial=false,backupOwner=false){
     if(committing||recovering||(importing&&!backupOwner)||(!financial&&criticalOperationBusy))throw blocked('Выполняется сохранение другой операции. Дождитесь завершения и повторите действие');
     if(criticalStorageRecoveryPending)throw blocked('Незавершённая операция хранения. Перезапустите M POS для восстановления данных');
-    if(storageBroken&&!restore)throw blocked('Хранилище недоступно или повреждено. Перезапустите приложение или восстановите проверенную копию');
+    if(storageBroken&&!restore)throw blocked(storageFailureHint()+'. Откройте «Диагностика хранилища» в красной панели');
   }
   const markBroken=global.markStorageBroken;
-  global.markStorageBroken=function(reason){if(!reason?.mposWriteBlocked)markBroken(reason)};
+  global.markStorageBroken=function(reason,key,operation){if(!reason?.mposWriteBlocked)markBroken(reason,key,operation)};
   function rawWrite(key,value){
-    const serialized=JSON.stringify(value);if(serialized===undefined)throw new Error('Некорректное значение хранилища');
-    global.localStorage.setItem(LS_PREFIX+key,serialized);
+    try{
+      const serialized=JSON.stringify(value);if(serialized===undefined)throw new Error('Некорректное значение хранилища');
+      global.localStorage.setItem(LS_PREFIX+key,serialized);
+    }catch(error){
+      const failure=new Error('Ошибка записи локальных данных ('+String(error?.name||'Error')+')');
+      failure.name=error?.name||'Error';failure.mposStorageKey=key;failure.mposStorageOperation='write';throw failure;
+    }
   }
   function journalWrite(type,writes,restore=false){
     assertWritable(restore,true,type==='backup-import'&&importing);
