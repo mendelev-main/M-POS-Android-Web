@@ -68,9 +68,9 @@ object AdministrationPasswordDialog {
         dialog.setOnShowListener {
             fun submit(){
                 if(finished)return
-                val candidate=field.text.toString()
-                if(!verifier(candidate)){field.text.clear();field.error="Неверный пароль";return}
-                finished=true;field.text.clear();dialog.dismiss();onResult(candidate)
+                val candidate=field.text?.toString().orEmpty()
+                if(!verifier(candidate)){field.text?.clear();field.error="Неверный пароль";return}
+                finished=true;field.text?.clear();dialog.dismiss();onResult(candidate)
             }
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { submit() }
             field.setOnEditorActionListener { _,action,event ->
@@ -78,7 +78,7 @@ object AdministrationPasswordDialog {
             }
             field.requestFocus()
         }
-        dialog.setOnDismissListener { field.text.clear();if(!finished){finished=true;onResult(null)} }
+        dialog.setOnDismissListener { field.text?.clear();if(!finished){finished=true;onResult(null)} }
         return dialog
     }
 }
