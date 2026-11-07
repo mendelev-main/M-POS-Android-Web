@@ -8,6 +8,7 @@
   global.webkit=global.webkit||{};
   global.webkit.messageHandlers=Object.freeze({
     startup:handler('startup'),
+    administration:handler('administration'),
     printer:handler('printer'),
     telegram:handler('telegram'),
     photoPicker:handler('photoPicker'),

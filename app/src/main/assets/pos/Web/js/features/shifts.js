@@ -7,9 +7,9 @@ const administrationSession=(()=>{
  let password=null;
  return {
    active:()=>password!==null,
-   start(value){if(value!=='Rom23061998')return false;password=value;return true;},
+   start(value){if(typeof window.__mposVerifyAdministrationPassword==='function'){if(window.__mposVerifyAdministrationPassword(value)!==true)return false;}else if(window.__MPOS_PLATFORM__==='android'){return false;}else{if(value!=='Rom23061998')return false;}password=value;return true;},
    close(){password=null;},
-   credentials(){const employee=state.employees.find(e=>e.role==='admin');return password===null?null:{password,employeeId:employee?.id||'',employeeName:employee?.name||'Администратор'};}
+   credentials(){const employee=state.employees.find(e=>e.role==='admin');return password===null?null:{password,adminCredentialVersion:typeof window.__mposVerifyAdministrationPassword==='function'?'android-admin-2026-11':undefined,employeeId:employee?.id||'',employeeName:employee?.name||'Администратор'};}
  };
 })();
 function adminSessionIsActive(){return administrationSession.active();}

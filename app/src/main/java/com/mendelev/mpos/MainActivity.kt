@@ -37,6 +37,8 @@ class MainActivity : AppCompatActivity() {
         private const val START_URL = "$APP_ORIGIN/assets/pos/pos.html"
     }
 
+    private var administrationDialog: android.app.AlertDialog? = null
+    private val administrationVerifier = com.mendelev.mpos.administration.AdministrationPasswordVerifier()
     private lateinit var posStorage: com.mendelev.mpos.storage.PosKeyValueStore
     private lateinit var webView: WebView
     private lateinit var imageStore: ProductImageStore
@@ -142,10 +144,11 @@ class MainActivity : AppCompatActivity() {
         posStorage = com.mendelev.mpos.storage.PosKeyValueStore(applicationContext)
         val storageToken = java.util.UUID.randomUUID().toString() + java.util.UUID.randomUUID().toString()
         webView.addJavascriptInterface(com.mendelev.mpos.storage.PosStorageBridge(posStorage, storageToken), "MPosStorage")
+        webView.addJavascriptInterface(com.mendelev.mpos.administration.AdministrationPasswordBridge(administrationVerifier,storageToken), "MPosAdministration")
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             // The bearer remains in a closure, only in our main trusted document.
             WebViewCompat.addDocumentStartJavaScript(webView,
-                """if(window===window.top){Object.defineProperty(window,'__mposStorageCall',{value:(request)=>MPosStorage.call(${JSONObject.quote(storageToken)},request),writable:false,configurable:false});}""",
+                """if(window===window.top){Object.defineProperty(window,'__mposStorageCall',{value:(request)=>MPosStorage.call(${JSONObject.quote(storageToken)},request),writable:false,configurable:false});Object.defineProperty(window,'__mposVerifyAdministrationPassword',{value:(value)=>MPosAdministration.verify(${JSONObject.quote(storageToken)},value),writable:false,configurable:false});}""",
                 setOf(APP_ORIGIN))
         } else {
             startupView.removeCallbacks(startupTimeout)
@@ -176,6 +179,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        administrationDialog?.dismiss()
         if (::startupView.isInitialized) startupView.removeCallbacks(startupTimeout)
         if (::printer.isInitialized) printer.close()
         if (::network.isInitialized) network.close()
@@ -210,6 +214,14 @@ class MainActivity : AppCompatActivity() {
                 webView.reload()
             }
         }
+    }
+
+    fun requestAdministrationPassword(requestId:String) = runOnUiThread {
+        if(!requestId.matches(Regex("[A-Za-z0-9_-]{1,100}"))||administrationDialog?.isShowing==true)return@runOnUiThread
+        administrationDialog=com.mendelev.mpos.administration.AdministrationPasswordDialog.create(this,administrationVerifier::matches) { value ->
+            administrationDialog=null
+            callJavaScript("window.__mposAdministrationPasswordResult&&window.__mposAdministrationPasswordResult(${JSONObject.quote(requestId)},${if(value==null) "null" else JSONObject.quote(value)});")
+        }.also { it.show() }
     }
 
     fun pickProductPhoto() = runOnUiThread {

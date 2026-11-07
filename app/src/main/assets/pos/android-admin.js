@@ -1,6 +1,21 @@
 /* Android settings presentation; upstream actions and session checks remain authoritative. */
 (function(global){
   'use strict';
+  let pendingAdministration=null;
+  global.openAdministrationSession=function(){
+    if(adminSessionIsActive()||pendingAdministration)return;
+    const requestId=uid();pendingAdministration=requestId;
+    const handler=global.webkit?.messageHandlers?.administration;
+    if(!handler?.postMessage||handler.postMessage({action:'requestPassword',requestId})===false){pendingAdministration=null;flash('Не удалось открыть ввод пароля');}
+  };
+  global.__mposAdministrationPasswordResult=function(requestId,value){
+    if(!pendingAdministration||requestId!==pendingAdministration)return;
+    pendingAdministration=null;
+    if(value===null||adminSessionIsActive())return;
+    if(!administrationSession.start(String(value))){flash('Неверный пароль');return;}
+    closeModal();state.settingsAdminPanel=false;state.tab='settings';render();flash('Администрирование активно');
+  };
+
   const icons={
     loyalty:'<path d="M20 8v12H4V8M2 8h20M12 8v12M12 8H7a3 3 0 1 1 3-3l2 3Zm0 0h5a3 3 0 1 0-3-3l-2 3Z"/>',
     network:'<rect x="8" y="2" width="8" height="6" rx="1"/><rect x="2" y="16" width="8" height="6" rx="1"/><rect x="14" y="16" width="8" height="6" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/>',

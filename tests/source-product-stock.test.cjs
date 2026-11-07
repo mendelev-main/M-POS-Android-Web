@@ -2966,3 +2966,22 @@ test('interrupted native payment recovers journal on restart without importing s
  const restarted=fixture();restarted.data.set('prilavok_orders','[]');installDurableStorage(restarted,durable.native,durable.control);await restarted.c.loadAll();
  assert.equal(restarted.state.orders.length,2);near(restarted.c.getProduct('flour').stock,9.8);assert.equal(durable.native.get('prilavok_criticalStorageJournal'),'null');
 });
+
+test('Android administration requires protected native verification and ignores legacy password fallback',()=>{
+ const f=fixture(false);f.c.__MPOS_PLATFORM__='android';f.fields['administration-password']={value:'test-administration'};
+ assert.equal(f.c.confirmAdministrationSession(),false);assert.equal(f.c.adminSessionIsActive(),false);
+ f.c.__mposVerifyAdministrationPassword=value=>value==='fixture-native-password';f.c.__MPOS_PLATFORM__='not-android';
+ f.fields['administration-password'].value='test-administration';assert.equal(f.c.confirmAdministrationSession(),false);
+ f.fields['administration-password'].value='fixture-native-password';assert.equal(f.c.confirmAdministrationSession(),true);assert.equal(f.c.adminSessionIsActive(),true);assert.equal(f.writes.length,0);
+ const credentials=vm.runInContext('administrationSession.credentials()',f.c);assert.equal(credentials.adminCredentialVersion,'android-admin-2026-11');
+});
+
+test('native administration prompt correlates callbacks, supports cancel and does not write passwords into DOM or storage',()=>{
+ const f=fixture(false),requests=[];f.c.__mposVerifyAdministrationPassword=v=>v==='fixture-native-password';f.c.webkit={messageHandlers:{administration:{postMessage:p=>{requests.push(p);return true}}}};
+ vm.runInContext(fs.readFileSync(path.join(root,'app/src/main/assets/pos/android-admin.js'),'utf8'),f.c);
+ f.c.openAdministrationSession();f.c.openAdministrationSession();assert.equal(requests.length,1);assert.equal(requests[0].action,'requestPassword');
+ f.c.__mposAdministrationPasswordResult('stale','fixture-native-password');assert.equal(f.c.adminSessionIsActive(),false);
+ f.c.__mposAdministrationPasswordResult(requests[0].requestId,null);assert.equal(f.c.adminSessionIsActive(),false);
+ f.c.openAdministrationSession();assert.equal(requests.length,2);f.c.__mposAdministrationPasswordResult(requests[1].requestId,'fixture-native-password');assert.equal(f.c.adminSessionIsActive(),true);
+ assert.equal(f.fields['administration-password'],undefined);assert.equal(f.writes.length,0);assert.doesNotMatch(JSON.stringify(requests),/fixture-native-password/);
+});
