@@ -173,3 +173,5 @@
 - Добавлены JVM проверки немедленной маскировки при SHOW_PASSWORD=1, accessibility SetText/маскировки событий, InputConnection, ошибки и очищения; JS проверки native auth/no fallback/requestId/no storage; backend-проверки versioned credential. Preflight до/после sync passed. Локальные JS/JVM тесты, lint и сборка не запускались. CI/деплой и физическая проверка AnyDesk ожидаются.
 
 - Первый CI 42369525850: все JS passed; native тесты подтвердили мгновенную маску и accessibility-ввод/маскировку node/event, но ожидания callback/очистки выполнялись до queued OnShow/OnDismiss в Robolectric. Добавлен idle главного Looper; внешнему Enter назначен ACTION_DOWN с существующим guard от повтора и отдельной регрессией. Backend Tests 42369431437 и VDS deploy 42369431579 success.
+
+- Второй CI 42369769970: JS и все четыре native administration теста passed, включая InputConnection/Enter и отсутствие пароля в accessibility. Lint потребовал AppCompatEditText для custom view; базовый класс заменён, маска и доступный write-only ввод остаются под теми же регрессиями.

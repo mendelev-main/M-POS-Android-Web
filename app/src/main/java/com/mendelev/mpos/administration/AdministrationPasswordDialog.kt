@@ -10,7 +10,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.EditText
+import androidx.appcompat.widget.AppCompatEditText
 import android.widget.LinearLayout
 
 /** Never creates the temporary Visible spans used by the standard password transformation. */
@@ -23,7 +23,7 @@ class AlwaysMaskedPasswordTransformation : PasswordTransformationMethod() {
     }
 }
 /** Remote controllers may set text, but accessibility only receives masked text. */
-class AdministrationPasswordEditText(context: Context) : EditText(context) {
+class AdministrationPasswordEditText(context: Context) : AppCompatEditText(context) {
     override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
         super.onInitializeAccessibilityNodeInfo(info)
         // Expose a writable text control to remote controllers, but never its clear value.
