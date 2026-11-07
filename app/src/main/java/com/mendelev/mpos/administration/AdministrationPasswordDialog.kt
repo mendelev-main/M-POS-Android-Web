@@ -74,7 +74,7 @@ object AdministrationPasswordDialog {
             }
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { submit() }
             field.setOnEditorActionListener { _,action,event ->
-                if(action==EditorInfo.IME_ACTION_DONE||(event?.keyCode==KeyEvent.KEYCODE_ENTER&&event.action==KeyEvent.ACTION_UP)){submit();true}else false
+                if(action==EditorInfo.IME_ACTION_DONE||(event?.keyCode==KeyEvent.KEYCODE_ENTER&&event.action==KeyEvent.ACTION_DOWN)){submit();true}else false
             }
             field.requestFocus()
         }
