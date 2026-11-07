@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private val backupCreator = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
-        uri?.let { lifecycleScope.launch(Dispatchers.IO) { backup.writeExport(it) } }
+        if (uri == null) backup.cancelExport() else lifecycleScope.launch(Dispatchers.IO) { backup.writeExport(uri) }
     }
     private val backupPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { lifecycleScope.launch(Dispatchers.IO) { backup.import(it) } }

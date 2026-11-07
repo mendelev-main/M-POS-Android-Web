@@ -897,7 +897,7 @@ test('backup version 13 rejects a missing full-data section before any write',as
  await assert.rejects(f.c.applyBackupData(backup),/webOrderAcceptances/);assert.equal(f.writes.length,writesBefore);
 });
 test('native backup bridge packages product images and uses system export and import',()=>{
- assert.match(androidRouter,/"backup" -> backup\.handle/);assert.match(androidBackup,/document\.put\("productImages", productImages\)/);assert.match(androidActivity,/ActivityResultContracts\.CreateDocument/);assert.match(androidActivity,/ActivityResultContracts\.OpenDocument/);assert.match(androidBackup,/images\.prune/);assert.match(backupScript,/handleNativeBackupImport/);
+ assert.match(androidRouter,/"backup" -> backup\.handle/);assert.match(androidBackup,/FullBackupArchive\.write\(document, it, images::read\)/);assert.match(androidBackup,/FullBackupArchive\.read\(input, ::saveImage\)/);assert.match(androidActivity,/ActivityResultContracts\.CreateDocument/);assert.match(androidActivity,/ActivityResultContracts\.OpenDocument/);assert.match(androidBackup,/images\.prune/);assert.match(backupScript,/handleNativeBackupImport/);
 });
 test('printer backup adapter preserves exact legacy keys and rolls back a partial restore',()=>{
  const data=new Map([['printers','[{"id":"old"}]'],['posNotificationSettings','{"sound":"soft"}']]),errors=[],messages=[];let failNotify=false;
