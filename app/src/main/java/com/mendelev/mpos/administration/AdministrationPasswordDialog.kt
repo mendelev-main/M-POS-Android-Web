@@ -3,7 +3,12 @@ package com.mendelev.mpos.administration
 import android.app.AlertDialog
 import android.content.Context
 import android.text.InputType
-import android.text.method.PasswordTransformationMethod
+import android.text.method.TransformationMethod
+import android.graphics.Rect
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
+import android.view.WindowManager
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityEvent
@@ -13,8 +18,9 @@ import android.view.inputmethod.EditorInfo
 import androidx.appcompat.widget.AppCompatEditText
 import android.widget.LinearLayout
 
-/** Never creates the temporary Visible spans used by the standard password transformation. */
-class AlwaysMaskedPasswordTransformation : PasswordTransformationMethod() {
+/** Visual masking without the OS password classification that blanks remote capture. */
+class AlwaysMaskedPasswordTransformation : TransformationMethod {
+    override fun onFocusChanged(view:View,sourceText:CharSequence,focused:Boolean,direction:Int,previouslyFocusedRect:Rect?) {}
     override fun getTransformation(source: CharSequence, view: View): CharSequence = object : CharSequence {
         override val length: Int get()=source.length
         override fun get(index: Int): Char { require(index in 0 until length);return '\u2022' }
@@ -24,13 +30,32 @@ class AlwaysMaskedPasswordTransformation : PasswordTransformationMethod() {
 }
 /** Remote controllers may set text, but accessibility only receives masked text. */
 class AdministrationPasswordEditText(context: Context) : AppCompatEditText(context) {
+    private val allowedMenuIds=setOf(android.R.id.paste,android.R.id.pasteAsPlainText,android.R.id.selectAll)
+    init {
+        val maskedMenu=object:ActionMode.Callback {
+            private fun filter(menu:Menu){ for(index in menu.size()-1 downTo 0){ val id=menu.getItem(index).itemId;if(id !in allowedMenuIds)menu.removeItem(id) } }
+            override fun onCreateActionMode(mode:ActionMode,menu:Menu):Boolean { filter(menu);return true }
+            override fun onPrepareActionMode(mode:ActionMode,menu:Menu):Boolean { filter(menu);return true }
+            override fun onActionItemClicked(mode:ActionMode,item:MenuItem):Boolean = item.itemId !in allowedMenuIds
+            override fun onDestroyActionMode(mode:ActionMode) {}
+        }
+        customSelectionActionModeCallback=maskedMenu
+        customInsertionActionModeCallback=maskedMenu
+    }
+    override fun onTextContextMenuItem(id:Int):Boolean {
+        if(id==android.R.id.copy||id==android.R.id.cut||id==android.R.id.shareText)return false
+        return super.onTextContextMenuItem(id)
+    }
+
     override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
         super.onInitializeAccessibilityNodeInfo(info)
         // Expose a writable text control to remote controllers, but never its clear value.
-        // The real inputType remains PASSWORD for the system IME.
+        // Capture stays permitted; the rendered and accessibility values are always masked.
         info.isPassword=false;info.inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         info.text="\u2022".repeat(text?.length?:0)
         info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_TEXT)
+        info.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_COPY)
+        info.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_CUT)
     }
     private fun maskEvent(event: AccessibilityEvent) {
         event.isPassword=false
@@ -41,6 +66,7 @@ class AdministrationPasswordEditText(context: Context) : AppCompatEditText(conte
     override fun onPopulateAccessibilityEvent(event: AccessibilityEvent) { super.onPopulateAccessibilityEvent(event);maskEvent(event) }
     override fun sendAccessibilityEventUnchecked(event: AccessibilityEvent) { maskEvent(event);super.sendAccessibilityEventUnchecked(event) }
     override fun performAccessibilityAction(action: Int,args: Bundle?): Boolean {
+        if(action==AccessibilityNodeInfo.ACTION_COPY||action==AccessibilityNodeInfo.ACTION_CUT)return false
         if(action==AccessibilityNodeInfo.ACTION_SET_TEXT&&isEnabled){
             val value=args?.getCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE)?:return false
             setText(value);setSelection(text?.length?:0);return true
@@ -55,7 +81,8 @@ object AdministrationPasswordDialog {
             filters=arrayOf(android.text.InputFilter.LengthFilter(256))
             id=android.R.id.edit
             hint="Пароль администратора"
-            inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setEmojiCompatEnabled(false)
+            inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             isSingleLine=true
             transformationMethod=AlwaysMaskedPasswordTransformation()
             imeOptions=EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
@@ -66,6 +93,8 @@ object AdministrationPasswordDialog {
         val dialog=AlertDialog.Builder(context).setTitle("Администрирование").setView(container)
             .setNegativeButton("Отмена",null).setPositiveButton("Войти",null).create()
         dialog.setOnShowListener {
+            // The administrator explicitly permits this window to be visible remotely.
+            dialog.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             fun submit(){
                 if(finished)return
                 val candidate=field.text?.toString().orEmpty()

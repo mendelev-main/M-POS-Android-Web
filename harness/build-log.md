@@ -177,3 +177,11 @@
 - Второй CI 42369769970: JS и все четыре native administration теста passed, включая InputConnection/Enter и отсутствие пароля в accessibility. Lint потребовал AppCompatEditText для custom view; базовый класс заменён, маска и доступный write-only ввод остаются под теми же регрессиями.
 
 - После перехода на AppCompatEditText компилятор 42369992511 потребовал nullable-safe доступ к Editable. Исправлено через ?.clear()/orEmpty(); поведение входа и маски не меняется.
+
+
+## 2026-11-07 — видимое окно администрирования через AnyDesk
+
+- Пользователь подтвердил: окно должно быть видно локально и удалённо, символы всегда скрыты. В 1.0.134-1 native поле сохраняло TYPE_TEXT_VARIATION_PASSWORD и наследовало PasswordTransformationMethod, что оставляло системную password-классификацию несмотря на маскированный accessibility. Реальный AnyDesk показал чёрный экран.
+- Теперь обычный text/no-suggestions input и собственный TransformationMethod без PasswordTransformationMethod. Отображение по-прежнему только точки, SHOW_PASSWORD не используется. Только у данного диалога на показе снимается FLAG_SECURE, согласно явному согласию пользователя; других окон и настроек захвата изменение не касается. Автозаполнение/обучение остаются выключенными.
+- Сохранены write-only accessibility, InputConnection, Enter и действующий пароль/verifier/backend. Чтобы обычный тип текста не позволял случайно раскрыть значение через copy/cut/share/process-text, меню оставляет только вставку/выделение; copy/cut/share и accessibility copy/cut блокируются.
+- Добавлена native регрессия отсутствия password-классификации и secure-window флага при сохранении точек и запрете копирования. Предыдущие четыре теста маски/удалённого ввода остаются. Preflight до правки passed, общий runtime не менялся. Локальные тесты и сборка не запускались. CI и реальная повторная проверка AnyDesk на планшете ожидаются.

@@ -5,6 +5,9 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Looper
 import android.view.KeyEvent
+import android.view.WindowManager
+import android.text.InputType
+import android.text.method.PasswordTransformationMethod
 import org.robolectric.Shadows.shadowOf
 import android.provider.Settings
 import android.view.accessibility.AccessibilityNodeInfo
@@ -66,6 +69,21 @@ class AdministrationPasswordTest {
         val field=dialog.findViewById<EditText>(android.R.id.edit);field.setText(fixture)
         field.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER));field.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER));idle()
         assertEquals(listOf(fixture),results);assertEquals("",field.text.toString())
+    }
+
+    @Test fun remoteWindowHasNoSystemPasswordClassificationAndCopyCannotRevealText() {
+        val activity=Robolectric.buildActivity(Activity::class.java).setup().get()
+        val dialog=AdministrationPasswordDialog.create(activity,{false},{})
+        dialog.window!!.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        dialog.show();idle()
+        val field=dialog.findViewById<EditText>(android.R.id.edit);field.setText(fixture)
+        assertEquals(0,dialog.window!!.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE)
+        assertEquals(InputType.TYPE_TEXT_VARIATION_NORMAL,field.inputType and InputType.TYPE_MASK_VARIATION)
+        assertFalse(field.transformationMethod is PasswordTransformationMethod)
+        assertEquals("•".repeat(fixture.length),field.transformationMethod.getTransformation(field.text,field).toString())
+        assertFalse(field.onTextContextMenuItem(android.R.id.copy));assertFalse(field.onTextContextMenuItem(android.R.id.cut));assertFalse(field.onTextContextMenuItem(android.R.id.shareText))
+        assertFalse(field.performAccessibilityAction(AccessibilityNodeInfo.ACTION_COPY,null));assertFalse(field.performAccessibilityAction(AccessibilityNodeInfo.ACTION_CUT,null))
+        assertEquals(fixture,field.text.toString());dialog.dismiss();idle()
     }
 
 }
