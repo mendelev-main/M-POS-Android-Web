@@ -69,7 +69,17 @@ class AdministrationPasswordEditText(context: Context) : AppCompatEditText(conte
         if(action==AccessibilityNodeInfo.ACTION_COPY||action==AccessibilityNodeInfo.ACTION_CUT)return false
         if(action==AccessibilityNodeInfo.ACTION_SET_TEXT&&isEnabled){
             val value=args?.getCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE)?:return false
-            setText(value);setSelection(text?.length?:0);return true
+            // Controllers may append a character to the masked accessibility value.
+            // Restore masked edges from our private buffer, never from clear accessibility.
+            val incoming=value.toString()
+            val previous=text?.toString().orEmpty()
+            val prefix=incoming.takeWhile { it=='\u2022' }.length
+            val suffix=if(prefix==incoming.length)0 else incoming.takeLastWhile { it=='\u2022' }.length
+            if(prefix+suffix>previous.length)return false
+            val middle=incoming.substring(prefix,incoming.length-suffix)
+            if('\u2022' in middle)return false
+            val restored=previous.take(prefix)+middle+(if(suffix>0)previous.takeLast(suffix)else "")
+            setText(restored);setSelection(text?.length?:0);return true
         }
         return super.performAccessibilityAction(action,args)
     }

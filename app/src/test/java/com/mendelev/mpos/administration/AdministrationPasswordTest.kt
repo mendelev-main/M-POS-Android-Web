@@ -86,4 +86,28 @@ class AdministrationPasswordTest {
         assertEquals(fixture,field.text.toString());dialog.dismiss();idle()
     }
 
+    @Test fun remoteControllerCanRoundTripMaskedValueWhileTypingAndDeleting() {
+        val activity=Robolectric.buildActivity(Activity::class.java).setup().get()
+        val results=mutableListOf<String?>()
+        val dialog=AdministrationPasswordDialog.create(activity,verifier()::matches,{results.add(it)})
+        dialog.show();idle()
+        val field=dialog.findViewById<EditText>(android.R.id.edit)
+        fun remote(value:String):Boolean=field.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SET_TEXT,Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,value)
+        })
+        for(ch in fixture){assertTrue(remote(field.createAccessibilityNodeInfo().text.toString()+ch))}
+        assertEquals(fixture,field.text.toString())
+        assertTrue(remote("•".repeat(fixture.length-1)))
+        assertEquals(fixture.dropLast(1),field.text.toString())
+        assertTrue(remote(field.createAccessibilityNodeInfo().text.toString()+fixture.last()))
+        assertEquals(fixture,field.text.toString())
+        assertTrue(remote("••X"+"•".repeat(fixture.length-3)))
+        assertEquals(fixture.take(2)+"X"+fixture.drop(3),field.text.toString())
+        assertFalse(remote("•".repeat(fixture.length+1)))
+        assertTrue(remote(""));assertEquals("",field.text.toString())
+        assertTrue(remote(fixture))
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();idle()
+        assertEquals(listOf(fixture),results);assertEquals("",field.text.toString())
+    }
+
 }
